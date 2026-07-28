@@ -254,8 +254,21 @@ input:focus, select:focus {
   max-height: 132px; overflow-y: auto;
 }
 
-.pcard { border-top: 2px solid var(--ink); padding-top: 18px; margin-bottom: 22px; }
-.pcard-label { margin-bottom: 14px; }
+/*
+ * Kartu pemenang: satu-satunya yang diangkat penuh. Tingkatan dibuat lewat
+ * ketinggian, bukan lewat warna mencolok — sisa halaman sengaja lebih rata
+ * supaya yang ini terbaca lebih dulu.
+ */
+.pcard {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-top: 3px solid var(--primary);
+  border-radius: 14px;
+  padding: 24px 28px 20px;
+  margin-bottom: 20px;
+  box-shadow: var(--shadow-lg);
+}
+.pcard-label { margin-bottom: 12px; }
 .pcard-row { display: flex; align-items: baseline; gap: 18px; flex-wrap: wrap; }
 .pcard-who {
   font-family: var(--display); font-size: 30px; font-weight: 800; letter-spacing: -.025em;
@@ -296,18 +309,20 @@ input:focus, select:focus {
 
 .pcard-meta {
   display: flex; gap: 20px; flex-wrap: wrap;
-  padding: 14px 0; font-size: 13px; color: var(--muted);
+  padding: 14px 0 16px; margin-top: 4px;
+  border-top: 1px solid var(--line);
+  font-size: 13px; color: var(--muted);
 }
 .pcard-meta b { color: var(--ink); font-weight: 600; font-family: var(--mono); }
 .pcard-act { display: flex; gap: 9px; flex-wrap: wrap; }
 
 /* ============================================================ kendali */
 
-/* Tanpa garis atas-bawah: satu pita melintang lebih sedikit di layar. */
+/* Kartu datar — mengelompokkan kendali tanpa bersaing dengan kartu pemenang. */
 .knobs {
   display: flex; gap: 14px 30px; flex-wrap: wrap;
-  padding: 0 0 20px; margin-bottom: 20px;
-  border-bottom: 1px solid var(--line);
+  background: var(--surface-2); border: 1px solid var(--line);
+  border-radius: var(--r); padding: 16px 20px; margin-bottom: 22px;
 }
 .knob { display: grid; grid-template-rows: 15px 38px 16px; gap: 8px; align-content: start; }
 .knob.wide { flex: 1 1 200px; }
@@ -342,13 +357,13 @@ input:focus, select:focus {
 
 /* ============================================================ deret angka */
 
-.chips {
-  display: flex; flex-wrap: wrap;
-  border: 1px solid var(--line); border-radius: var(--r);
-  box-shadow: var(--shadow-sm); overflow: hidden; margin-bottom: 26px;
+/* Kartu-kartu kecil terpisah — lebih ringan dari kartu pemenang. */
+.chips { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 24px; }
+.chip {
+  flex: 1 1 128px; padding: 14px 18px;
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--r); box-shadow: var(--shadow-sm);
 }
-.chip { flex: 1 1 128px; padding: 14px 18px; border-left: 1px solid var(--line); }
-.chip:first-child { border-left: 0; }
 .chip .n {
   font-family: var(--mono); font-size: 22px; font-weight: 600;
   line-height: 1.15; font-variant-numeric: tabular-nums; color: var(--faint);
@@ -358,7 +373,9 @@ input:focus, select:focus {
   letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin-top: 6px;
 }
 .chip.on .n { color: var(--ink); }
+.chip.bad { background: var(--danger-soft); border-color: rgba(192, 67, 47, .22); }
 .chip.bad .n { color: var(--danger); }
+.chip.warn { background: var(--warn-soft); border-color: rgba(197, 137, 27, .25); }
 .chip.warn .n { color: var(--amber); }
 .chip.good .n { color: var(--ok); }
 
