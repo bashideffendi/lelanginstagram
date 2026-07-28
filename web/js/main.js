@@ -35,7 +35,7 @@ const safeUrl = (u) => {
 const state = {
   dumps: [], primary: null, diff: null, isDemo: false,
   tz: browserTz(), cutoff: null, captionGuess: null, grace: 60,
-  query: '', includeReplies: true, onlyFlagged: false, tech: false, wrap: false,
+  query: '', includeReplies: true, onlyFlagged: false, tech: false, rulesOpen: false, wrap: false,
   result: null, hash: null, hashToken: 0, canonicalJson: null, guessedCutoff: false,
   sort: { chrono: { key: 'seq', dir: 1 }, accounts: { key: 'count', dir: -1 } }
 };
@@ -611,11 +611,13 @@ function render() {
   state.result = analyze(state.primary.comments, {
     cutoffEpoch: state.cutoff,
     graceSec: state.grace,
-    includeReplies: state.includeReplies
+    includeReplies: state.includeReplies,
+    ownerUsername: state.primary.source?.owner_username || null
   });
 
   tzNote();
   syncCutoffUI();
+  renderCaption();
   renderProof();
   renderChips();
   renderChrono();
@@ -630,6 +632,33 @@ function renderEvidence() {
   if (!state.result) return;
   $('sumtext').textContent = summaryText(
     state.result.summary, state.primary.source, state.tz, state.hash);
+}
+
+/**
+ * Aturan lelang dari caption postingan.
+ *
+ * Ini bagian dari bukti: di situlah penyelenggara menuliskan jam tutup, harga
+ * awal, dan kelipatannya. Terlipat sejak awal supaya tidak mendorong kartu
+ * bukti keluar layar, tapi tetap satu klik dari pandangan.
+ */
+function renderCaption() {
+  const cap = state.primary.source?.caption;
+  if (!cap) { $('caption').innerHTML = ''; return; }
+
+  const owner = state.primary.source?.owner_username;
+  $('caption').innerHTML =
+    '<section class="rules' + (state.rulesOpen ? ' open' : '') + '">' +
+    '<button class="rules-top" id="rulestoggle" aria-expanded="' + !!state.rulesOpen + '">' +
+    '<span class="label">Aturan lelang' + (owner ? ' &middot; @' + esc(owner) : '') + '</span>' +
+    '<span class="rules-act">' + (state.rulesOpen ? 'Sembunyikan' : 'Tampilkan') + '</span>' +
+    '</button>' +
+    '<div class="rules-body">' + esc(cap) + '</div>' +
+    '</section>';
+
+  $('rulestoggle').onclick = () => {
+    state.rulesOpen = !state.rulesOpen;
+    renderCaption();
+  };
 }
 
 /** Kartu bukti — bagian yang difoto layar dan dikirim ke penyelenggara. */
@@ -758,7 +787,10 @@ const TAGS = {
     'Ada tawaran lain di detik yang sama persis; urutan diambil dari nomor komentar.'],
   'bid-turun': ['down', () => 'nilai turun', 'Lebih kecil dari tawaran tertinggi sebelumnya.'],
   'bid-sama': ['same', () => 'nilai sama', 'Sama persis dengan tawaran tertinggi sebelumnya.'],
-  beruntun: ['burst', () => 'beruntun', 'Akun yang sama berkomentar lagi dalam 5 detik.']
+  beruntun: ['burst', () => 'beruntun', 'Akun yang sama berkomentar lagi dalam 5 detik.'],
+  penyelenggara: ['host', () => 'penyelenggara',
+    'Komentar pemilik postingan. Angkanya tidak dihitung sebagai tawaran, karena ' +
+    'pengumuman aturan lelang hampir selalu memuat angka seperti harga awal dan kelipatan.']
 };
 
 function tags(r) {
@@ -831,7 +863,10 @@ function rowHtml(r, span, extraCls = '', lead = '') {
     `<td class="clock">${fmtTime(r.created_at, state.tz)}</td>` +
     `<td class="n dim">${lead ? '—' : (r.gap != null ? fmtDuration(r.gap) : '—')}</td>` +
     `<td class="who">${esc(r.username || '—')}${r.is_reply ? ' <span class="dim">(balasan)</span>' : ''}</td>` +
-    `<td class="money">${r.bid != null ? 'Rp' + fmtRupiah(r.bid) : '<span class="dim">—</span>'}</td>` +
+    // Angka di komentar penyelenggara bukan tawaran, jadi jangan ditampilkan
+    // seolah-olah tawaran — itu yang tadinya membuatnya tampak sebagai pemenang.
+    `<td class="money">${r.bid != null && !r.isOwner
+      ? 'Rp' + fmtRupiah(r.bid) : '<span class="dim">—</span>'}</td>` +
     (state.tech
       ? `<td class="n dim">${r.increment != null ? (r.increment > 0 ? '+' : '') + fmtRupiah(r.increment) : ''}</td>` +
         `<td class="mn">${r.created_at}</td>`

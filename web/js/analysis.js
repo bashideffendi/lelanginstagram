@@ -162,7 +162,12 @@ export function fmtRupiah(v) {
  *   includeReplies  ikutkan balasan bersarang
  */
 export function analyze(comments, opts = {}) {
-  const { cutoffEpoch = null, graceSec = 60, includeReplies = true } = opts;
+  const {
+    cutoffEpoch = null, graceSec = 60, includeReplies = true,
+    ownerUsername = null
+  } = opts;
+
+  const owner = ownerUsername ? String(ownerUsername).toLowerCase() : null;
 
   const rows = comments
     .filter((c) => (includeReplies ? true : !c.is_reply))
@@ -189,12 +194,19 @@ export function analyze(comments, opts = {}) {
     r.tieSize = group.length;
     r.tieIndex = group.indexOf(r) + 1;
 
+    // Penyelenggara bukan peserta. Pengumuman aturan lelang hampir selalu
+    // memuat angka — harga awal, kelipatan — dan kalau angka itu ikut dihitung,
+    // penyelenggaranya sendiri bisa dinobatkan sebagai pemenang, lalu semua
+    // tawaran asli dicap "nilai turun" karena dibandingkan dengannya.
+    r.isOwner = !!owner && String(r.username || '').toLowerCase() === owner;
+
     const bid = parseBid(r.text);
     r.bid = bid.value;
     r.bidConfidence = bid.confidence;
     r.bidMatched = bid.matched;
 
     r.flags = [];
+    if (r.isOwner) r.flags.push('penyelenggara');
 
     if (cutoffEpoch != null) {
       if (r.created_at > cutoffEpoch) {
@@ -208,17 +220,17 @@ export function analyze(comments, opts = {}) {
 
     if (r.tie) r.flags.push('detik-kembar');
 
-    if (r.bid != null) {
+    // Tangga tawaran hanya menghitung peserta; komentar penyelenggara
+    // dilewati sepenuhnya, tidak menaikkan maupun dibandingkan.
+    if (r.bid != null && !r.isOwner) {
       if (prevHighBid != null) {
         r.increment = r.bid - prevHighBid;
         if (r.bid < prevHighBid) r.flags.push('bid-turun');
         else if (r.bid === prevHighBid) r.flags.push('bid-sama');
       }
       if (prevHighBid == null || r.bid > prevHighBid) prevHighBid = r.bid;
-      r.runningHigh = prevHighBid;
-    } else {
-      r.runningHigh = prevHighBid;
     }
+    r.runningHigh = prevHighBid;
 
     prev = r;
   }
@@ -266,7 +278,8 @@ function perAccount(rows, cutoffEpoch) {
     // tawaran dalam satu detik justru tampak paling santai.
     if (a.count > 1) a.gaps.push(Math.max(0, r.created_at - a.last));
     if (r.created_at > a.last) a.last = r.created_at;
-    if (r.bid != null && (a.maxBid == null || r.bid > a.maxBid)) a.maxBid = r.bid;
+    if (r.isOwner) a.isOwner = true;
+    if (r.bid != null && !r.isOwner && (a.maxBid == null || r.bid > a.maxBid)) a.maxBid = r.bid;
     if (r.flags.includes('lewat-cutoff')) {
       a.lateCount++;
       if (r.bid != null) a.lateBidCount++;
@@ -326,7 +339,8 @@ function summarize(rows, cutoffEpoch) {
     // Bid sah tertinggi = bid terbesar yang masuk sebelum cutoff.
     winner: (() => {
       const eligible = rows.filter(
-        (r) => r.bid != null && (cutoffEpoch == null || r.created_at <= cutoffEpoch)
+        (r) => r.bid != null && !r.isOwner &&
+          (cutoffEpoch == null || r.created_at <= cutoffEpoch)
       );
       if (!eligible.length) return null;
       const max = Math.max(...eligible.map((r) => r.bid));
