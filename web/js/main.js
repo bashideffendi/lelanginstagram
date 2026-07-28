@@ -87,6 +87,9 @@ async function initPaste() {
     setStat('Mode server aktif tapi terkunci. Isi kunci di bawah, sekali saja.', 'warn');
     $('keybox').classList.remove('hidden');
     $('ketokkey').value = savedKey();
+  } else if (serverState === 'no-session') {
+    setStat('Kunci sudah benar, tapi sesi Instagram belum disetel di server. ' +
+      'Setel <code>IG_SESSIONID</code> di Environment Variables Vercel, lalu deploy ulang.', 'warn');
   } else {
     setStat(
       'Belum ada cara penarikan yang siap. Pasang extension Ketok, atau pakai bookmarklet di bawah. ' +
@@ -104,6 +107,10 @@ async function applyKey() {
   if (serverState === 'ready') {
     $('keybox').classList.add('hidden');
     setStat('Kunci diterima. Mode server aktif — tempel link postingannya.', 'ready');
+  } else if (serverState === 'no-session') {
+    $('keybox').classList.add('hidden');
+    setStat('Kunci diterima, tapi sesi Instagram belum disetel di server. ' +
+      'Setel <code>IG_SESSIONID</code> di Environment Variables Vercel, lalu deploy ulang.', 'warn');
   } else {
     setStat('Kunci ditolak server. Periksa nilai KETOK_KEY di Environment Variables Vercel.', 'bad');
   }
@@ -127,6 +134,11 @@ async function runPaste() {
     if (serverState === 'need-key') {
       setStat('Mode server terkunci. Isi kunci di bawah dulu.', 'bad');
       $('keybox').classList.remove('hidden');
+      return;
+    }
+    if (serverState === 'no-session') {
+      setStat('Kunci sudah benar, tapi sesi Instagram belum disetel di server. ' +
+        'Setel <code>IG_SESSIONID</code> di Vercel lalu deploy ulang, atau pakai extension.', 'bad');
       return;
     }
     if (serverState !== 'ready') {

@@ -86,9 +86,10 @@ async function callServer(path, key) {
 
 /**
  * Apakah mode server siap dipakai?
- *   'off'       endpoint tidak ada, atau sengaja belum diaktifkan di server
- *   'need-key'  aktif, tapi kunci belum diisi atau salah
- *   'ready'     aktif dan kunci diterima
+ *   'off'         endpoint tidak ada, atau sengaja belum diaktifkan di server
+ *   'need-key'    aktif, tapi kunci belum diisi atau salah
+ *   'no-session'  kunci sudah benar, tapi sesi Instagram belum disetel di server
+ *   'ready'       aktif, kunci diterima, sesi ada
  */
 export async function probeServer(key) {
   try {
@@ -97,6 +98,7 @@ export async function probeServer(key) {
     const r = await callServer('/api/comments', key);
     if (r.status === 400) return 'ready';
     if (r.status === 401) return 'need-key';
+    if (r.status === 503 && r.body.error === 'sesi_kosong') return 'no-session';
     return 'off';
   } catch {
     return 'off';
