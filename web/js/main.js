@@ -271,7 +271,10 @@ export function parseClock(raw) {
 }
 
 const pad = (n) => String(n).padStart(2, '0');
-const fmtClock = (h, mi, sec) => `${pad(h)}:${pad(mi)}` + (sec ? `:${pad(sec)}` : '');
+
+// Selalu sampai detik. Alat ini menjual ketelitian detik, jadi menyembunyikan
+// ":00" membuat orang mengira ketelitiannya berhenti di menit.
+const fmtClock = (h, mi, sec) => `${pad(h)}:${pad(mi)}:${pad(sec || 0)}`;
 
 /**
  * Sisipkan titik dua sambil diketik, supaya "2030" langsung terbaca "20:30"
@@ -348,7 +351,7 @@ function cutoffPicks() {
   const picks = [];
 
   if (state.captionGuess) {
-    picks.push({ label: state.captionGuess.label.replace('.', ':'), sub: 'dari caption', epoch: state.captionGuess.epoch });
+    picks.push({ label: fmtTime(state.captionGuess.epoch, state.tz), sub: 'dari caption', epoch: state.captionGuess.epoch });
   }
 
   // Jam bulat terdekat sebelum atau tepat pada komentar terakhir.
@@ -383,9 +386,7 @@ function syncCutoffUI() {
 
   // Jangan menimpa ketikan yang sedang berlangsung.
   if (document.activeElement !== timeIn) {
-    timeIn.value = state.cutoff != null
-      ? fmtTime(state.cutoff, state.tz).replace(/:00$/, '')
-      : '';
+    timeIn.value = state.cutoff != null ? fmtTime(state.cutoff, state.tz) : '';
   }
 
   // Keterangan tebakan menempel di kolomnya, tidak jadi pita sendiri.
@@ -691,9 +692,33 @@ function renderCaption() {
   // jadi ia tidak pernah mendorong apa pun keluar layar.
   $('caption').innerHTML =
     '<section class="rules">' +
-    '<div class="rules-top"><span class="label">' + asal + '</span></div>' +
+    '<div class="rules-top"><span class="label">' + asal + '</span>' +
+    '<span class="rules-scroll">gulir untuk baca semua</span></div>' +
     '<div class="rules-body">' + esc(teks) + '</div>' +
+    '<div class="rules-fade"></div>' +
     '</section>';
+
+  // Isi yang terpotong tanpa tanda apa pun tidak terbaca sebagai bisa digulir,
+  // apalagi di layar sentuh yang tidak menampilkan batang gulir.
+  const body = $('caption').querySelector('.rules-body');
+  const fade = $('caption').querySelector('.rules-fade');
+  const kartu = $('caption').querySelector('.rules');
+  const tandai = () => {
+    const bisaGulir = body.scrollHeight > body.clientHeight + 2;
+    const diUjung = body.scrollTop + body.clientHeight >= body.scrollHeight - 2;
+    kartu.classList.toggle('ada-gulir', bisaGulir);
+    // Pudarnya disetel langsung, bukan lewat kelas: nilainya jadi pasti dan
+    // bisa diperiksa, tidak bergantung pada urutan aturan gaya.
+    fade.style.opacity = bisaGulir && !diUjung ? '1' : '0';
+  };
+  body.addEventListener('scroll', tandai, { passive: true });
+  window.addEventListener('resize', tandai);
+
+  // Tinggi isi baru pasti setelah tata letak dan huruf selesai; sekali di
+  // bingkai berikutnya saja terlalu cepat, jadi diukur ulang saat berubah.
+  requestAnimationFrame(tandai);
+  if (window.ResizeObserver) new ResizeObserver(tandai).observe(body);
+  document.fonts?.ready?.then(tandai);
 }
 
 /**
@@ -1225,10 +1250,12 @@ function wire() {
     readCutoffFromUI();
     render();
   });
-  // Saat fokus lepas, kolom dikembalikan ke nilai yang benar-benar dipakai,
-  // jadi tanda merahnya harus ikut hilang — bukan menuduh nilai yang sah.
+  // Saat fokus lepas, kolom dikembalikan ke nilai yang benar-benar dipakai —
+  // lengkap sampai detik, dan tanda merahnya ikut hilang.
   $('cutoffTime').addEventListener('blur', () => {
     readCutoffFromUI();
+    const c = parseClock($('cutoffTime').value);
+    if (c) $('cutoffTime').value = fmtClock(c.h, c.mi, c.sec);
     $('cutoffTime').classList.remove('bad');
     render();
   });
