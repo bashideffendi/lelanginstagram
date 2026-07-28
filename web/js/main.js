@@ -35,7 +35,8 @@ const safeUrl = (u) => {
 const state = {
   dumps: [], primary: null, diff: null, isDemo: false,
   tz: browserTz(), cutoff: null, captionGuess: null, grace: 60,
-  query: '', includeReplies: true, onlyFlagged: false, tech: false, rulesOpen: false, wrap: false,
+  query: '', includeReplies: true, onlyFlagged: false, tech: false, rulesOpen: false,
+  owner: '', wrap: false,
   result: null, hash: null, hashToken: 0, canonicalJson: null, guessedCutoff: false,
   sort: { chrono: { key: 'seq', dir: 1 }, accounts: { key: 'count', dir: -1 } }
 };
@@ -561,6 +562,8 @@ function activate(dumps) {
       'Klik &ldquo;Cek lelang lain&rdquo; di kanan atas untuk memakai data sungguhan.</div>'
     : '';
 
+  state.owner = state.primary.source?.owner_username || '';
+
   const g = guessCutoff(state.primary.source?.caption, state.primary.comments, state.tz);
   state.captionGuess = g;
   if (g) {
@@ -612,10 +615,11 @@ function render() {
     cutoffEpoch: state.cutoff,
     graceSec: state.grace,
     includeReplies: state.includeReplies,
-    ownerUsername: state.primary.source?.owner_username || null
+    ownerUsername: state.owner || null
   });
 
   tzNote();
+  syncOwnerUI();
   syncCutoffUI();
   renderCaption();
   renderProof();
@@ -632,6 +636,39 @@ function renderEvidence() {
   if (!state.result) return;
   $('sumtext').textContent = summaryText(
     state.result.summary, state.primary.source, state.tz, state.hash);
+}
+
+/**
+ * Pilihan penyelenggara.
+ *
+ * Instagram tidak selalu mengembalikan pemilik postingan — panggilan info
+ * postingan dibiarkan gagal tanpa menghentikan penarikan, jadi namanya bisa
+ * kosong. Kalau pengecualian penyelenggara hanya bergantung pada itu, ia diam
+ * -diam tidak melakukan apa-apa dan panitia tetap dinobatkan sebagai pemenang.
+ * Karena itu selalu bisa dipilih sendiri.
+ */
+function syncOwnerUI() {
+  const sel = $('owner');
+  const hitung = new Map();
+  for (const c of state.primary.comments) {
+    const u = c.username;
+    if (u) hitung.set(u, (hitung.get(u) || 0) + 1);
+  }
+  const daftar = [...hitung.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+
+  const kunci = daftar.map(([u]) => u).join('|');
+  if (sel.dataset.built !== kunci) {
+    sel.innerHTML = '<option value="">(tidak ada / tidak tahu)</option>' +
+      daftar.map(([u, n]) =>
+        `<option value="${esc(u)}">${esc(u)} — ${n} komentar</option>`).join('');
+    sel.dataset.built = kunci;
+  }
+  sel.value = state.owner || '';
+
+  const terdeteksi = state.primary.source?.owner_username;
+  $('ownernote').innerHTML = terdeteksi
+    ? 'Terbaca otomatis dari postingan.'
+    : '<span style="color:var(--amber)">Tidak terbaca otomatis — pilih sendiri.</span>';
 }
 
 /**
@@ -801,10 +838,13 @@ function tags(r) {
 }
 
 function renderLegend() {
-  const label = { late: 'telat', snipe: 'detik akhir', tie: 'detik sama',
-    down: 'nilai turun', same: 'nilai sama', burst: 'beruntun' };
+  // Nama tanda diambil dari sumber yang sama dengan tabelnya. Daftar nama
+  // terpisah pernah ketinggalan saat tanda baru ditambahkan, dan keterangannya
+  // menampilkan "undefined".
+  const contoh = { late: 5, snipe: 5, tie: 1, tieSize: 2, tieIndex: 1 };
   $('legend').innerHTML = Object.values(TAGS)
-    .map(([cls, , desc]) => `<div><span class="tag ${cls}">${label[cls]}</span> ${desc}</div>`)
+    .map(([cls, nama, desc]) =>
+      `<div><span class="tag ${cls}">${esc(nama(contoh))}</span> ${desc}</div>`)
     .join('');
 }
 
@@ -1051,6 +1091,7 @@ function wire() {
 
   // Zona waktu hanya mengubah cara menampilkan; momen tutupnya tidak bergeser.
   $('tz').onchange = () => { state.tz = $('tz').value; render(); };
+  $('owner').onchange = () => { state.owner = $('owner').value; render(); };
 
   $('cutoffTime').addEventListener('input', (e) => {
     applyMask(e.target);
