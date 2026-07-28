@@ -1,5 +1,5 @@
 import { parseDump, readFileAsDump } from './dump.js';
-import { analyze, chronoCompare, fmtRupiah } from './analysis.js';
+import { analyze, chronoCompare, fmtRupiah, isAnnouncement } from './analysis.js';
 import { diffDumps } from './diff.js';
 import {
   browserTz, tzOptions, tzOffsetLabel, fmtDateTime, fmtTime, fmtDate,
@@ -562,7 +562,19 @@ function activate(dumps) {
       'Klik &ldquo;Cek lelang lain&rdquo; di kanan atas untuk memakai data sungguhan.</div>'
     : '';
 
-  state.owner = state.primary.source?.owner_username || '';
+  // Instagram tidak selalu memberi tahu pemilik postingan. Kalau begitu,
+  // penulis komentar aturan lelang praktis pasti penyelenggaranya —
+  // tidak masuk akal peserta yang mengumumkan harga awal dan kelipatan.
+  const dariIg = state.primary.source?.owner_username || '';
+  const dariAturan = (() => {
+    const p = state.primary.comments
+      .filter((c) => c.username && isAnnouncement(c.text))
+      .sort((a, b) => a.created_at - b.created_at)[0];
+    return p ? p.username : '';
+  })();
+
+  state.owner = dariIg || dariAturan || '';
+  state.ownerSource = dariIg ? 'ig' : (dariAturan ? 'aturan' : 'none');
 
   const g = guessCutoff(state.primary.source?.caption, state.primary.comments, state.tz);
   state.captionGuess = g;
@@ -621,8 +633,8 @@ function render() {
   tzNote();
   syncOwnerUI();
   syncCutoffUI();
-  renderCaption();
   renderProof();
+  renderCaption();          // butuh state.result untuk cadangan komentar aturan
   renderChips();
   renderChrono();
   renderAccounts();
@@ -665,10 +677,13 @@ function syncOwnerUI() {
   }
   sel.value = state.owner || '';
 
-  const terdeteksi = state.primary.source?.owner_username;
-  $('ownernote').innerHTML = terdeteksi
-    ? 'Terbaca otomatis dari postingan.'
-    : '<span style="color:var(--amber)">Tidak terbaca otomatis — pilih sendiri.</span>';
+  const catatan = {
+    ig: 'Terbaca otomatis dari postingan.',
+    aturan: 'Ditebak dari komentar aturan lelang — ganti kalau salah.',
+    manual: 'Kamu yang memilih.',
+    none: '<span style="color:var(--amber)">Tidak terbaca otomatis — pilih sendiri.</span>'
+  };
+  $('ownernote').innerHTML = catatan[state.ownerSource] || catatan.none;
 }
 
 /**
@@ -680,16 +695,30 @@ function syncOwnerUI() {
  */
 function renderCaption() {
   const cap = state.primary.source?.caption;
-  if (!cap) { $('caption').innerHTML = ''; return; }
-
   const owner = state.primary.source?.owner_username;
+
+  let teks = cap;
+  let asal = owner ? 'Caption postingan &middot; @' + esc(owner) : 'Caption postingan';
+
+  // Caption tidak selalu ikut tertarik. Komentar aturan lelang memuat
+  // keterangan yang sama, jadi ia dipakai sebagai gantinya — dengan label
+  // yang jujur, supaya tidak disangka caption asli.
+  if (!teks) {
+    const p = (state.result?.rows || []).find((r) => r.isAnnouncement || r.isOwner);
+    if (p && String(p.text || '').length > 60) {
+      teks = p.text;
+      asal = 'Aturan lelang, dari komentar' + (p.username ? ' @' + esc(p.username) : '');
+    }
+  }
+  if (!teks) { $('caption').innerHTML = ''; return; }
+
   $('caption').innerHTML =
     '<section class="rules' + (state.rulesOpen ? ' open' : '') + '">' +
     '<button class="rules-top" id="rulestoggle" aria-expanded="' + !!state.rulesOpen + '">' +
-    '<span class="label">Aturan lelang' + (owner ? ' &middot; @' + esc(owner) : '') + '</span>' +
+    '<span class="label">' + asal + '</span>' +
     '<span class="rules-act">' + (state.rulesOpen ? 'Sembunyikan' : 'Tampilkan') + '</span>' +
     '</button>' +
-    '<div class="rules-body">' + esc(cap) + '</div>' +
+    '<div class="rules-body">' + esc(teks) + '</div>' +
     '</section>';
 
   $('rulestoggle').onclick = () => {
@@ -825,6 +854,9 @@ const TAGS = {
   'bid-turun': ['down', () => 'nilai turun', 'Lebih kecil dari tawaran tertinggi sebelumnya.'],
   'bid-sama': ['same', () => 'nilai sama', 'Sama persis dengan tawaran tertinggi sebelumnya.'],
   beruntun: ['burst', () => 'beruntun', 'Akun yang sama berkomentar lagi dalam 5 detik.'],
+  pengumuman: ['host', () => 'pengumuman',
+    'Komentar aturan lelang, dikenali dari bentuknya: panjang, bergaris pemisah, ' +
+    'dan memuat istilah seperti OB, kelipatan, atau BIN. Angkanya bukan tawaran.'],
   penyelenggara: ['host', () => 'penyelenggara',
     'Komentar pemilik postingan. Angkanya tidak dihitung sebagai tawaran, karena ' +
     'pengumuman aturan lelang hampir selalu memuat angka seperti harga awal dan kelipatan.']
@@ -1091,7 +1123,11 @@ function wire() {
 
   // Zona waktu hanya mengubah cara menampilkan; momen tutupnya tidak bergeser.
   $('tz').onchange = () => { state.tz = $('tz').value; render(); };
-  $('owner').onchange = () => { state.owner = $('owner').value; render(); };
+  $('owner').onchange = () => {
+    state.owner = $('owner').value;
+    state.ownerSource = 'manual';
+    render();
+  };
 
   $('cutoffTime').addEventListener('input', (e) => {
     applyMask(e.target);

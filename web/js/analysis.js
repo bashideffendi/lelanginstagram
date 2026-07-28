@@ -78,6 +78,39 @@ function buangJam(s) {
     .replace(/\b\d{1,2}[.:]\d{2}\s*(?:wib|wita|wit)\b/gi, ' ');
 }
 
+/** Istilah yang muncul di pengumuman aturan lelang, bukan di tawaran. */
+const ISTILAH_ATURAN = [
+  /\brules?\b/i, /\baturan\b/i, /\bob\b\s*[:.]/i, /kelipatan/i,
+  /buy\s*it\s*now/i, /\bbin\b/i, /\bnote\b/i, /wajib/i, /pembayaran/i,
+  /penipuan/i, /\bdm\b/i, /rekening|\brek\b/i, /runner\s*up/i, /\bbid\b\s*[:.]/i
+];
+
+/**
+ * Apakah komentar ini pengumuman aturan, bukan tawaran?
+ *
+ * Penyelenggara menempelkan aturan lelang sebagai komentar panjang berisi
+ * harga awal dan kelipatan. Angka-angka itu bukan tawaran, tapi tanpa
+ * penjagaan ini ia terbaca sebagai tawaran tertinggi, memenangkan lelang,
+ * lalu membuat semua tawaran asli tampak menurun.
+ *
+ * Sengaja ketat: tawaran sungguhan selalu pendek ("750", "1,5jt"), tidak
+ * pernah berbaris-baris dengan garis pemisah dan daftar syarat.
+ */
+export function isAnnouncement(text) {
+  const s = String(text || '');
+  if (s.length < 90) return false;
+
+  const baris = s.split(/\r?\n/).filter((b) => b.trim()).length;
+  if (baris < 3) return false;
+
+  const adaGarisPemisah = /[=\-_·•*]{4,}/.test(s);
+  const cocok = ISTILAH_ATURAN.filter((re) => re.test(s)).length;
+
+  // Garis pemisah plus satu istilah sudah sangat khas pengumuman.
+  // Tanpa garis pemisah, butuh beberapa istilah sekaligus.
+  return (adaGarisPemisah && cocok >= 1) || cocok >= 3;
+}
+
 /**
  * Tebak nilai tawaran dari teks komentar.
  *
@@ -200,6 +233,10 @@ export function analyze(comments, opts = {}) {
     // tawaran asli dicap "nilai turun" karena dibandingkan dengannya.
     r.isOwner = !!owner && String(r.username || '').toLowerCase() === owner;
 
+    // Pengumuman aturan dikenali dari bentuknya sendiri, jadi tetap tertangkap
+    // walaupun Instagram tidak memberi tahu siapa pemilik postingannya.
+    r.isAnnouncement = isAnnouncement(r.text);
+
     const bid = parseBid(r.text);
     r.bid = bid.value;
     r.bidConfidence = bid.confidence;
@@ -207,6 +244,7 @@ export function analyze(comments, opts = {}) {
 
     r.flags = [];
     if (r.isOwner) r.flags.push('penyelenggara');
+    else if (r.isAnnouncement) r.flags.push('pengumuman');
 
     if (cutoffEpoch != null) {
       if (r.created_at > cutoffEpoch) {
@@ -222,7 +260,7 @@ export function analyze(comments, opts = {}) {
 
     // Tangga tawaran hanya menghitung peserta; komentar penyelenggara
     // dilewati sepenuhnya, tidak menaikkan maupun dibandingkan.
-    if (r.bid != null && !r.isOwner) {
+    if (r.bid != null && !r.isOwner && !r.isAnnouncement) {
       if (prevHighBid != null) {
         r.increment = r.bid - prevHighBid;
         if (r.bid < prevHighBid) r.flags.push('bid-turun');
@@ -279,7 +317,7 @@ function perAccount(rows, cutoffEpoch) {
     if (a.count > 1) a.gaps.push(Math.max(0, r.created_at - a.last));
     if (r.created_at > a.last) a.last = r.created_at;
     if (r.isOwner) a.isOwner = true;
-    if (r.bid != null && !r.isOwner && (a.maxBid == null || r.bid > a.maxBid)) a.maxBid = r.bid;
+    if (r.bid != null && !r.isOwner && !r.isAnnouncement && (a.maxBid == null || r.bid > a.maxBid)) a.maxBid = r.bid;
     if (r.flags.includes('lewat-cutoff')) {
       a.lateCount++;
       if (r.bid != null) a.lateBidCount++;
@@ -339,7 +377,7 @@ function summarize(rows, cutoffEpoch) {
     // Bid sah tertinggi = bid terbesar yang masuk sebelum cutoff.
     winner: (() => {
       const eligible = rows.filter(
-        (r) => r.bid != null && !r.isOwner &&
+        (r) => r.bid != null && !r.isOwner && !r.isAnnouncement &&
           (cutoffEpoch == null || r.created_at <= cutoffEpoch)
       );
       if (!eligible.length) return null;

@@ -90,7 +90,7 @@ export function fetchMediaInfo(api, mediaId, errors) {
     });
 }
 
-export function fetchComments(api, mediaId, onProgress, errors, maxPages) {
+export function fetchComments(api, mediaId, onProgress, errors, maxPages, sisi) {
   var all = [];
   var minId = null;
   var page = 0;
@@ -102,6 +102,16 @@ export function fetchComments(api, mediaId, onProgress, errors, maxPages) {
     if (minId) url += '&min_id=' + encodeURIComponent(minId);
 
     return api(url).then(function (j) {
+      // Balasan daftar komentar kerap ikut membawa caption dan pemilik
+      // postingan. Dipungut di sini sebagai cadangan, supaya keduanya tidak
+      // hilang hanya karena panggilan info postingan gagal.
+      if (sisi && page === 0 && j.caption) {
+        if (!sisi.caption && j.caption.text) sisi.caption = j.caption.text;
+        if (!sisi.owner && j.caption.user && j.caption.user.username) {
+          sisi.owner = j.caption.user.username;
+        }
+      }
+
       all = all.concat(j.comments || j.child_comments || []);
       page++;
 
@@ -238,6 +248,7 @@ export function extract(opts) {
 
   var meta = { shortcode: shortcode, mediaId: mediaId, info: null };
   var rawTop = [];
+  var sisi = { caption: null, owner: null };     // cadangan dari daftar komentar
 
   report({ stage: 'info', count: 0 });
 
@@ -247,7 +258,7 @@ export function extract(opts) {
       report({ stage: 'comments', count: 0, total: info && info.comment_count });
       return fetchComments(api, mediaId, function (n, page) {
         report({ stage: 'comments', count: n, page: page, total: info && info.comment_count });
-      }, errors, opts.maxPages);
+      }, errors, opts.maxPages, sisi);
     })
     .then(function (top) {
       rawTop = top;
@@ -301,9 +312,9 @@ export function extract(opts) {
             : (opts.url || null),
           shortcode: shortcode || null,
           media_id: mediaId,
-          owner_username: meta.info && meta.info.owner_username,
+          owner_username: (meta.info && meta.info.owner_username) || sisi.owner || null,
           post_taken_at: meta.info && meta.info.taken_at,
-          caption: meta.info && meta.info.caption,
+          caption: (meta.info && meta.info.caption) || sisi.caption || null,
           reported_comment_count: meta.info && meta.info.comment_count
         },
         stats: {
