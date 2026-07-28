@@ -162,6 +162,17 @@ code {
   background: var(--accent); transition: width .25s;
 }
 
+.keybox {
+  margin-top: 14px;
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--r); padding: 16px 18px; box-shadow: var(--shadow);
+  max-width: 460px;
+}
+.keybox > label { display: block; font-size: 13.5px; font-weight: 650; margin-bottom: 7px; }
+.keyrow { display: flex; gap: 8px; }
+.keyrow input { flex: 1 1 auto; }
+.keyhint { font-size: 12.5px; color: var(--muted); margin-top: 8px; }
+
 .extinfo {
   margin-top: 18px;
   background: var(--surface); border: 1px solid var(--line);

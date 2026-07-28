@@ -42,15 +42,24 @@ export function shortcodeFromUrl(href) {
   return m ? m[1] : null;
 }
 
-/** Pembuat pemanggil API. `base` kosong untuk bookmarklet, penuh untuk extension. */
-export function createApi(base) {
+/**
+ * Pembuat pemanggil API.
+ *
+ * `base` kosong untuk bookmarklet, penuh untuk extension dan server.
+ * `extraHeaders` dipakai server untuk mengirim cookie secara eksplisit —
+ * di browser cookie ikut sendiri lewat credentials:'include'.
+ */
+export function createApi(base, extraHeaders) {
   return function api(path) {
+    var headers = {
+      'x-ig-app-id': APP_ID,
+      'x-requested-with': 'XMLHttpRequest'
+    };
+    if (extraHeaders) for (var k in extraHeaders) headers[k] = extraHeaders[k];
+
     return fetch(base + path, {
       credentials: 'include',
-      headers: {
-        'x-ig-app-id': APP_ID,
-        'x-requested-with': 'XMLHttpRequest'
-      }
+      headers: headers
     }).then(function (r) {
       if (!r.ok) {
         var err = new Error('HTTP ' + r.status + ' pada ' + path);
@@ -154,7 +163,7 @@ export function normalize(c, parentPk) {
  * @param opts.onProgress ({stage, count, page, total}) => void
  */
 export function extract(opts) {
-  var api = createApi(opts.base || '');
+  var api = createApi(opts.base || '', opts.headers);
   var errors = [];
   var report = opts.onProgress || function () {};
 

@@ -36,14 +36,36 @@
     <p class="pastestat" id="paststat">Memeriksa&hellip;</p>
     <div id="pasteprog" class="pasteprog hidden"><i></i></div>
 
+    <div id="keybox" class="keybox hidden">
+      <label for="ketokkey">Kunci mode server</label>
+      <div class="keyrow">
+        <input type="password" id="ketokkey" placeholder="Kata sandi mode server" autocomplete="off">
+        <button id="keysave" class="btn">Simpan</button>
+      </div>
+      <p class="keyhint">Disimpan di browser ini saja, tidak dikirim ke mana-mana selain server Ketok kamu sendiri.</p>
+    </div>
+
     <div id="extinfo" class="extinfo hidden">
-      <h3>Kotak di atas butuh extension Ketok</h3>
+      <h3>Dua cara mengisi kotak di atas</h3>
       <p>
         Halaman web biasa tidak diizinkan browser mengambil komentar dari
-        instagram.com, dan tidak punya akses ke sesi login kamu. Extension inilah
-        yang punya izin itu &mdash; sesi login kamu tetap di browser, tidak ada
-        kata sandi atau cookie yang dibaca maupun dikirim ke mana pun.
+        instagram.com, dan tidak punya akses ke sesi login kamu. Jadi kotak
+        tempel-link butuh salah satu dari dua ini:
       </p>
+      <p style="margin-top:12px">
+        <b>Extension</b> &mdash; menarik dari browser kamu sendiri, memakai sesi
+        yang sudah ada. Tidak ada cookie yang dibaca, disalin, atau dikirim ke
+        mana pun, dan tidak ada akun lain yang menanggung risiko. Ini yang
+        dipakai lebih dulu kalau terpasang.
+      </p>
+      <p style="margin-top:8px">
+        <b>Mode server</b> &mdash; dipakai kalau extension tidak ada, misalnya
+        saat kamu membuka Ketok dari HP. Server menarik memakai sesi akun
+        Instagram khusus yang kamu setel sendiri. Cara mengaktifkannya ada di
+        <a href="https://github.com/bashideffendi/lelanginstagram#mode-server" target="_blank" rel="noopener">README</a>
+        &mdash; pakai akun terpisah, bukan akun yang kamu pakai ikut lelang.
+      </p>
+      <h3 style="margin-top:18px">Memasang extension</h3>
       <ol>
         <li>Unduh atau salin folder <code>extension/</code> dari
           <a href="https://github.com/bashideffendi/lelanginstagram" target="_blank" rel="noopener">repo Ketok</a></li>

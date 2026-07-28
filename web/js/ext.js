@@ -64,3 +64,53 @@ export async function extractViaExtension(url, onProgress) {
 export function looksLikePostUrl(url) {
   return /instagram\.com\/(?:[^/?#]+\/)?(?:p|reel|reels|tv)\/[A-Za-z0-9_-]{5,}/.test(String(url));
 }
+
+// ---------------------------------------------------------------- mode server
+
+const KEY_STORE = 'ketok_key';
+
+export function savedKey() {
+  try { return localStorage.getItem(KEY_STORE) || ''; } catch { return ''; }
+}
+
+export function saveKey(k) {
+  try { localStorage.setItem(KEY_STORE, k); } catch { /* mode privat */ }
+}
+
+async function callServer(path, key) {
+  const r = await fetch(path, { headers: key ? { 'x-ketok-key': key } : {} });
+  let body = {};
+  try { body = await r.json(); } catch { /* bukan JSON */ }
+  return { ok: r.ok, status: r.status, body };
+}
+
+/**
+ * Apakah mode server siap dipakai?
+ *   'off'       endpoint tidak ada, atau sengaja belum diaktifkan di server
+ *   'need-key'  aktif, tapi kunci belum diisi atau salah
+ *   'ready'     aktif dan kunci diterima
+ */
+export async function probeServer(key) {
+  try {
+    // Tanpa parameter url, endpoint yang sehat menjawab 400 — itu justru
+    // bukti bahwa gembok dan sesinya sudah lolos.
+    const r = await callServer('/api/comments', key);
+    if (r.status === 400) return 'ready';
+    if (r.status === 401) return 'need-key';
+    return 'off';
+  } catch {
+    return 'off';
+  }
+}
+
+export async function extractViaServer(url, key) {
+  const r = await callServer('/api/comments?url=' + encodeURIComponent(url), key);
+  if (!r.ok) {
+    throw Object.assign(new Error(r.body.message || 'Gagal menghubungi server (HTTP ' + r.status + ').'), {
+      code: r.body.error,
+      httpStatus: r.status,
+      igStatus: r.body.status
+    });
+  }
+  return r.body;
+}

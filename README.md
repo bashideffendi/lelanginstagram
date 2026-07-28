@@ -15,8 +15,13 @@ Live: <https://lelanginsta.tempuscollective.com>
 | Bagian | Isi | Jalan di mana |
 |---|---|---|
 | **Web app** | Analisis, jam tutup, perbandingan snapshot, ekspor | Browser, tanpa server |
-| **Extension** | Kotak tempel-link: menarik komentar dari alamat yang kamu tempel | Chrome, izin ke instagram.com |
-| **Bookmarklet** | Alternatif tanpa pasang apa pun: menarik dari post yang sedang dibuka | Tab Instagram |
+| **Extension** | Isi kotak tempel-link dari browsermu sendiri | Chrome, izin ke instagram.com |
+| **Mode server** | Isi kotak tempel-link tanpa pasang apa pun (mis. dari HP) | Fungsi Vercel, opsional |
+| **Bookmarklet** | Menarik dari post yang sedang dibuka, tanpa pasang apa pun | Tab Instagram |
+
+Kotak tempel-link memilih sendiri: extension dulu kalau ada, mode server kalau
+tidak. Extension diutamakan karena penarikannya dari browsermu sendiri, jadi
+tidak ada akun lain yang menanggung risiko.
 
 Extension dan bookmarklet sama-sama memakai sesi login browser kamu sendiri.
 Tidak ada server perantara, dan tidak ada kredensial yang dibaca atau keluar
@@ -64,6 +69,39 @@ kamu tinggal menempel link postingan lalu menekan **Ambil komentar**.
 Kalau menambah alamat baru tempat web app di-hosting, daftarkan di
 `content_scripts.matches` pada `extension/manifest.json` — bridge hanya
 disuntikkan ke alamat yang terdaftar di sana.
+
+### Mode server
+
+Dipakai otomatis kalau extension tidak terpasang — misalnya saat membuka Ketok
+dari HP. Inilah cara kerja commentgrid: server yang menarik, bukan browsermu.
+
+**Pakai akun Instagram khusus, bukan akun yang kamu pakai ikut lelang.** Semua
+permintaan lewat sini terlihat oleh Instagram sebagai perbuatan akun itu, dari
+IP pusat data — pola yang memang rutin dibatasi. Kalau akun itu kena, tidak ada
+yang hilang; kalau yang kena akun lelangmu, kamu kehilangan akses ke lelang yang
+sedang kamu selidiki.
+
+Setel di Vercel → Settings → Environment Variables:
+
+| Variabel | Wajib | Isi |
+|---|---|---|
+| `KETOK_KEY` | ya | Kata sandi bebas. Tanpa ini endpoint mati total |
+| `IG_SESSIONID` | ya | Cookie `sessionid` dari akun khusus tadi |
+| `IG_DS_USER_ID` | tidak | Cookie `ds_user_id` |
+| `IG_CSRFTOKEN` | tidak | Cookie `csrftoken` |
+
+Mengambil `sessionid`: login dengan akun khusus itu → DevTools (`F12`) →
+Application → Cookies → `https://www.instagram.com` → salin nilai `sessionid`.
+
+`KETOK_KEY` wajib karena endpoint-nya publik. Tanpa gembok itu, siapa pun yang
+menemukan alamatnya bisa memakai akun Instagram kamu untuk menarik data. Di
+halaman Ketok, kunci itu diisi sekali dan disimpan di browser.
+
+Sesi Instagram kedaluwarsa berkala. Kalau kotak paste menjawab "sesi sudah
+kedaluwarsa", login ulang dengan akun khusus itu dan perbarui `IG_SESSIONID`.
+
+Selama variabelnya belum disetel, endpoint menjawab 503 dan halaman Ketok
+otomatis kembali menyarankan extension. Tidak ada yang rusak.
 
 ### Alternatif tanpa extension: bookmarklet
 

@@ -78,6 +78,7 @@
     '<div class="b">' +
     '<div class="row"><span>Komentar</span><b id="cnt">0</b></div>' +
     '<div class="row"><span>Balasan</span><b id="rep">0</b></div>' +
+    '<div class="row"><span>Tujuan</span><b id="dest"></b></div>' +
     '<div class="bar"><i id="fill"></i></div>' +
     '<div class="msg" id="msg">Menyiapkan&hellip;</div>' +
     '<div class="err" id="err"></div>' +
@@ -92,6 +93,15 @@
   var setMsg = function (t) { $('msg').textContent = t; };
   var setErr = function (t) { $('err').textContent = t; };
   var setFill = function (p) { $('fill').style.width = Math.max(0, Math.min(100, p)) + '%'; };
+
+  // Alamat tujuan dipanggang saat build. Ditampilkan supaya bookmarklet lama
+  // yang menunjuk domain usang langsung ketahuan, bukan bikin bingung.
+  try {
+    $('dest').textContent = new URL(WEB_APP).host;
+    $('dest').title = WEB_APP;
+  } catch (e) {
+    $('dest').textContent = WEB_APP;
+  }
 
   $('close').onclick = function () {
     host.remove();

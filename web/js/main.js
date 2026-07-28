@@ -9,7 +9,8 @@ import {
   download, sha256Hex, commentsCsv, accountsCsv, diffCsv, summaryText
 } from './export.js';
 import {
-  pingExtension, extractViaExtension, looksLikePostUrl
+  pingExtension, extractViaExtension, looksLikePostUrl,
+  probeServer, extractViaServer, savedKey, saveKey
 } from './ext.js';
 
 const $ = (id) => document.getElementById(id);
@@ -48,6 +49,7 @@ async function initBookmarklet() {
 // ================================================================ kotak paste
 
 let extVersion = null;
+let serverState = 'off';     // 'off' | 'need-key' | 'ready'
 
 function setStat(text, cls = '') {
   const el = $('paststat');
@@ -60,17 +62,50 @@ function showExtInfo() {
   $('extinfo').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
+/**
+ * Extension diutamakan: penarikannya dari browser kamu sendiri, jadi tidak
+ * membebani akun Instagram mana pun selain milikmu yang memang sedang membuka
+ * halaman itu. Mode server hanya dipakai kalau extension tidak ada — misalnya
+ * saat kamu membuka Ketok dari HP.
+ */
 async function initPaste() {
-  setStat('Memeriksa apakah extension Ketok terpasang&hellip;');
-  extVersion = await pingExtension();
+  setStat('Memeriksa cara penarikan yang tersedia&hellip;');
 
+  extVersion = await pingExtension();
   if (extVersion) {
     setStat(`Extension aktif (v${esc(extVersion)}) — tempel link postingannya, lalu tekan Ambil komentar.`, 'ready');
+    return;
+  }
+
+  serverState = await probeServer(savedKey());
+
+  if (serverState === 'ready') {
+    setStat('Mode server aktif — tempel link postingannya, lalu tekan Ambil komentar. ' +
+      '<button class="linkbtn" id="whyext">Apa bedanya dengan extension?</button>', 'ready');
+    $('whyext').onclick = showExtInfo;
+  } else if (serverState === 'need-key') {
+    setStat('Mode server aktif tapi terkunci. Isi kunci di bawah, sekali saja.', 'warn');
+    $('keybox').classList.remove('hidden');
+    $('ketokkey').value = savedKey();
   } else {
     setStat(
-      'Extension Ketok belum terpasang, jadi kotak ini belum bisa dipakai. ' +
-      '<button class="linkbtn" id="whyext">Kenapa perlu extension?</button>', 'warn');
+      'Belum ada cara penarikan yang siap. Pasang extension Ketok, atau pakai bookmarklet di bawah. ' +
+      '<button class="linkbtn" id="whyext">Kenapa perlu salah satunya?</button>', 'warn');
     $('whyext').onclick = showExtInfo;
+  }
+}
+
+async function applyKey() {
+  const k = $('ketokkey').value.trim();
+  if (!k) { setStat('Kunci masih kosong.', 'bad'); return; }
+  saveKey(k);
+  setStat('Memeriksa kunci&hellip;');
+  serverState = await probeServer(k);
+  if (serverState === 'ready') {
+    $('keybox').classList.add('hidden');
+    setStat('Kunci diterima. Mode server aktif — tempel link postingannya.', 'ready');
+  } else {
+    setStat('Kunci ditolak server. Periksa nilai KETOK_KEY di Environment Variables Vercel.', 'bad');
   }
 }
 
@@ -83,10 +118,19 @@ async function runPaste() {
       'buka postingannya dulu, lalu salin alamat dari bilah alamat browser.', 'bad');
     return;
   }
-  if (!extVersion) {
-    extVersion = await pingExtension();
-    if (!extVersion) {
-      setStat('Extension Ketok belum terpasang. Petunjuk pemasangannya ada di bawah.', 'bad');
+
+  // Extension bisa dipasang setelah halaman dibuka, jadi selalu cek ulang.
+  if (!extVersion) extVersion = await pingExtension();
+
+  if (!extVersion && serverState !== 'ready') {
+    serverState = await probeServer(savedKey());
+    if (serverState === 'need-key') {
+      setStat('Mode server terkunci. Isi kunci di bawah dulu.', 'bad');
+      $('keybox').classList.remove('hidden');
+      return;
+    }
+    if (serverState !== 'ready') {
+      setStat('Belum ada cara penarikan yang siap. Petunjuknya ada di bawah.', 'bad');
       showExtInfo();
       return;
     }
@@ -99,27 +143,43 @@ async function runPaste() {
   fill.style.width = '0%';
 
   try {
-    const dump = await extractViaExtension(url, (p) => {
-      if (p.stage === 'info') setStat('Mengambil keterangan postingan&hellip;');
-      else if (p.stage === 'comments') {
-        setStat(`Menarik komentar&hellip; ${p.count} terkumpul` + (p.total ? ` dari sekitar ${p.total}` : ''));
-        fill.style.width = (p.total ? Math.min(95, (p.count / p.total) * 100) : Math.min(90, (p.page || 0) * 8)) + '%';
-      } else if (p.stage === 'replies') {
-        setStat(`Mengambil balasan&hellip; utas ${p.page} dari ${p.total}`);
-      }
-    });
-    fill.style.width = '100%';
-    activate([parseDump(dump, 'lewat extension')]);
+    let dump;
+    if (extVersion) {
+      dump = await extractViaExtension(url, (p) => {
+        if (p.stage === 'info') setStat('Mengambil keterangan postingan&hellip;');
+        else if (p.stage === 'comments') {
+          setStat(`Menarik komentar&hellip; ${p.count} terkumpul` + (p.total ? ` dari sekitar ${p.total}` : ''));
+          fill.style.width = (p.total ? Math.min(95, (p.count / p.total) * 100) : Math.min(90, (p.page || 0) * 8)) + '%';
+        } else if (p.stage === 'replies') {
+          setStat(`Mengambil balasan&hellip; utas ${p.page} dari ${p.total}`);
+        }
+      });
+      fill.style.width = '100%';
+      activate([parseDump(dump, 'lewat extension')]);
+    } else {
+      // Server menarik dalam satu permintaan, jadi tidak ada progres bertahap.
+      setStat('Server sedang menarik komentar&hellip; postingan ramai bisa makan sekitar satu menit.');
+      fill.style.width = '60%';
+      dump = await extractViaServer(url, savedKey());
+      fill.style.width = '100%';
+      activate([parseDump(dump, 'lewat server')]);
+    }
   } catch (e) {
-    let hint = '';
-    if (e.status === 401 || e.status === 403) hint = ' Buka instagram.com di tab lain dan pastikan kamu sudah login.';
-    else if (e.status === 429) hint = ' Instagram sedang membatasi permintaan. Tunggu beberapa menit.';
-    else if (e.status === 404) hint = ' Postingannya mungkin sudah dihapus, atau akunnya privat.';
-    setStat('Gagal: ' + esc(e.message) + hint, 'bad');
+    setStat('Gagal: ' + esc(e.message) + extractHint(e), 'bad');
+    if (e.code === 'nonaktif' || e.code === 'sesi_kosong') showExtInfo();
+    if (e.httpStatus === 401) { $('keybox').classList.remove('hidden'); }
   } finally {
     btn.disabled = false;
     setTimeout(() => $('pasteprog').classList.add('hidden'), 800);
   }
+}
+
+function extractHint(e) {
+  const s = e.status ?? e.igStatus;
+  if (s === 401 || s === 403) return ' Buka instagram.com di tab lain dan pastikan kamu sudah login.';
+  if (s === 429) return ' Instagram sedang membatasi permintaan. Tunggu beberapa menit.';
+  if (s === 404) return ' Postingannya mungkin sudah dihapus, atau akunnya privat.';
+  return '';
 }
 
 // ================================================================ timezone
@@ -625,6 +685,8 @@ function wire() {
   $('reset').onclick = () => location.reload();
   $('go').onclick = runPaste;
   $('iglink').addEventListener('keydown', (e) => { if (e.key === 'Enter') runPaste(); });
+  $('keysave').onclick = applyKey;
+  $('ketokkey').addEventListener('keydown', (e) => { if (e.key === 'Enter') applyKey(); });
 
   for (const el of ['cutoff', 'reps', 'onlyflag', 'tech']) $(el).onchange = render;
   $('q').oninput = render;
