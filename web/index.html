@@ -139,18 +139,25 @@
 
   <section class="knobs">
     <div class="knob">
-      <label for="cutoff">Jam lelang ditutup</label>
-      <input type="datetime-local" id="cutoff" step="1">
+      <label for="cutoffTime">Jam lelang ditutup</label>
+      <div class="clockin">
+        <input type="text" id="cutoffTime" inputmode="numeric" autocomplete="off"
+               placeholder="21:00" maxlength="8" aria-describedby="cutoffhint">
+        <span class="clockin-on">pada</span>
+        <select id="cutoffDate"></select>
+      </div>
+      <div class="picks" id="cutoffPicks"></div>
+      <span class="knob-hint" id="cutoffhint">Ketik jamnya saja &mdash; 21, 21.00, atau 21:00:30.</span>
     </div>
     <div class="knob">
       <label for="tz">Zona waktu</label>
       <select id="tz"></select>
+      <span class="knob-hint" id="tznote"></span>
     </div>
     <div class="knob wide">
       <label for="q">Cari</label>
       <input type="search" id="q" placeholder="nama akun atau isi komentar">
     </div>
-    <p class="knob-note" id="tznote"></p>
   </section>
 
   <section class="chips" id="cards"></section>

@@ -3,7 +3,7 @@ import { analyze, chronoCompare, fmtRupiah } from './analysis.js';
 import { diffDumps } from './diff.js';
 import {
   browserTz, tzOptions, tzOffsetLabel, fmtDateTime, fmtTime, fmtDate,
-  fmtDuration, datetimeLocalToEpoch, epochToDatetimeLocal, wallTimeToEpoch
+  fmtDuration, wallTimeToEpoch
 } from './time.js';
 import {
   download, sha256Hex, commentsCsv, accountsCsv, diffCsv, summaryText
@@ -20,7 +20,7 @@ const esc = (s) =>
 
 const state = {
   dumps: [], primary: null, diff: null, isDemo: false,
-  tz: browserTz(), cutoff: null, grace: 60,
+  tz: browserTz(), cutoff: null, captionGuess: null, grace: 60,
   query: '', includeReplies: true, onlyFlagged: false, tech: false, wrap: false,
   result: null, hash: null, guessedCutoff: false,
   sort: { chrono: { key: 'seq', dir: 1 }, accounts: { key: 'count', dir: -1 } }
@@ -222,6 +222,139 @@ function tzShort(epoch) {
   return map[state.tz] || tzOffsetLabel(epoch, state.tz);
 }
 
+// ================================================================ kendali jam tutup
+
+/**
+ * Terima jam apa adanya seperti orang menuliskannya: 21, 21.00, 21:00,
+ * 2100, 9.30, 210030. Tanggalnya diambil dari pilihan terpisah, karena
+ * lelang hampir selalu tutup di hari yang sama dengan komentarnya.
+ */
+export function parseClock(raw) {
+  const s = String(raw ?? '').trim();
+  if (!s) return null;
+
+  let h, mi = 0, sec = 0;
+
+  if (/[.:\-\s]/.test(s)) {
+    const p = s.split(/[.:\-\s]+/).filter(Boolean);
+    if (!p.length || p.length > 3 || p.some((x) => !/^\d{1,2}$/.test(x))) return null;
+    h = +p[0]; mi = +(p[1] ?? 0); sec = +(p[2] ?? 0);
+  } else {
+    if (!/^\d+$/.test(s)) return null;
+    if (s.length <= 2) h = +s;
+    else if (s.length === 3) { h = +s.slice(0, 1); mi = +s.slice(1); }
+    else if (s.length === 4) { h = +s.slice(0, 2); mi = +s.slice(2); }
+    else if (s.length === 6) { h = +s.slice(0, 2); mi = +s.slice(2, 4); sec = +s.slice(4); }
+    else return null;
+  }
+
+  if (h > 23 || mi > 59 || sec > 59) return null;
+  return { h, mi, sec };
+}
+
+const pad = (n) => String(n).padStart(2, '0');
+const fmtClock = (h, mi, sec) => `${pad(h)}:${pad(mi)}` + (sec ? `:${pad(sec)}` : '');
+
+/** Hari-hari yang benar-benar ada komentarnya, dalam zona waktu terpilih. */
+function commentDays() {
+  const days = [];
+  for (const c of state.primary.comments) {
+    const d = fmtDate(c.created_at, state.tz);
+    if (!days.includes(d)) days.push(d);
+  }
+  return days.sort((a, b) => {
+    const [da, ma, ya] = a.split('/'); const [db, mb, yb] = b.split('/');
+    return `${ya}${ma}${da}`.localeCompare(`${yb}${mb}${db}`);
+  });
+}
+
+function dayClockToEpoch(day, clock) {
+  const [d, mo, y] = day.split('/').map(Number);
+  return wallTimeToEpoch(y, mo, d, clock.h, clock.mi, clock.sec, state.tz);
+}
+
+/** Pilihan cepat, diturunkan dari data supaya sekali klik biasanya sudah benar. */
+function cutoffPicks() {
+  const rows = state.result?.rows || [];
+  if (!rows.length) return [];
+  const last = rows[rows.length - 1].created_at;
+  const picks = [];
+
+  if (state.captionGuess) {
+    picks.push({ label: state.captionGuess.label.replace('.', ':'), sub: 'dari caption', epoch: state.captionGuess.epoch });
+  }
+
+  // Jam bulat terdekat sebelum atau tepat pada komentar terakhir.
+  const day = fmtDate(last, state.tz);
+  const [hh] = fmtTime(last, state.tz).split(':').map(Number);
+  const roundEpoch = dayClockToEpoch(day, { h: hh, mi: 0, sec: 0 });
+  if (!picks.some((p) => p.epoch === roundEpoch)) {
+    picks.push({ label: fmtClock(hh, 0, 0), sub: 'jam bulat', epoch: roundEpoch });
+  }
+
+  if (!picks.some((p) => p.epoch === last)) {
+    picks.push({ label: fmtTime(last, state.tz), sub: 'komentar terakhir', epoch: last });
+  }
+  return picks;
+}
+
+function syncCutoffUI() {
+  const dateSel = $('cutoffDate');
+  const timeIn = $('cutoffTime');
+
+  const days = commentDays();
+  const cutoffDay = state.cutoff != null ? fmtDate(state.cutoff, state.tz) : null;
+  const opts = cutoffDay && !days.includes(cutoffDay) ? [...days, cutoffDay] : days;
+
+  const wanted = cutoffDay || days[days.length - 1] || '';
+  if (dateSel.dataset.built !== opts.join('|')) {
+    dateSel.innerHTML = opts.map((d) => `<option value="${d}">${d}</option>`).join('');
+    dateSel.dataset.built = opts.join('|');
+  }
+  dateSel.value = wanted;
+  dateSel.classList.toggle('hidden', opts.length < 2 && !cutoffDay);
+
+  // Jangan menimpa ketikan yang sedang berlangsung.
+  if (document.activeElement !== timeIn) {
+    timeIn.value = state.cutoff != null
+      ? fmtTime(state.cutoff, state.tz).replace(/:00$/, '')
+      : '';
+  }
+
+  const picks = cutoffPicks();
+  $('cutoffPicks').innerHTML = picks.length
+    ? '<span class="picklbl">Cepat:</span>' + picks.map((p) =>
+        `<button type="button" data-epoch="${p.epoch}"${p.epoch === state.cutoff ? ' class="on"' : ''}` +
+        ` title="${esc(p.sub)}">${esc(p.label)}</button>`).join('')
+    : '';
+  for (const b of $('cutoffPicks').querySelectorAll('button')) {
+    b.onclick = () => {
+      state.cutoff = +b.dataset.epoch;
+      state.guessedCutoff = false;
+      render();
+    };
+  }
+}
+
+function readCutoffFromUI() {
+  const timeIn = $('cutoffTime');
+  const raw = timeIn.value.trim();
+
+  if (!raw) {
+    timeIn.classList.remove('bad');
+    state.cutoff = null;
+    return;
+  }
+  const clock = parseClock(raw);
+  timeIn.classList.toggle('bad', !clock);
+  if (!clock) return;                       // biarkan nilai lama sampai ketikannya sah
+
+  const day = $('cutoffDate').value || commentDays().slice(-1)[0];
+  if (!day) return;
+  state.cutoff = dayClockToEpoch(day, clock);
+  state.guessedCutoff = false;
+}
+
 // ================================================================ tebak jam tutup
 
 function guessCutoff(caption, comments, tz) {
@@ -301,12 +434,13 @@ function activate(dumps) {
     : '';
 
   const g = guessCutoff(state.primary.source?.caption, state.primary.comments, state.tz);
+  state.captionGuess = g;
   if (g) {
-    $('cutoff').value = epochToDatetimeLocal(g.epoch, state.tz);
+    state.cutoff = g.epoch;
     state.guessedCutoff = g.label;
   } else {
-    const last = Math.max(...state.primary.comments.map((c) => c.created_at));
-    $('cutoff').placeholder = epochToDatetimeLocal(last, state.tz);
+    state.cutoff = null;
+    state.guessedCutoff = false;
   }
 
   computeHash();
@@ -323,7 +457,6 @@ async function computeHash() {
 // ================================================================ gambar ulang
 
 function render() {
-  state.cutoff = datetimeLocalToEpoch($('cutoff').value, state.tz);
   state.includeReplies = $('reps').checked;
   state.onlyFlagged = $('onlyflag').checked;
   state.tech = $('tech').checked;
@@ -337,6 +470,7 @@ function render() {
   });
 
   tzNote();
+  syncCutoffUI();
   renderProof();
   renderChips();
   renderChrono();
@@ -715,15 +849,15 @@ function wire() {
   $('keysave').onclick = applyKey;
   $('ketokkey').addEventListener('keydown', (e) => { if (e.key === 'Enter') applyKey(); });
 
-  for (const el of ['cutoff', 'reps', 'onlyflag', 'tech', 'wrap']) $(el).onchange = render;
+  for (const el of ['reps', 'onlyflag', 'tech', 'wrap']) $(el).onchange = render;
   $('q').oninput = render;
-  $('tz').onchange = () => {
-    const prev = datetimeLocalToEpoch($('cutoff').value, state.tz);
-    state.tz = $('tz').value;
-    if (prev != null) $('cutoff').value = epochToDatetimeLocal(prev, state.tz);
-    render();
-  };
-  $('cutoff').addEventListener('input', () => { state.guessedCutoff = false; });
+
+  // Zona waktu hanya mengubah cara menampilkan; momen tutupnya tidak bergeser.
+  $('tz').onchange = () => { state.tz = $('tz').value; render(); };
+
+  $('cutoffTime').addEventListener('input', () => { readCutoffFromUI(); render(); });
+  $('cutoffTime').addEventListener('blur', () => { readCutoffFromUI(); render(); });
+  $('cutoffDate').addEventListener('change', () => { readCutoffFromUI(); render(); });
 
   $('legendtoggle').onclick = () => {
     const l = $('legend');
