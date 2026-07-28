@@ -255,6 +255,55 @@ export function parseClock(raw) {
 const pad = (n) => String(n).padStart(2, '0');
 const fmtClock = (h, mi, sec) => `${pad(h)}:${pad(mi)}` + (sec ? `:${pad(sec)}` : '');
 
+/**
+ * Sisipkan titik dua sambil diketik, supaya "2030" langsung terbaca "20:30"
+ * dan tidak ada momen ragu apakah yang diketik sudah benar.
+ *
+ * Kalau pengguna mengetik pemisahnya sendiri, pengelompokannya dihormati —
+ * "9:30" tetap 9:30, tidak dipaksa jadi 93:0.
+ */
+export function maskClock(raw) {
+  const s = String(raw ?? '');
+
+  if (/[.:]/.test(s)) {
+    const parts = s.replace(/[^\d.:]/g, '').split(/[.:]/).slice(0, 3);
+    return parts.map((p, i) => (i === 0 ? p.slice(0, 2) : p.slice(0, 2))).join(':');
+  }
+
+  const d = s.replace(/\D/g, '').slice(0, 6);
+  if (d.length <= 2) return d;
+
+  // Dua digit pertama hanya bisa jadi jam kalau nilainya masuk akal.
+  const hLen = +d.slice(0, 2) <= 23 ? 2 : 1;
+  const h = d.slice(0, hLen);
+  const rest = d.slice(hLen);
+  const mi = rest.slice(0, 2);
+  const sec = rest.slice(2, 4);
+  return h + ':' + mi + (sec ? ':' + sec : '');
+}
+
+/** Terapkan mask tanpa membuat kursor melompat ke ujung saat menyunting di tengah. */
+function applyMask(el) {
+  const digitsBefore = el.value.slice(0, el.selectionStart ?? el.value.length)
+    .replace(/\D/g, '').length;
+  const masked = maskClock(el.value);
+  if (masked === el.value) return;
+
+  el.value = masked;
+
+  let seen = 0;
+  let pos = masked.length;
+  if (digitsBefore === 0) {
+    pos = 0;
+  } else {
+    for (let i = 0; i < masked.length; i++) {
+      if (/\d/.test(masked[i])) seen++;
+      if (seen === digitsBefore) { pos = i + 1; break; }
+    }
+  }
+  try { el.setSelectionRange(pos, pos); } catch { /* input bisa belum fokus */ }
+}
+
 /** Hari-hari yang benar-benar ada komentarnya, dalam zona waktu terpilih. */
 function commentDays() {
   const days = [];
@@ -856,7 +905,11 @@ function wire() {
   // Zona waktu hanya mengubah cara menampilkan; momen tutupnya tidak bergeser.
   $('tz').onchange = () => { state.tz = $('tz').value; render(); };
 
-  $('cutoffTime').addEventListener('input', () => { readCutoffFromUI(); render(); });
+  $('cutoffTime').addEventListener('input', (e) => {
+    applyMask(e.target);
+    readCutoffFromUI();
+    render();
+  });
   $('cutoffTime').addEventListener('blur', () => { readCutoffFromUI(); render(); });
   $('cutoffDate').addEventListener('change', () => { readCutoffFromUI(); render(); });
 
