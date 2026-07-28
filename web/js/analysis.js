@@ -60,7 +60,9 @@ export function parseBid(text) {
   }
   if (best) return best;
 
-  const tokens = clean.match(/\d[\d.,]*/g) || [];
+  // Hanya angka yang berdiri sendiri. Tanpa ini, "SKX007" terbaca sebagai
+  // tawaran bernilai 7 — kesalahan yang berbahaya di alat yang dipakai menuduh.
+  const tokens = clean.match(/(?<![A-Za-z0-9])\d[\d.,]*(?![A-Za-z0-9])/g) || [];
   for (const t of tokens) {
     const v = toNumber(t);
     if (!Number.isFinite(v) || v <= 0) continue;
