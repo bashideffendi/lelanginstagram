@@ -261,37 +261,42 @@ function menawarDiPembukaan(teks) {
 /**
  * Terapkan aturan sniper zone.
  *
- * Banyak lelang Instagram memakai aturan anti-sniping: kalau ada tawaran masuk
- * dalam N menit terakhir, waktu tutup diundur N menit dari tawaran itu, dan
- * berulang sampai tidak ada lagi tawaran di zona tersebut. Tanpa ini, orang
- * yang menawar di detik akhir otomatis menang.
+ * Sniper zone adalah N menit terakhir sebelum lelang tutup — untuk tutup
+ * 21.00 dengan zona 5 menit, zonanya 20.55 sampai 21.00.
  *
- * Aturan ini mengubah siapa yang dianggap telat, jadi hasilnya dilaporkan
- * lengkap dengan tiap perpanjangannya supaya bisa diperiksa.
+ * Aturannya: yang boleh menawar di dalam zona hanya akun yang SUDAH pernah
+ * menawar sebelum zona dimulai. Akun yang baru muncul di zona itu tidak
+ * berhak; tawarannya tidak sah. Aturan ini menutup celah orang yang menunggu
+ * di menit terakhir lalu menyalip tanpa pernah ikut menaikkan harga.
+ *
+ * Tidak semua penjual memakainya, jadi zona nol berarti aturan ini mati.
  */
-export function hitungCutoffEfektif(rows, cutoff, sniperSec) {
-  if (cutoff == null || !sniperSec) {
-    return { efektif: cutoff, perpanjangan: 0, putaran: [] };
+export function terapkanSniperZone(rows, cutoff, sniperSec) {
+  const mati = { aktif: false, mulai: null, pelanggar: [] };
+  if (cutoff == null || !sniperSec) return mati;
+
+  const mulai = cutoff - sniperSec;
+  const pelanggar = [];
+
+  // Siapa saja yang sudah menawar sebelum zona dimulai.
+  const sudahMenawar = new Set(
+    rows
+      .filter((r) => r.bid != null && !r.isOwner && !r.isAnnouncement && r.created_at < mulai)
+      .map((r) => String(r.username || '').toLowerCase())
+  );
+
+  for (const r of rows) {
+    if (r.bid == null || r.isOwner || r.isAnnouncement) continue;
+    if (r.created_at < mulai || r.created_at > cutoff) continue;
+
+    r.diZonaSniper = true;
+    if (!sudahMenawar.has(String(r.username || '').toLowerCase())) {
+      r.sniperIlegal = true;
+      pelanggar.push(r);
+    }
   }
 
-  let eff = cutoff;
-  const putaran = [];
-
-  for (let aman = 0; aman < 500; aman++) {
-    const diZona = rows.filter((r) =>
-      r.bid != null && !r.isOwner && !r.isAnnouncement &&
-      r.created_at <= eff && r.created_at > eff - sniperSec);
-    if (!diZona.length) break;
-
-    const terakhir = Math.max(...diZona.map((r) => r.created_at));
-    const baru = terakhir + sniperSec;
-    if (baru <= eff) break;
-
-    putaran.push({ dari: eff, ke: baru, karena: terakhir });
-    eff = baru;
-  }
-
-  return { efektif: eff, perpanjangan: eff - cutoff, putaran };
+  return { aktif: true, mulai, pelanggar };
 }
 
 export function analyze(comments, opts = {}) {
@@ -364,10 +369,10 @@ export function analyze(comments, opts = {}) {
     r.bidScaled = r.bidRaw != null && !r.bidStrong && skala !== 1;
   }
 
-  // --- Sniper zone mengubah waktu tutup yang berlaku, jadi dihitung sebelum
-  // ada satu pun tawaran dinilai telat.
-  const sniper = hitungCutoffEfektif(rows, cutoffEpoch, sniperSec);
-  const cutoffBerlaku = sniper.efektif;
+  // --- Sniper zone menentukan tawaran mana yang tidak berhak, jadi dihitung
+  // sebelum pemenang dipilih. Ia tidak menggeser waktu tutup.
+  const sniper = terapkanSniperZone(rows, cutoffEpoch, sniperSec);
+  const cutoffBerlaku = cutoffEpoch;
 
   // --- Lintasan kedua: urutan, penandaan, dan tangga tawaran.
   let prevHighBid = null;
@@ -385,6 +390,7 @@ export function analyze(comments, opts = {}) {
     r.flags = [];
     if (r.isOwner) r.flags.push('penyelenggara');
     else if (r.isAnnouncement) r.flags.push('pengumuman');
+    if (r.sniperIlegal) r.flags.push('sniper-ilegal');
 
     if (cutoffBerlaku != null) {
       if (r.created_at > cutoffBerlaku) {
@@ -519,6 +525,7 @@ function summarize(rows, cutoffEpoch) {
     snipe: rows.filter((r) => r.flags.includes('detik-akhir')).length,
     tieRows: rows.filter((r) => r.tie).length,
     tieGroups: tieGroups.size,
+    sniperIlegal: rows.filter((r) => r.sniperIlegal).length,
     bidDown: rows.filter((r) => r.flags.includes('bid-turun')).length,
     bidSame: rows.filter((r) => r.flags.includes('bid-sama')).length,
     parsedBids: withBid.length,
@@ -526,8 +533,9 @@ function summarize(rows, cutoffEpoch) {
     cutoff: cutoffEpoch,
     // Bid sah tertinggi = bid terbesar yang masuk sebelum cutoff.
     winner: (() => {
+      // Tawaran yang melanggar sniper zone tidak berhak menang.
       const eligible = rows.filter(
-        (r) => r.bid != null && !r.isOwner && !r.isAnnouncement &&
+        (r) => r.bid != null && !r.isOwner && !r.isAnnouncement && !r.sniperIlegal &&
           (cutoffEpoch == null || r.created_at <= cutoffEpoch)
       );
       if (!eligible.length) return null;

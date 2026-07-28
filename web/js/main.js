@@ -742,6 +742,10 @@ function renderProof() {
     flags.push(['bad', `${s.lateBids} tawaran masuk setelah lelang ditutup.`,
       `Yang paling telat lewat ${fmtDuration(worst)}.`]);
   }
+  if (s.sniperIlegal > 0) {
+    flags.push(['bad', `${s.sniperIlegal} tawaran masuk di sniper zone tanpa berhak.`,
+      'Akunnya belum pernah menawar sebelum zona itu dimulai.']);
+  }
   if (state.diff && state.diff.deleted.length) {
     flags.push(['bad', `${state.diff.deleted.length} komentar dihapus di antara dua tarikan kamu.`,
       'Isinya masih tersimpan di tab &ldquo;Yang dihapus&rdquo;.']);
@@ -786,9 +790,10 @@ function renderProof() {
   // dinyatakan, tapi tempatnya satu baris kecil, bukan pita kuning berjajar.
   const cara = [];
   const sn = s.sniper;
-  if (sn && sn.putaran.length) {
-    cara.push(`sniper zone ${state.sniperMin} menit memundurkan tutup ke ` +
-      `<b>${fmtTime(sn.efektif, state.tz)}</b> (${sn.putaran.length}&times;)`);
+  if (sn && sn.aktif) {
+    cara.push(`sniper zone ${state.sniperMin} menit sejak ` +
+      `<b>${fmtTime(sn.mulai, state.tz)}</b>` +
+      (sn.pelanggar.length ? ` — ${sn.pelanggar.length} tawaran tidak berhak` : ''));
   }
   if (s.bidScale && s.bidScale !== 1) {
     cara.push(`angka tanpa satuan dibaca <b>${s.bidScale === 1e6 ? 'jutaan' : 'ribuan'}</b>`);
@@ -803,11 +808,19 @@ function renderProof() {
   if ($('howmore')) {
     $('howmore').onclick = () => {
       const p = [];
-      if (sn && sn.putaran.length) {
-        p.push('Sniper zone ' + state.sniperMin + ' menit:');
-        p.push('  tutup semula ' + fmtTime(s.cutoffAsli, state.tz));
-        for (const x of sn.putaran) {
-          p.push('  tawaran ' + fmtTime(x.karena, state.tz) + ' -> tutup jadi ' + fmtTime(x.ke, state.tz));
+      if (sn && sn.aktif) {
+        p.push('Sniper zone ' + state.sniperMin + ' menit: ' +
+          fmtTime(sn.mulai, state.tz) + ' sampai ' + fmtTime(s.cutoff, state.tz));
+        p.push('  Yang boleh menawar di dalamnya hanya akun yang sudah pernah');
+        p.push('  menawar sebelum zona dimulai.');
+        if (sn.pelanggar.length) {
+          p.push('  Tidak berhak:');
+          for (const x of sn.pelanggar) {
+            p.push('    ' + fmtTime(x.created_at, state.tz) + '  @' + (x.username || '?') +
+              '  Rp' + fmtRupiah(x.bid));
+          }
+        } else {
+          p.push('  Tidak ada pelanggaran.');
         }
       }
       if (s.bidScale && s.bidScale !== 1) {
@@ -866,6 +879,9 @@ const TAGS = {
   'bid-turun': ['down', () => 'nilai turun', 'Lebih kecil dari tawaran tertinggi sebelumnya.'],
   'bid-sama': ['same', () => 'nilai sama', 'Sama persis dengan tawaran tertinggi sebelumnya.'],
   beruntun: ['burst', () => 'beruntun', 'Akun yang sama berkomentar lagi dalam 5 detik.'],
+  'sniper-ilegal': ['late', () => 'sniper zone',
+    'Menawar di dalam sniper zone padahal akunnya belum pernah menawar sebelum ' +
+    'zona itu dimulai. Tawaran ini tidak berhak menang.'],
   pengumuman: ['host', () => 'pengumuman',
     'Komentar aturan lelang, dikenali dari bentuknya: panjang, bergaris pemisah, ' +
     'dan memuat istilah seperti OB, kelipatan, atau BIN. Angkanya bukan tawaran.'],
@@ -1006,19 +1022,27 @@ function renderChrono() {
         : rows.filter((r) => r.created_at <= cutoff).length)   // terlama di atas
     : -1;
 
-  const barisTutup = () => {
-    const sn = state.result.summary.sniper;
-    const mundur = sn && sn.putaran.length
-      ? ` &middot; dimundurkan dari ${fmtTime(state.result.summary.cutoffAsli, state.tz)} oleh sniper zone`
-      : '';
-    return `<tr class="closed"><td colspan="${span}">` +
-      `Lelang ditutup ${fmtTime(cutoff, state.tz)} ${tzShort(cutoff)}${mundur}` +
-      '</td></tr>';
-  };
+  const barisTutup = () =>
+    `<tr class="closed"><td colspan="${span}">` +
+    `Lelang ditutup ${fmtTime(cutoff, state.tz)} ${tzShort(cutoff)}</td></tr>`;
+
+  // Batas mulainya sniper zone: di dalamnya hanya penawar lama yang berhak.
+  const sn = state.result.summary.sniper;
+  const posisiZona = sn && sn.aktif && urutWaktu
+    ? (state.sort.chrono.dir === -1
+        ? rows.filter((r) => r.created_at > sn.mulai).length
+        : rows.filter((r) => r.created_at < sn.mulai).length)
+    : -1;
+
+  const barisZona = () =>
+    `<tr class="zone"><td colspan="${span}">` +
+    `Sniper zone mulai ${fmtTime(sn.mulai, state.tz)} &middot; ` +
+    'hanya akun yang sudah menawar sebelum ini yang berhak</td></tr>';
 
   let prevDay = null;
   rows.forEach((r, i) => {
     if (i === posisiTutup) { out.push(barisTutup()); prevDay = null; }
+    if (i === posisiZona) { out.push(barisZona()); prevDay = null; }
 
     const day = fmtDate(r.created_at, state.tz);
     if (day !== prevDay) {
@@ -1028,6 +1052,7 @@ function renderChrono() {
     out.push(rowHtml(r, span, w && r.pk === w.pk ? 'pinned' : ''));
   });
   if (posisiTutup === rows.length) out.push(barisTutup());
+  if (posisiZona === rows.length) out.push(barisZona());
 
   tbl.tBodies[0].innerHTML = out.join('');
 }

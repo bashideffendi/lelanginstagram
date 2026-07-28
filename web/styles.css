@@ -427,6 +427,16 @@ tbody tr.closed td {
 }
 tbody tr.closed:hover td { background: var(--danger-soft); }
 
+/* Batas mulainya sniper zone — peringatan, bukan penutupan. */
+tbody tr.zone td {
+  background: var(--warn-soft);
+  border-top: 2px dashed rgba(197, 137, 27, .55);
+  color: var(--warn); padding: 7px 13px;
+  font-family: var(--mono); font-size: 10.5px; font-weight: 500;
+  letter-spacing: .1em; text-transform: uppercase;
+}
+tbody tr.zone:hover td { background: var(--warn-soft); }
+
 tbody tr.pinned td { background: var(--primary-soft); }
 tbody tr.pinned:hover td { background: var(--primary-soft); }
 tbody tr.r-late td { background: var(--danger-soft); }

@@ -143,10 +143,17 @@
           <div class="knob">
             <label for="sniper">Sniper zone</label>
             <div class="knob-in">
-              <input type="number" id="sniper" min="0" max="120" step="1" value="0">
-              <span class="knob-on">menit</span>
+              <select id="sniper">
+                <option value="0" selected>Tidak ada</option>
+                <option value="3">3 menit terakhir</option>
+                <option value="5">5 menit terakhir</option>
+                <option value="10">10 menit terakhir</option>
+                <option value="15">15 menit terakhir</option>
+                <option value="30">30 menit terakhir</option>
+                <option value="60">60 menit terakhir</option>
+              </select>
             </div>
-            <div class="knob-hint" id="snipernote">0 = tidak ada aturan ini</div>
+            <div class="knob-hint" id="snipernote">Hanya penawar lama boleh masuk</div>
           </div>
           <div class="knob">
             <label for="tz">Zona waktu</label>
