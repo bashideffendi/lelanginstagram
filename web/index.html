@@ -10,28 +10,18 @@
 </head>
 <body>
 
-<div class="shell">
-
-  <aside class="side">
+<header class="mast">
+  <div class="mast-in">
     <a class="brand" href="./">
       <span class="mark">Lelang<b>Insta</b></span>
-      <span class="sub">Cek Pemenang Lelang</span>
+      <span class="sub">Cek Pemenang Lelang Instagram</span>
     </a>
-
-    <nav class="tabs hidden" id="tabs">
-      <button data-tab="chrono" class="on">Urutan tawaran <span class="pip" id="c-chrono"></span></button>
-      <button data-tab="accounts">Per akun <span class="pip" id="c-accounts"></span></button>
-      <button data-tab="diff" id="tab-diff" class="hidden">Yang dihapus <span class="pip" id="c-diff"></span></button>
-      <button data-tab="evidence">Simpan bukti</button>
-    </nav>
-
-    <span class="spacer"></span>
+    <span class="fill"></span>
     <button id="reset" class="btn quiet sm hidden">Cek lelang lain</button>
-    <p class="foot">Jam diterjemahkan dari catatan waktu asli Instagram dan tidak pernah diubah.</p>
-  </aside>
+  </div>
+</header>
 
-  <div class="main">
-    <div class="wrap">
+<div class="wrap">
 
       <!-- ================================================== halaman awal -->
       <section id="landing">
@@ -163,6 +153,13 @@
 
         <div class="chips" id="cards"></div>
 
+        <nav class="tabs" id="tabs">
+          <button data-tab="chrono" class="on">Urutan tawaran <span class="pip" id="c-chrono"></span></button>
+          <button data-tab="accounts">Per akun <span class="pip" id="c-accounts"></span></button>
+          <button data-tab="diff" id="tab-diff" class="hidden">Yang dihapus <span class="pip" id="c-diff"></span></button>
+          <button data-tab="evidence">Simpan bukti</button>
+        </nav>
+
         <div class="tab on" id="tab-body-chrono">
           <div class="toolrow">
             <label class="tog"><input type="checkbox" id="onlyflag"> Hanya yang ditandai</label>
@@ -220,13 +217,12 @@
         </div>
 
         <p class="foot-note">
-          Mengganti zona waktu hanya mengubah cara menampilkan, bukan momennya.
+          Jam diterjemahkan dari catatan waktu asli Instagram dan tidak pernah diubah &mdash;
+          mengganti zona waktu hanya mengubah cara menampilkan, bukan momennya.
           Tawaran pada detik yang sama diurutkan memakai nomor komentar Instagram.
         </p>
       </section>
 
-    </div>
-  </div>
 </div>
 
 <script type="module" src="js/main.js"></script>
