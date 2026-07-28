@@ -9,8 +9,15 @@
 import { fmtDateTime, fmtIsoUtc, tzOffsetLabel, fmtDuration } from './time.js';
 import { fmtRupiah } from './analysis.js';
 
+/**
+ * Excel memperlakukan sel yang diawali = + - @ atau tab sebagai rumus, dan
+ * menjalankannya saat berkas dibuka. Komentar Instagram bisa berisi apa saja,
+ * termasuk teks yang sengaja dibentuk seperti rumus. Awalan kutip tunggal
+ * menetralkannya tanpa mengubah apa yang terbaca oleh manusia.
+ */
 function csvCell(v) {
-  const s = v == null ? '' : String(v);
+  let s = v == null ? '' : String(v);
+  if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
   return /[",\n\r;]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
 }
 
@@ -138,13 +145,17 @@ export function summaryText(summary, source, tz, dumpHash) {
   if (summary.winner) {
     L.push('');
     L.push('BID SAH TERTINGGI (sebelum cutoff)');
-    L.push(`  @${summary.winner.username}  ${fmtRupiah(summary.winner.bid)}`);
+    // Komentar dari akun yang sudah dihapus tidak punya username.
+    L.push(`  ${summary.winner.username ? '@' + summary.winner.username : '(akun tidak diketahui)'}` +
+      `  ${fmtRupiah(summary.winner.bid)}`);
     L.push(`  ${fmtDateTime(summary.winner.created_at, tz)}   [epoch ${summary.winner.created_at}]`);
     L.push(`  comment ID ${summary.winner.pk}`);
   }
   if (dumpHash) {
     L.push('');
-    L.push(`SHA-256 dump mentah: ${dumpHash}`);
+    L.push('SHA-256 berkas "Data asli (JSON)":');
+    L.push(`  ${dumpHash}`);
+    L.push('  Hitung ulang sidik jari berkas itu untuk memastikan isinya tidak diubah.');
   }
   L.push('');
   L.push('Catatan: Instagram hanya menyediakan presisi detik. Bid pada detik yang');

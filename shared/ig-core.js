@@ -119,24 +119,78 @@ export function fetchComments(api, mediaId, onProgress, errors, maxPages) {
         });
       }
       return all;
+    }).catch(function (e) {
+      // Halaman pertama gagal berarti tidak ada apa-apa untuk diselamatkan —
+      // biarkan naik supaya pengguna melihat penyebabnya (biasanya belum login).
+      if (!all.length) throw e;
+
+      // Sudah ada yang terkumpul: lebih baik kembalikan sebagian dan catat
+      // kekurangannya, daripada membuang ribuan komentar karena satu halaman gagal.
+      errors.push({
+        stage: 'comments',
+        message: 'Terhenti di halaman ' + (page + 1) + ': ' + e.message +
+          ' — ' + all.length + ' komentar terkumpul, sisanya tidak terambil.',
+        partial: true
+      });
+      return all;
     });
   }
   return step();
 }
 
-/** Balasan bersarang. Dua bentuk path dicoba karena Instagram pernah menggantinya. */
-export function fetchReplies(api, mediaId, commentPk) {
-  var paths = [
-    '/api/v1/media/' + mediaId + '/comments/' + commentPk + '/child_comments/?max_id=',
-    '/api/v1/media/' + commentPk + '/child_comments/'
-  ];
-  function tryPath(i) {
-    if (i >= paths.length) return Promise.resolve([]);
-    return api(paths[i])
-      .then(function (j) { return j.child_comments || j.comments || []; })
-      .catch(function () { return tryPath(i + 1); });
+/**
+ * Balasan bersarang, lengkap dengan paginasinya.
+ *
+ * Dua bentuk path dicoba karena Instagram pernah menggantinya. Galat dicatat,
+ * tidak ditelan: utas yang gagal diambil harus terlihat di berkas bukti,
+ * karena balasan yang hilang bisa berisi tawaran.
+ */
+export function fetchReplies(api, mediaId, commentPk, errors, maxPages) {
+  var limit = maxPages || 20;
+  var out = [];
+
+  function base(i, cursor) {
+    var p = i === 0
+      ? '/api/v1/media/' + mediaId + '/comments/' + commentPk + '/child_comments/'
+      : '/api/v1/media/' + commentPk + '/child_comments/';
+    return p + '?max_id=' + (cursor ? encodeURIComponent(cursor) : '');
   }
-  return tryPath(0);
+
+  function halaman(i, cursor, page) {
+    return api(base(i, cursor)).then(function (j) {
+      out = out.concat(j.child_comments || j.comments || []);
+      var next = j.next_max_child_cursor || j.next_max_id || null;
+      var lagi = j.has_more_tail_child_comments !== false && !!next;
+
+      if (lagi && page + 1 < limit) {
+        return politeDelay().then(function () {
+          return halaman(i, String(next), page + 1);
+        });
+      }
+      if (lagi && errors) {
+        errors.push({
+          stage: 'replies',
+          message: 'Balasan pada komentar ' + commentPk + ' berhenti di batas ' +
+            limit + ' halaman.'
+        });
+      }
+      return out;
+    });
+  }
+
+  return halaman(0, null, 0).catch(function (e1) {
+    out = [];
+    return halaman(1, null, 0).catch(function (e2) {
+      if (errors) {
+        errors.push({
+          stage: 'replies',
+          message: 'Balasan pada komentar ' + commentPk + ' gagal diambil: ' + e2.message,
+          status: e2.status || e1.status || null
+        });
+      }
+      return [];
+    });
+  });
 }
 
 export function normalize(c, parentPk) {
@@ -199,12 +253,24 @@ export function extract(opts) {
       var threads = top.filter(function (c) { return (c.child_comment_count || 0) > 0; });
       if (!threads.length) return [];
 
+      // Batas keseluruhan balasan. Tanpa ini, satu postingan dengan ratusan utas
+      // berbalas bisa memicu ribuan permintaan ke Instagram dari satu klik.
+      var batasUtas = opts.maxThreads || 300;
+      if (threads.length > batasUtas) {
+        errors.push({
+          stage: 'replies',
+          message: 'Hanya ' + batasUtas + ' dari ' + threads.length +
+            ' utas berbalas yang diambil.'
+        });
+        threads = threads.slice(0, batasUtas);
+      }
+
       var out = [];
       var i = 0;
       function next() {
         if (i >= threads.length) return Promise.resolve(out);
         var parent = threads[i++];
-        return fetchReplies(api, mediaId, parent.pk).then(function (kids) {
+        return fetchReplies(api, mediaId, parent.pk, errors).then(function (kids) {
           kids.forEach(function (k) { out.push({ parent: parent.pk, c: k }); });
           report({ stage: 'replies', count: out.length, page: i, total: threads.length });
           return politeDelay().then(next);
@@ -227,8 +293,12 @@ export function extract(opts) {
           via: opts.via || 'unknown'
         },
         source: {
-          url: 'https://www.instagram.com/p/' + shortcode + '/',
-          shortcode: shortcode,
+          // Tanpa shortcode (mediaId datang dari halaman, bukan dari alamat),
+          // jangan mengarang permalink yang berujung "/p/null/".
+          url: shortcode
+            ? 'https://www.instagram.com/p/' + shortcode + '/'
+            : (opts.url || null),
+          shortcode: shortcode || null,
           media_id: mediaId,
           owner_username: meta.info && meta.info.owner_username,
           post_taken_at: meta.info && meta.info.taken_at,

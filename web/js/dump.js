@@ -23,15 +23,29 @@ function normalizeRaw(c, parentPk) {
 
 export function parseDump(json, filename = '') {
   let data = json;
-  if (typeof data === 'string') data = JSON.parse(data);
+  if (typeof data === 'string') {
+    try {
+      data = JSON.parse(data);
+    } catch {
+      throw new Error('Berkas ini bukan JSON yang sah.');
+    }
+  }
+  // Tanpa penjagaan ini, berkas berisi `null` atau sekadar angka menghasilkan
+  // pesan galat teknis yang tidak memberi tahu apa pun kepada pengguna.
+  if (data == null || typeof data !== 'object') {
+    throw new Error('Format tidak dikenali — isinya bukan berkas hasil tarikan Lelang Insta.');
+  }
 
   let comments = null;
   let source = {};
   let meta = {};
 
   if (Array.isArray(data)) {
-    // Array komentar telanjang.
-    comments = data.map((c) => (c.username !== undefined ? c : normalizeRaw(c, null)));
+    // Array komentar telanjang. Elemen kosong dibuang lebih dulu supaya
+    // berkas yang cacat sebagian tetap bisa dibaca.
+    comments = data
+      .filter((c) => c && typeof c === 'object')
+      .map((c) => (c.username !== undefined ? c : normalizeRaw(c, null)));
   } else if (Array.isArray(data.comments) && data.comments.length && data.comments[0].username !== undefined) {
     // Dump Ketok.
     comments = data.comments;
@@ -49,7 +63,7 @@ export function parseDump(json, filename = '') {
   if (!comments) throw new Error('Format tidak dikenali — tidak menemukan daftar komentar.');
 
   comments = comments
-    .filter((c) => c && c.pk && Number.isFinite(Number(c.created_at)))
+    .filter((c) => c && typeof c === 'object' && c.pk && Number.isFinite(Number(c.created_at)))
     .map((c) => ({ ...c, created_at: Number(c.created_at) }));
 
   if (!comments.length) throw new Error('Dump terbaca tapi tidak berisi komentar yang valid.');

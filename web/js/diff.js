@@ -19,6 +19,10 @@ export function diffDumps(before, after) {
     a = after; b = before; swapped = true;
   }
 
+  // Tanpa waktu penarikan, urutannya cuma mengikuti urutan berkas dijatuhkan.
+  // Arah yang keliru membuat komentar BARU dilaporkan sebagai DIHAPUS.
+  const waktuTidakPasti = beforeAt == null || afterAt == null;
+
   const mapA = new Map(a.comments.map((c) => [c.pk, c]));
   const mapB = new Map(b.comments.map((c) => [c.pk, c]));
 
@@ -38,12 +42,18 @@ export function diffDumps(before, after) {
   deleted.sort(chronoCompare);
   added.sort(chronoCompare);
 
-  const sameSource =
-    !a.source?.media_id || !b.source?.media_id ||
-    a.source.media_id === b.source.media_id;
+  // Sumber hanya dianggap sama kalau keduanya memang menyebutkan postingan
+  // yang sama. Sebelumnya identitas yang hilang dianggap cocok, sehingga
+  // membandingkan dua postingan berbeda melaporkan semuanya sebagai dihapus.
+  const idA = a.source?.media_id || a.source?.shortcode || null;
+  const idB = b.source?.media_id || b.source?.shortcode || null;
+  const sameSource = idA != null && idB != null && String(idA) === String(idB);
+  const sumberTidakDikenal = idA == null || idB == null;
 
   return {
     swapped,
+    waktuTidakPasti,
+    sumberTidakDikenal,
     sameSource,
     beforeLabel: a.filename || 'snapshot 1',
     afterLabel: b.filename || 'snapshot 2',

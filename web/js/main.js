@@ -36,7 +36,7 @@ const state = {
   dumps: [], primary: null, diff: null, isDemo: false,
   tz: browserTz(), cutoff: null, captionGuess: null, grace: 60,
   query: '', includeReplies: true, onlyFlagged: false, tech: false, wrap: false,
-  result: null, hash: null, guessedCutoff: false,
+  result: null, hash: null, hashToken: 0, canonicalJson: null, guessedCutoff: false,
   sort: { chrono: { key: 'seq', dir: 1 }, accounts: { key: 'count', dir: -1 } }
 };
 
@@ -420,28 +420,78 @@ function readCutoffFromUI() {
 
 // ================================================================ tebak jam tutup
 
+/**
+ * Tebak jam tutup dari caption postingan.
+ *
+ * Dua jebakan yang harus dihindari, keduanya menghasilkan tuduhan palsu:
+ *
+ * 1. Menjangkarkan jam ke tanggal komentar TERAKHIR. Lelang yang tutup 21.00
+ *    tapi masih diramaikan sampai lewat tengah malam akan menaruh cutoff di
+ *    hari berikutnya — telat 24 jam, dan semua pelanggaran raib.
+ * 2. Mengambil angka pertama sesudah kata "close". Caption seperti
+ *    "CLOSED YA! kelipatan bid 2.50, tutup 21.00" akan memilih 02:50.
+ *
+ * Karena itu setiap angka jam dicoba pada setiap hari yang benar-benar ada
+ * komentarnya, lalu dipilih yang paling masuk akal sebagai penutup lelang.
+ */
 function guessCutoff(caption, comments, tz) {
   if (!caption || !comments.length) return null;
+
   const re = /(?<!\d)([01]?\d|2[0-3])[.:]([0-5]\d)(?!\d)/g;
   const found = [];
   let m;
   while ((m = re.exec(caption)) !== null) found.push({ h: +m[1], mi: +m[2], at: m.index });
   if (!found.length) return null;
 
+  // Angka yang menempel pada kata penutupan lebih dipercaya, tapi jaraknya
+  // dipersempit supaya harga atau kelipatan bid tidak ikut tersedot.
   const kw = /(clos\w*|tutup|\bcd\b|\bco\b|berakhir|selesai)/gi;
-  let pick = found[found.length - 1];
+  const berlabel = new Set();
   let k;
   while ((k = kw.exec(caption)) !== null) {
-    const near = found.find((f) => f.at > k.index && f.at - k.index < 40);
-    if (near) { pick = near; break; }
+    for (const f of found) {
+      if (f.at >= k.index && f.at - (k.index + k[0].length) <= 12) berlabel.add(f);
+    }
   }
 
-  const last = Math.max(...comments.map((c) => c.created_at));
-  const [d, mo, y] = fmtDate(last, tz).split('/').map(Number);
-  const epoch = wallTimeToEpoch(y, mo, d, pick.h, pick.mi, 0, tz);
   const first = Math.min(...comments.map((c) => c.created_at));
-  if (epoch < first || epoch > last + 86400) return null;
-  return { epoch, label: `${String(pick.h).padStart(2, '0')}.${String(pick.mi).padStart(2, '0')}` };
+  const last = Math.max(...comments.map((c) => c.created_at));
+
+  // Hari-hari yang punya komentar, ditambah sehari sesudah yang terakhir
+  // untuk lelang yang memang tutup lewat tengah malam.
+  const hari = [];
+  for (const c of comments) {
+    const d = fmtDate(c.created_at, tz);
+    if (!hari.includes(d)) hari.push(d);
+  }
+  const besok = fmtDate(last + 86400, tz);
+  if (!hari.includes(besok)) hari.push(besok);
+
+  const kandidat = [];
+  for (const f of found) {
+    for (const d of hari) {
+      const [dd, mm, yy] = d.split('/').map(Number);
+      const epoch = wallTimeToEpoch(yy, mm, dd, f.h, f.mi, 0, tz);
+      // Penutup lelang harus berada di dalam rentang komentar, atau sedikit
+      // sesudahnya — bukan sebelum tawaran pertama masuk.
+      if (epoch < first || epoch > last + 6 * 3600) continue;
+      kandidat.push({ f, epoch, berlabel: berlabel.has(f) });
+    }
+  }
+  if (!kandidat.length) return null;
+
+  // Yang berlabel menang. Di antara yang setara, yang paling dekat dengan
+  // komentar terakhir paling mungkin jadi penutupnya.
+  kandidat.sort((a, b) => {
+    if (a.berlabel !== b.berlabel) return a.berlabel ? -1 : 1;
+    return Math.abs(a.epoch - last) - Math.abs(b.epoch - last);
+  });
+
+  const pilih = kandidat[0];
+  return {
+    epoch: pilih.epoch,
+    label: `${String(pilih.f.h).padStart(2, '0')}.${String(pilih.f.mi).padStart(2, '0')}`
+  };
 }
 
 // ================================================================ muat
@@ -451,14 +501,25 @@ function showError(msg) {
   $('loaderr').classList.remove('hidden');
 }
 
+function pilihTab(nama) {
+  document.querySelectorAll('.tabs button').forEach((x) =>
+    x.classList.toggle('on', x.dataset.tab === nama));
+  document.querySelectorAll('.tab').forEach((x) =>
+    x.classList.toggle('on', x.id === 'tab-body-' + nama));
+}
+
 async function loadFiles(files) {
   $('loaderr').classList.add('hidden');
   try {
     const parsed = [];
     for (const f of [...files].slice(0, 2)) parsed.push(await readFileAsDump(f));
+    state.isDemo = false;                    // berkas asli, bukan peragaan lagi
     activate(parsed);
   } catch (e) {
     showError(e.message);
+    // Galat pada halaman hasil tidak terlihat kalau kotaknya tertinggal di
+    // halaman awal, jadi pastikan pengguna tetap membacanya.
+    if ($('landing').classList.contains('hidden')) alert(e.message);
   }
 }
 
@@ -490,6 +551,10 @@ function activate(dumps) {
   $('reset').classList.remove('hidden');
   $('tab-diff').classList.toggle('hidden', !state.diff);
 
+  // Kalau tab "Yang dihapus" sedang terbuka lalu data baru tidak punya
+  // pembanding, tabnya menghilang tapi isinya tertinggal di layar.
+  if (!state.diff && $('tab-body-diff').classList.contains('on')) pilihTab('chrono');
+
   $('democue').innerHTML = state.isDemo
     ? '<div class="democue"><b>Ini lelang contoh, bukan data asli.</b> ' +
       'Angkanya dibuat-buat supaya kamu bisa melihat cara kerjanya. ' +
@@ -511,10 +576,27 @@ function activate(dumps) {
   window.scrollTo(0, 0);
 }
 
+/**
+ * Sidik jari dihitung atas teks yang PERSIS SAMA dengan berkas yang bisa
+ * diunduh lewat tombol "Data asli (JSON)". Sebelumnya ia dihitung atas
+ * bentuk lain, sehingga tidak cocok dengan berkas mana pun — sidik jari yang
+ * tidak bisa dicocokkan orang lain tidak ada gunanya sebagai bukti.
+ */
 async function computeHash() {
-  try { state.hash = await sha256Hex(JSON.stringify(state.primary.original)); }
-  catch { state.hash = null; }
-  $('hash').textContent = state.hash || 'tidak tersedia';
+  const token = ++state.hashToken;
+  state.hash = null;
+  state.canonicalJson = JSON.stringify(state.primary.original, null, 2);
+  $('hash').textContent = 'menghitung…';
+
+  let hash = null;
+  try { hash = await sha256Hex(state.canonicalJson); } catch { hash = null; }
+
+  // Data lain mungkin sudah dimuat selagi ini berjalan.
+  if (token !== state.hashToken) return;
+
+  state.hash = hash;
+  $('hash').textContent = hash || 'tidak tersedia';
+  if (state.result) renderEvidence();
 }
 
 // ================================================================ gambar ulang
@@ -540,6 +622,12 @@ function render() {
   renderAccounts();
   renderDiff();
   renderLegend();
+  renderEvidence();
+}
+
+/** Dipanggil ulang saat sidik jari selesai dihitung, karena datang belakangan. */
+function renderEvidence() {
+  if (!state.result) return;
   $('sumtext').textContent = summaryText(
     state.result.summary, state.primary.source, state.tz, state.hash);
 }
@@ -843,9 +931,18 @@ function renderDiff() {
   $('c-diff').textContent = d.deleted.length + d.added.length + d.changed.length;
 
   const info = [];
-  if (!d.sameSource) {
+  if (!d.sameSource && !d.sumberTidakDikenal) {
     info.push('<p class="alert bad">Dua berkas ini dari postingan yang berbeda, ' +
       'jadi perbandingannya tidak berarti apa-apa.</p>');
+  } else if (d.sumberTidakDikenal) {
+    info.push('<p class="alert warn">Salah satu berkas tidak mencantumkan postingan asalnya, ' +
+      'jadi Lelang Insta tidak bisa memastikan keduanya dari lelang yang sama. ' +
+      'Periksa sendiri sebelum memakai hasil ini sebagai bukti.</p>');
+  }
+  if (d.waktuTidakPasti) {
+    info.push('<p class="alert warn">Salah satu berkas tidak mencantumkan waktu penarikan, ' +
+      'jadi urutan mana yang lebih dulu hanya mengikuti urutan kamu menjatuhkannya. ' +
+      'Kalau terbalik, komentar baru akan salah dilaporkan sebagai dihapus.</p>');
   }
   info.push('<p class="tabnote">' +
     `Membandingkan tarikan <b>${d.beforeAt ? fmtDateTime(d.beforeAt, state.tz) : 'lebih awal'}</b> ` +
@@ -895,13 +992,13 @@ function wire() {
     drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add('over'); }));
   ['dragleave', 'drop'].forEach((ev) =>
     drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.remove('over'); }));
-  drop.addEventListener('drop', (e) => {
-    if (e.dataTransfer?.files?.length) loadFiles(e.dataTransfer.files);
-  });
+  // Satu penangan untuk seluruh halaman. Tanpa preventDefault di mana pun
+  // berkas dijatuhkan, browser akan meninggalkan halaman ini dan membuka
+  // JSON mentahnya — pekerjaan yang sedang berjalan hilang.
   document.addEventListener('dragover', (e) => e.preventDefault());
   document.addEventListener('drop', (e) => {
-    if (!$('landing').classList.contains('hidden')) return;
     e.preventDefault();
+    drop.classList.remove('over');
     if (e.dataTransfer?.files?.length) loadFiles(e.dataTransfer.files);
   });
 
@@ -925,7 +1022,13 @@ function wire() {
     readCutoffFromUI();
     render();
   });
-  $('cutoffTime').addEventListener('blur', () => { readCutoffFromUI(); render(); });
+  // Saat fokus lepas, kolom dikembalikan ke nilai yang benar-benar dipakai,
+  // jadi tanda merahnya harus ikut hilang — bukan menuduh nilai yang sah.
+  $('cutoffTime').addEventListener('blur', () => {
+    readCutoffFromUI();
+    $('cutoffTime').classList.remove('bad');
+    render();
+  });
   $('cutoffDate').addEventListener('change', () => { readCutoffFromUI(); render(); });
 
   $('legendtoggle').onclick = () => {
@@ -935,12 +1038,7 @@ function wire() {
   };
 
   document.querySelectorAll('.tabs button').forEach((b) => {
-    b.onclick = () => {
-      document.querySelectorAll('.tabs button').forEach((x) => x.classList.remove('on'));
-      document.querySelectorAll('.tab').forEach((x) => x.classList.remove('on'));
-      b.classList.add('on');
-      $('tab-body-' + b.dataset.tab).classList.add('on');
-    };
+    b.onclick = () => pilihTab(b.dataset.tab);
   });
 
   document.addEventListener('click', (e) => {
@@ -967,8 +1065,12 @@ function wire() {
     if (!state.diff) return alert('Jatuhkan dua berkas hasil tarikan dulu untuk bisa membandingkan.');
     download(`${baseName()}_dihapus.csv`, diffCsv(state.diff, state.tz), 'text/csv;charset=utf-8');
   };
+  // Teks yang sama persis dengan yang disidikjarikan, supaya penerima bisa
+  // menghitung ulang SHA-256 berkas ini dan mendapat angka yang identik.
   $('dlraw').onclick = () =>
-    download(`${baseName()}_asli.json`, JSON.stringify(state.primary.original, null, 2), 'application/json');
+    download(`${baseName()}_asli.json`,
+      state.canonicalJson ?? JSON.stringify(state.primary.original, null, 2),
+      'application/json');
   $('dlsum').onclick = () => download(`${baseName()}_ringkasan.txt`, $('sumtext').textContent);
   $('copysum').onclick = () => copy($('sumtext').textContent, $('copysum'));
   $('copyhash').onclick = () => copy(state.hash || '', $('copyhash'));
