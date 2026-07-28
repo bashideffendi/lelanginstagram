@@ -549,6 +549,7 @@ function activate(dumps) {
   $('landing').classList.add('hidden');
   $('app').classList.remove('hidden');
   $('reset').classList.remove('hidden');
+  $('tabs').classList.remove('hidden');          // navigasi sisi baru berguna setelah ada data
   $('tab-diff').classList.toggle('hidden', !state.diff);
 
   // Kalau tab "Yang dihapus" sedang terbuka lalu data baru tidak punya
