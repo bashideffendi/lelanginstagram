@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Ketok — penarik komentar lelang Instagram",
+  "name": "Lelang Insta — penarik komentar lelang Instagram",
   "version": "1.0.0",
-  "description": "Menarik komentar postingan lelang Instagram beserta jam aslinya, lalu menyerahkannya ke Ketok untuk dianalisis.",
+  "description": "Menarik komentar postingan lelang Instagram beserta jam aslinya, lalu menyerahkannya ke Lelang Insta untuk diperiksa.",
   "host_permissions": [
     "https://www.instagram.com/*",
     "https://instagram.com/*"

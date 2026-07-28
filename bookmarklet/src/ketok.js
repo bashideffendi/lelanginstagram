@@ -14,12 +14,12 @@
   var WEB_APP = '__KETOK_WEB_APP__';
 
   try {
-    var ov = localStorage.getItem('ketok_web');
+    var ov = localStorage.getItem('lelanginsta_web');
     if (ov) WEB_APP = ov;
   } catch (e) { /* localStorage bisa diblokir */ }
 
   if (window.__KETOK_RUNNING__) {
-    alert('Ketok sudah jalan di tab ini.');
+    alert('Lelang Insta sudah jalan di tab ini.');
     return;
   }
   window.__KETOK_RUNNING__ = true;
@@ -74,7 +74,7 @@
     'label{display:flex;align-items:center;gap:7px;color:#6b7684;margin-top:11px;cursor:pointer;font-size:12.5px}' +
     '</style>' +
     '<div class="p">' +
-    '<div class="h"><i></i><b>Ketok</b><span>v' + VERSION + '</span><div class="x" id="close">&times;</div></div>' +
+    '<div class="h"><i></i><b>Lelang Insta</b><span>v' + VERSION + '</span><div class="x" id="close">&times;</div></div>' +
     '<div class="b">' +
     '<div class="row"><span>Komentar</span><b id="cnt">0</b></div>' +
     '<div class="row"><span>Balasan</span><b id="rep">0</b></div>' +
@@ -84,7 +84,7 @@
     '<div class="err" id="err"></div>' +
     '<label><input type="checkbox" id="raw" checked> Sertakan data asli sebagai bukti</label>' +
     '<div class="btns">' +
-    '<button class="pri" id="open" disabled>Buka di Ketok</button>' +
+    '<button class="pri" id="open" disabled>Buka hasilnya</button>' +
     '<button id="save" disabled>Simpan berkas</button>' +
     '</div>' +
     '</div></div>';
@@ -120,7 +120,7 @@
   }
 
   $('save').onclick = function () {
-    var name = 'ketok_' + (dump.source.shortcode || dump.source.media_id) +
+    var name = 'lelanginsta_' + (dump.source.shortcode || dump.source.media_id) +
       '_' + dump.ketok.extracted_at + '.json';
     var blob = new Blob([JSON.stringify(payload(), null, 2)], { type: 'application/json' });
     var a = document.createElement('a');
@@ -134,9 +134,9 @@
   $('open').onclick = function () {
     var target = WEB_APP.replace(/\/+$/, '');
     var w = window.open(target + '/#handoff', '_blank');
-    if (!w) { setErr('Popup diblokir. Pakai "Simpan berkas" lalu jatuhkan berkasnya di Ketok.'); return; }
+    if (!w) { setErr('Popup diblokir. Pakai "Simpan berkas" lalu jatuhkan berkasnya di halaman Lelang Insta.'); return; }
 
-    setMsg('Menunggu Ketok siap&hellip;');
+    setMsg('Menunggu halaman siap&hellip;');
     var sent = false;
     var origin = (function () { try { return new URL(target).origin; } catch (e) { return '*'; } })();
     var data = payload();
@@ -145,7 +145,7 @@
       if (!ev.data || ev.data.ketok !== 'ready' || sent) return;
       sent = true;
       w.postMessage({ ketok: 'dump', payload: data }, origin);
-      setMsg('Data dikirim ke tab Ketok.');
+      setMsg('Data dikirim ke tab Lelang Insta.');
       window.removeEventListener('message', onMsg);
     }
     window.addEventListener('message', onMsg);
@@ -154,7 +154,7 @@
     var iv = setInterval(function () {
       if (sent || tries++ > 20) {
         clearInterval(iv);
-        if (!sent) setErr('Ketok tidak merespons. Pakai "Simpan berkas".');
+        if (!sent) setErr('Halaman tidak merespons. Pakai "Simpan berkas".');
         return;
       }
       try { w.postMessage({ ketok: 'dump', payload: data }, origin); } catch (e) { /* belum siap */ }

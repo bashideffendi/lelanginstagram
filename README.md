@@ -1,16 +1,16 @@
-# Ketok
+# Lelang Insta
 
-Baca waktu asli komentar Instagram dalam timezone apa pun, urutkan bid secara
-kronologis, dan periksa pelanggaran cutoff lelang.
+**Cek Pemenang Lelang Instagram.** Buka jam persis tiap komentar sampai ke detik,
+urutkan tawarannya, dan buktikan siapa yang menawar setelah lelang ditutup.
 
-Dibuat karena tool sejenis (mis. commentgrid) menampilkan waktu dalam timezone
-server mereka tanpa keterangan, sehingga tidak bisa dipakai membandingkan urutan
-bid. Ketok menyimpan **epoch mentah** dari Instagram dan memperlakukan timezone
-murni sebagai lapisan tampilan.
+Dibuat karena alat sejenis menampilkan waktu dalam zona waktu server mereka tanpa
+keterangan, sehingga tidak bisa dipakai membandingkan urutan tawaran. Lelang Insta
+menyimpan **epoch mentah** dari Instagram dan memperlakukan zona waktu murni
+sebagai lapisan tampilan.
 
 Live: <https://lelanginsta.tempuscollective.com>
 
-## Tiga bagian
+## Empat bagian
 
 | Bagian | Isi | Jalan di mana |
 |---|---|---|
@@ -28,17 +28,17 @@ Tidak ada server perantara, dan tidak ada kredensial yang dibaca atau keluar
 dari browser. Web app tidak pernah menerima data lewat jaringan — hasil
 berpindah lewat `postMessage` di dalam browser, atau lewat berkas.
 
-### Kenapa kotak tempel-link butuh extension
+### Kenapa kotak tempel-link tidak bisa berdiri sendiri
 
 Halaman web biasa tidak bisa mengambil komentar dari instagram.com: browser
 memblokirnya lewat CORS, dan halaman itu juga tidak punya akses ke sesi login
-kamu. Satu-satunya cara memberi kotak tempel-link kemampuan itu tanpa
-menitipkan cookie Instagram ke sebuah server adalah lewat extension, yang
-punya izin host ke instagram.com dan menarik data langsung dari browser kamu.
+siapa pun. Jadi kotak tempel-link selalu butuh salah satu dari dua hal — sebuah
+extension yang punya izin host ke instagram.com, atau sebuah server yang
+menyimpan sesi Instagram.
 
 Logika penarikannya sendiri hanya ada di `shared/ig-core.js`, dipakai bersama
-oleh extension dan bookmarklet — jadi kalau Instagram mengubah endpoint,
-perbaikannya cukup di satu tempat.
+oleh extension, bookmarklet, dan mode server — jadi kalau Instagram mengubah
+endpoint, perbaikannya cukup di satu tempat.
 
 ## Pakai
 
@@ -48,7 +48,7 @@ perbaikannya cukup di satu tempat.
 python -m http.server 8777 --directory web
 ```
 
-Buka <http://localhost:8777>. Klik **Lihat contoh hasilnya** — tool langsung
+Buka <http://localhost:8777>. Klik **Lihat contoh hasilnya** — halaman langsung
 terisi data lelang contoh, tanpa perlu memasang apa pun. Ini cara tercepat
 memahami tampilannya.
 
@@ -61,9 +61,9 @@ Belum lewat Chrome Web Store, jadi pasangnya manual — sekali saja:
 
 1. `chrome://extensions` → nyalakan **Developer mode** (pojok kanan atas)
 2. **Load unpacked** → pilih folder `extension/` di repo ini
-3. Muat ulang halaman Ketok
+3. Muat ulang halaman Lelang Insta
 
-Setelah itu kotak di halaman utama akan menyala hijau (`Extension aktif`), dan
+Setelah itu kotak di halaman utama akan berubah jadi "Extension terpasang", dan
 kamu tinggal menempel link postingan lalu menekan **Ambil komentar**.
 
 Kalau menambah alamat baru tempat web app di-hosting, daftarkan di
@@ -72,7 +72,7 @@ disuntikkan ke alamat yang terdaftar di sana.
 
 ### Mode server
 
-Dipakai otomatis kalau extension tidak terpasang — misalnya saat membuka Ketok
+Dipakai otomatis kalau extension tidak terpasang — misalnya saat membuka Lelang Insta
 dari HP. Inilah cara kerja commentgrid: server yang menarik, bukan browsermu.
 
 **Pakai akun Instagram khusus, bukan akun yang kamu pakai ikut lelang.** Semua
@@ -85,30 +85,36 @@ Setel di Vercel → Settings → Environment Variables:
 
 | Variabel | Wajib | Isi |
 |---|---|---|
-| `KETOK_KEY` | ya | Kata sandi bebas. Tanpa ini endpoint mati total |
 | `IG_SESSIONID` | ya | Cookie `sessionid` dari akun khusus tadi |
+| `KETOK_KEY` | tidak | Kalau diisi, endpoint terkunci dan hanya bisa dipakai yang tahu kuncinya. Kalau dikosongkan, terbuka untuk umum |
 | `IG_DS_USER_ID` | tidak | Cookie `ds_user_id` |
 | `IG_CSRFTOKEN` | tidak | Cookie `csrftoken` |
 
 Mengambil `sessionid`: login dengan akun khusus itu → DevTools (`F12`) →
-Application → Cookies → `https://www.instagram.com` → salin nilai `sessionid`.
+Application → Cookies → `https://www.instagram.com` → salin nilai `sessionid`
+apa adanya, termasuk `%3A` di dalamnya.
 
-`KETOK_KEY` wajib karena endpoint-nya publik. Tanpa gembok itu, siapa pun yang
-menemukan alamatnya bisa memakai akun Instagram kamu untuk menarik data. Di
-halaman Ketok, kunci itu diisi sekali dan disimpan di browser.
+**Membuka untuk umum ada harganya.** Setiap penarikan orang lain memakai akun
+Instagram kamu, jadi trafiknya menumpuk di satu akun dan risiko pembatasan naik.
+Ada pengaman bawaan — maksimal 20 penarikan per IP tiap 10 menit dan 60 halaman
+komentar per penarikan — tapi ingatannya per instance lambda, jadi longgar.
+Kalau kamu lebih suka tertutup, isi `KETOK_KEY`.
 
-Sesi Instagram kedaluwarsa berkala. Kalau kotak paste menjawab "sesi sudah
+Sesi Instagram kedaluwarsa berkala. Kalau kotak tempel-link menjawab "sesi sudah
 kedaluwarsa", login ulang dengan akun khusus itu dan perbarui `IG_SESSIONID`.
 
-Selama variabelnya belum disetel, endpoint menjawab 503 dan halaman Ketok
-otomatis kembali menyarankan extension. Tidak ada yang rusak.
+**Environment variable dipanggang saat deploy.** Menambah atau mengubahnya tidak
+berpengaruh sampai ada deploy baru.
+
+Selama `IG_SESSIONID` belum disetel, endpoint menjawab 503 dan halaman otomatis
+menyarankan extension. Tidak ada yang rusak.
 
 ### Alternatif tanpa extension: bookmarklet
 
-1. Di halaman awal, seret tombol oranye **Ketok** ke bar bookmark — sekali saja
+1. Di halaman awal, seret tombol oranye **Lelang Insta** ke bar bookmark — sekali saja
 2. Buka permalink post lelang: `instagram.com/p/XXXX/`, bukan feed atau story
-3. Klik bookmark **Ketok**, tunggu panel selesai menarik
-4. Klik **Buka di Ketok** — hasilnya pindah sendiri ke web app
+3. Klik bookmark **Lelang Insta**, tunggu panel selesai menarik
+4. Klik **Buka hasilnya** — hasilnya pindah sendiri ke web app
 
 Jam tutup lelang ditebak otomatis dari caption postingan (`CLOSED 21.00 WIB`
 dan sejenisnya) lalu ditandai jelas sebagai tebakan. Perbaiki kalau salah;
@@ -148,7 +154,7 @@ Data contoh (`web/contoh/`) dan berkas uji lengkap (`samples/`) dihasilkan oleh
 ## Batasan yang perlu diketahui
 
 **Presisi hanya detik.** Instagram tidak menyediakan milidetik. Dua bid pada
-detik yang sama tidak bisa diurutkan dari waktunya; Ketok memakai comment ID
+detik yang sama tidak bisa diurutkan dari waktunya; Lelang Insta memakai comment ID
 sebagai pemecah seri karena ID Instagram naik monoton.
 
 **Komentar terhapus tidak bisa dipulihkan.** Sekali dihapus, tidak ada jejaknya
@@ -162,7 +168,7 @@ perlu dibaca manual. Kolom `keyakinan_bid` di CSV menandai yang lemah.
 
 **Endpoint Instagram tidak resmi dan bisa berubah.** Biasanya perlu perbaikan
 satu-dua kali setahun. Kalau panel bookmarklet menampilkan HTTP 404, itu
-tandanya bentuk endpoint berubah — perbaiki di `bookmarklet/src/ketok.js`.
+tandanya bentuk endpoint berubah — perbaiki di `shared/ig-core.js`.
 
 **Menarik terlalu sering berisiko rate limit.** Bookmarklet sudah memberi jeda
 antar-request. HTTP 429 berarti tunggu beberapa menit.
@@ -186,7 +192,7 @@ extension/
   bridge.js          jembatan halaman <-> extension (tanpa perlu ID extension)
   ig-core.js         salinan shared/ — dihasilkan build.mjs
 bookmarklet/
-  src/ketok.js       panel dan penyerahan hasil (intinya ditanam saat build)
+  src/Lelang Insta.js       panel dan penyerahan hasil (intinya ditanam saat build)
   build.mjs          tanam inti + minifikasi + cek sintaks + salin ke extension
   dist/              hasil build
 web/
@@ -213,5 +219,5 @@ biasa — deploy dengan mengarahkan Vercel ke folder itu.
 `build.mjs` memakai minifikasi naif (buang komentar, rapatkan whitespace).
 String yang mengandung penanda komentar bisa merusaknya, jadi hasilnya
 dikompilasi dulu dengan `new Function` dan build berhenti kalau gagal.
-Kalau menambah kode di `src/ketok.js`, hindari string seperti `*` `/` `*`
+Kalau menambah kode di `src/Lelang Insta.js`, hindari string seperti `*` `/` `*`
 berdempetan.

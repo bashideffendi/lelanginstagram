@@ -41,6 +41,13 @@ const SCRIPT = [
   [2210, 'jamtangan.bdg', '1,15jt'],
   [2455, 'seiko_lover88', '1,2jt'],
   [2610, 'newbie_2026', 'nyimak dulu'],
+  // Sengaja panjang, untuk memperagakan pelipatan komentar di tabel.
+  [2680, 'om_koleksi',
+    'min mau tanya dong ini yang seri SKX007 apa SKX009 ya, soalnya di foto ketiga ' +
+    'bezelnya keliatan biru tapi di foto pertama kok item, terus ini udah pernah ' +
+    'servis belum, kalau udah di mana servisnya, sama kelengkapannya apa aja, box ' +
+    'paper lengkap atau cuma unitnya doang, mohon dijawab ya min soalnya saya ' +
+    'serius mau nawar tapi takut salah barang'],
   [2788, 'om_koleksi', '1,25jt'],
   [2990, 'diver_kaki5', '1,3jt'],
   [3210, 'rizky_watchs', '1,35jt'],

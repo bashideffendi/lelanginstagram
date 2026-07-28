@@ -110,7 +110,7 @@ export function diffCsv(diff, tz) {
 /** Ringkasan teks siap tempel ke laporan/chat. */
 export function summaryText(summary, source, tz, dumpHash) {
   const L = [];
-  L.push('RINGKASAN LELANG — Ketok');
+  L.push('BUKTI URUTAN TAWARAN — Lelang Insta');
   L.push('='.repeat(46));
   if (source?.url) L.push(`Post          : ${source.url}`);
   if (source?.owner_username) L.push(`Pemilik       : @${source.owner_username}`);

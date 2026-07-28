@@ -81,7 +81,7 @@ const installHtml = `<!doctype html>
 <html lang="id">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Pasang Ketok</title>
+<title>Pasang Lelang Insta</title>
 <style>
   body{margin:0;padding:48px 24px;background:#f6f7f9;color:#16191d;
        font:16px/1.6 ui-sans-serif,system-ui,-apple-system,Segoe UI,sans-serif}
@@ -101,24 +101,24 @@ const installHtml = `<!doctype html>
            border-radius:8px;padding:11px;font:11px ui-monospace,Consolas,monospace}
 </style>
 <main>
-  <h1>Pasang Ketok</h1>
+  <h1>Pasang Lelang Insta</h1>
   <p class="sub">Menuju <code>${WEB_APP}</code></p>
 
-  <a class="drag" href="${bookmarklet.replace(/"/g, '&quot;')}" onclick="return false">🔨 Ketok — seret ke bar bookmark</a>
+  <a class="drag" href="${bookmarklet.replace(/"/g, '&quot;')}" onclick="return false">Lelang Insta — seret ke bar bookmark</a>
   <p class="hint">Seret tombol di atas ke bar bookmark. Jangan diklik dari halaman ini.</p>
 
   <ol>
     <li>Tampilkan bar bookmark: <code>Ctrl</code> + <code>Shift</code> + <code>B</code></li>
     <li>Seret tombol oranye di atas ke bar itu</li>
     <li>Buka permalink post lelang — <code>instagram.com/p/XXXX/</code>, bukan beranda</li>
-    <li>Klik bookmark <b>Ketok</b>, tunggu penarikan selesai</li>
-    <li>Klik <b>Buka di Ketok</b> untuk analisis, atau <b>Simpan berkas</b> untuk arsip</li>
+    <li>Klik bookmark <b>Lelang Insta</b>, tunggu penarikan selesai</li>
+    <li>Klik <b>Buka hasilnya</b> untuk memeriksa, atau <b>Simpan berkas</b> untuk arsip</li>
   </ol>
 
   <div class="box">
     <b>Halaman ini cadangan.</b> Cara yang lebih mudah: buka
     <a href="${WEB_APP}">${WEB_APP}</a> dan seret tombolnya langsung dari sana,
-    atau tempel link postingan di kotak paste kalau extension Ketok sudah terpasang.
+    atau tempel link postingan di kotak paste kalau extension Lelang Insta sudah terpasang.
   </div>
 
   <p style="color:#6b7684;font-size:14px">Kalau seret-ke-bookmark tidak jalan, salin teks ini sebagai alamat bookmark:</p>

@@ -21,7 +21,7 @@ const esc = (s) =>
 const state = {
   dumps: [], primary: null, diff: null, isDemo: false,
   tz: browserTz(), cutoff: null, grace: 60,
-  query: '', includeReplies: true, onlyFlagged: false, tech: false,
+  query: '', includeReplies: true, onlyFlagged: false, tech: false, wrap: false,
   result: null, hash: null, guessedCutoff: false,
   sort: { chrono: { key: 'seq', dir: 1 }, accounts: { key: 'count', dir: -1 } }
 };
@@ -35,66 +35,60 @@ async function initBookmarklet() {
   } catch {
     $('bm').removeAttribute('href');
     $('bm').style.opacity = '.5';
-    $('bm').style.cursor = 'not-allowed';
     $('bmnote').innerHTML =
-      'Tombol belum tersedia — jalankan <code>node bookmarklet/build.mjs</code> sekali untuk membuatnya.';
+      'Belum dibuat — jalankan <code>node bookmarklet/build.mjs</code> sekali.';
   }
   $('bm').addEventListener('click', (e) => {
     e.preventDefault();
     $('bmnote').textContent = 'Tombol ini harus diseret ke bar bookmark, bukan diklik di sini.';
-    $('bmnote').style.color = 'var(--danger)';
+    $('bmnote').style.color = 'var(--bad)';
   });
 }
 
-// ================================================================ kotak paste
+// ================================================================ kotak ambil
 
 let extVersion = null;
-let serverState = 'off';     // 'off' | 'need-key' | 'ready'
+let serverState = 'off';     // 'off' | 'need-key' | 'no-session' | 'ready'
 
 function setStat(text, cls = '') {
-  const el = $('paststat');
-  el.className = 'pastestat ' + cls;
-  el.innerHTML = text;
+  $('paststat').className = 'take-stat ' + cls;
+  $('paststat').innerHTML = text;
 }
 
-function showExtInfo() {
-  $('extinfo').classList.remove('hidden');
+function openFine() {
+  $('extinfo').open = true;
   $('extinfo').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 /**
- * Extension diutamakan: penarikannya dari browser kamu sendiri, jadi tidak
- * membebani akun Instagram mana pun selain milikmu yang memang sedang membuka
- * halaman itu. Mode server hanya dipakai kalau extension tidak ada — misalnya
- * saat kamu membuka Ketok dari HP.
+ * Extension diutamakan kalau ada: penarikannya dari browser pengguna sendiri,
+ * jadi lebih cepat, tanpa batas laju, dan tidak membebani sesi milik server.
  */
-async function initPaste() {
-  setStat('Memeriksa cara penarikan yang tersedia&hellip;');
+async function initTake() {
+  setStat('Menyiapkan&hellip;');
 
   extVersion = await pingExtension();
   if (extVersion) {
-    setStat(`Extension aktif (v${esc(extVersion)}) — tempel link postingannya, lalu tekan Ambil komentar.`, 'ready');
+    setStat('Siap. Extension terpasang, penarikan berjalan dari browser kamu sendiri.', 'ready');
     return;
   }
 
   serverState = await probeServer(savedKey());
 
   if (serverState === 'ready') {
-    setStat('Mode server aktif — tempel link postingannya, lalu tekan Ambil komentar. ' +
-      '<button class="linkbtn" id="whyext">Apa bedanya dengan extension?</button>', 'ready');
-    $('whyext').onclick = showExtInfo;
+    setStat('Siap. Tempel link postingan lelangnya di atas.', 'ready');
   } else if (serverState === 'need-key') {
-    setStat('Mode server aktif tapi terkunci. Isi kunci di bawah, sekali saja.', 'warn');
+    setStat('Terkunci. Isi kunci di bawah, sekali saja.', 'warn');
     $('keybox').classList.remove('hidden');
     $('ketokkey').value = savedKey();
   } else if (serverState === 'no-session') {
-    setStat('Kunci sudah benar, tapi sesi Instagram belum disetel di server. ' +
-      'Setel <code>IG_SESSIONID</code> di Environment Variables Vercel, lalu deploy ulang.', 'warn');
+    setStat('Server belum disetel sesi Instagram-nya. ' +
+      '<button class="link" id="whyext">Pakai cara lain</button>', 'warn');
+    $('whyext').onclick = openFine;
   } else {
-    setStat(
-      'Belum ada cara penarikan yang siap. Pasang extension Ketok, atau pakai bookmarklet di bawah. ' +
-      '<button class="linkbtn" id="whyext">Kenapa perlu salah satunya?</button>', 'warn');
-    $('whyext').onclick = showExtInfo;
+    setStat('Server sedang tidak tersedia. ' +
+      '<button class="link" id="whyext">Pakai cara lain</button>', 'warn');
+    $('whyext').onclick = openFine;
   }
 }
 
@@ -106,44 +100,38 @@ async function applyKey() {
   serverState = await probeServer(k);
   if (serverState === 'ready') {
     $('keybox').classList.add('hidden');
-    setStat('Kunci diterima. Mode server aktif — tempel link postingannya.', 'ready');
+    setStat('Kunci diterima. Tempel link postingannya di atas.', 'ready');
   } else if (serverState === 'no-session') {
     $('keybox').classList.add('hidden');
-    setStat('Kunci diterima, tapi sesi Instagram belum disetel di server. ' +
-      'Setel <code>IG_SESSIONID</code> di Environment Variables Vercel, lalu deploy ulang.', 'warn');
+    setStat('Kunci diterima, tapi sesi Instagram belum disetel di server.', 'warn');
   } else {
-    setStat('Kunci ditolak server. Periksa nilai KETOK_KEY di Environment Variables Vercel.', 'bad');
+    setStat('Kunci ditolak server.', 'bad');
   }
 }
 
-async function runPaste() {
+async function runTake() {
   const url = $('iglink').value.trim();
 
   if (!url) { setStat('Tempel dulu link postingannya.', 'bad'); return; }
   if (!looksLikePostUrl(url)) {
-    setStat('Itu bukan link postingan. Bentuknya harus <code>instagram.com/p/XXXX/</code> — ' +
-      'buka postingannya dulu, lalu salin alamat dari bilah alamat browser.', 'bad');
+    setStat('Itu bukan link postingan. Bentuknya <code>instagram.com/p/XXXX/</code> — ' +
+      'buka postingannya, lalu salin alamat dari bilah alamat browser.', 'bad');
     return;
   }
 
-  // Extension bisa dipasang setelah halaman dibuka, jadi selalu cek ulang.
+  // Extension bisa dipasang setelah halaman terbuka, jadi selalu cek ulang.
   if (!extVersion) extVersion = await pingExtension();
 
   if (!extVersion && serverState !== 'ready') {
     serverState = await probeServer(savedKey());
     if (serverState === 'need-key') {
-      setStat('Mode server terkunci. Isi kunci di bawah dulu.', 'bad');
+      setStat('Terkunci. Isi kunci di bawah dulu.', 'bad');
       $('keybox').classList.remove('hidden');
       return;
     }
-    if (serverState === 'no-session') {
-      setStat('Kunci sudah benar, tapi sesi Instagram belum disetel di server. ' +
-        'Setel <code>IG_SESSIONID</code> di Vercel lalu deploy ulang, atau pakai extension.', 'bad');
-      return;
-    }
     if (serverState !== 'ready') {
-      setStat('Belum ada cara penarikan yang siap. Petunjuknya ada di bawah.', 'bad');
-      showExtInfo();
+      setStat('Server sedang tidak tersedia. Pakai extension atau bookmarklet di bawah.', 'bad');
+      openFine();
       return;
     }
   }
@@ -158,43 +146,42 @@ async function runPaste() {
     let dump;
     if (extVersion) {
       dump = await extractViaExtension(url, (p) => {
-        if (p.stage === 'info') setStat('Mengambil keterangan postingan&hellip;');
+        if (p.stage === 'info') setStat('Membaca keterangan postingan&hellip;');
         else if (p.stage === 'comments') {
           setStat(`Menarik komentar&hellip; ${p.count} terkumpul` + (p.total ? ` dari sekitar ${p.total}` : ''));
           fill.style.width = (p.total ? Math.min(95, (p.count / p.total) * 100) : Math.min(90, (p.page || 0) * 8)) + '%';
         } else if (p.stage === 'replies') {
-          setStat(`Mengambil balasan&hellip; utas ${p.page} dari ${p.total}`);
+          setStat(`Menarik balasan&hellip; utas ${p.page} dari ${p.total}`);
         }
       });
       fill.style.width = '100%';
       activate([parseDump(dump, 'lewat extension')]);
     } else {
-      // Server menarik dalam satu permintaan, jadi tidak ada progres bertahap.
-      setStat('Server sedang menarik komentar&hellip; postingan ramai bisa makan sekitar satu menit.');
+      setStat('Menarik komentar&hellip; postingan ramai bisa makan sekitar satu menit.');
       fill.style.width = '60%';
       dump = await extractViaServer(url, savedKey());
       fill.style.width = '100%';
       activate([parseDump(dump, 'lewat server')]);
     }
   } catch (e) {
-    setStat('Gagal: ' + esc(e.message) + extractHint(e), 'bad');
-    if (e.code === 'nonaktif' || e.code === 'sesi_kosong') showExtInfo();
-    if (e.httpStatus === 401) { $('keybox').classList.remove('hidden'); }
+    setStat('Gagal: ' + esc(e.message) + failHint(e), 'bad');
+    if (e.code === 'sesi_kosong') openFine();
+    if (e.httpStatus === 401) $('keybox').classList.remove('hidden');
   } finally {
     btn.disabled = false;
     setTimeout(() => $('pasteprog').classList.add('hidden'), 800);
   }
 }
 
-function extractHint(e) {
+function failHint(e) {
   const s = e.status ?? e.igStatus;
   if (s === 401 || s === 403) return ' Buka instagram.com di tab lain dan pastikan kamu sudah login.';
-  if (s === 429) return ' Instagram sedang membatasi permintaan. Tunggu beberapa menit.';
+  if (s === 429) return ' Tunggu beberapa menit.';
   if (s === 404) return ' Postingannya mungkin sudah dihapus, atau akunnya privat.';
   return '';
 }
 
-// ================================================================ timezone
+// ================================================================ zona waktu
 
 function initTz() {
   const sel = $('tz');
@@ -223,26 +210,28 @@ function tzNote() {
   const auto = browserTz();
   $('tznote').textContent = state.tz === auto
     ? `Mengikuti jam laptop kamu (${tzOffsetLabel(ref, state.tz)}).`
-    : `${tzOffsetLabel(ref, state.tz)}. Jam laptop kamu: ${auto}.`;
+    : `${tzOffsetLabel(ref, state.tz)} — jam laptop kamu: ${auto}.`;
+}
+
+/** Singkatan zona untuk kartu bukti: WIB lebih dimengerti daripada UTC+07:00. */
+function tzShort(epoch) {
+  const map = {
+    'Asia/Jakarta': 'WIB', 'Asia/Pontianak': 'WIB',
+    'Asia/Makassar': 'WITA', 'Asia/Jayapura': 'WIT', UTC: 'UTC'
+  };
+  return map[state.tz] || tzOffsetLabel(epoch, state.tz);
 }
 
 // ================================================================ tebak jam tutup
 
-/**
- * Cari jam tutup di caption post — penjual hampir selalu menuliskannya
- * ("CLOSED 21.00 WIB"). Hanya tebakan; ditandai jelas ke pengguna.
- */
 function guessCutoff(caption, comments, tz) {
   if (!caption || !comments.length) return null;
   const re = /(?<!\d)([01]?\d|2[0-3])[.:]([0-5]\d)(?!\d)/g;
   const found = [];
   let m;
-  while ((m = re.exec(caption)) !== null) {
-    found.push({ h: +m[1], mi: +m[2], at: m.index });
-  }
+  while ((m = re.exec(caption)) !== null) found.push({ h: +m[1], mi: +m[2], at: m.index });
   if (!found.length) return null;
 
-  // Utamakan angka jam yang muncul dekat kata penutupan.
   const kw = /(clos\w*|tutup|\bcd\b|\bco\b|berakhir|selesai)/gi;
   let pick = found[found.length - 1];
   let k;
@@ -251,18 +240,15 @@ function guessCutoff(caption, comments, tz) {
     if (near) { pick = near; break; }
   }
 
-  // Pakai tanggal dari komentar terakhir, karena di situlah lelang berakhir.
   const last = Math.max(...comments.map((c) => c.created_at));
   const [d, mo, y] = fmtDate(last, tz).split('/').map(Number);
   const epoch = wallTimeToEpoch(y, mo, d, pick.h, pick.mi, 0, tz);
-
-  // Buang tebakan yang jelas di luar rentang komentar.
   const first = Math.min(...comments.map((c) => c.created_at));
   if (epoch < first || epoch > last + 86400) return null;
   return { epoch, label: `${String(pick.h).padStart(2, '0')}.${String(pick.mi).padStart(2, '0')}` };
 }
 
-// ================================================================ muat data
+// ================================================================ muat
 
 function showError(msg) {
   $('loaderr').textContent = msg;
@@ -292,8 +278,7 @@ async function loadDemo() {
     state.isDemo = true;
     activate(parsed);
   } catch (e) {
-    showError('Gagal memuat data contoh: ' + e.message +
-      '. Jalankan `node samples/generate.mjs` sekali untuk membuatnya.');
+    showError('Gagal memuat contoh: ' + e.message);
   }
 }
 
@@ -311,8 +296,8 @@ function activate(dumps) {
 
   $('democue').innerHTML = state.isDemo
     ? '<div class="democue"><b>Ini lelang contoh, bukan data asli.</b> ' +
-      'Semua angkanya dibuat-buat supaya kamu bisa melihat cara kerja Ketok. ' +
-      'Klik "Muat data lain" di kanan atas kalau sudah punya hasil tarikan sungguhan.</div>'
+      'Angkanya dibuat-buat supaya kamu bisa melihat cara kerjanya. ' +
+      'Klik &ldquo;Cek lelang lain&rdquo; di kanan atas untuk memakai data sungguhan.</div>'
     : '';
 
   const g = guessCutoff(state.primary.source?.caption, state.primary.comments, state.tz);
@@ -335,13 +320,14 @@ async function computeHash() {
   $('hash').textContent = state.hash || 'tidak tersedia';
 }
 
-// ================================================================ render
+// ================================================================ gambar ulang
 
 function render() {
   state.cutoff = datetimeLocalToEpoch($('cutoff').value, state.tz);
   state.includeReplies = $('reps').checked;
   state.onlyFlagged = $('onlyflag').checked;
   state.tech = $('tech').checked;
+  state.wrap = $('wrap').checked;
   state.query = $('q').value.trim().toLowerCase();
 
   state.result = analyze(state.primary.comments, {
@@ -351,116 +337,131 @@ function render() {
   });
 
   tzNote();
-  renderPost();
-  renderVerdict();
-  renderCards();
+  renderProof();
+  renderChips();
   renderChrono();
   renderAccounts();
   renderDiff();
   renderLegend();
-  renderEvidence();
+  $('sumtext').textContent = summaryText(
+    state.result.summary, state.primary.source, state.tz, state.hash);
 }
 
-function renderPost() {
-  const s = state.primary.source || {};
-  const m = state.primary.meta || {};
-  const bits = [];
-  if (s.owner_username) bits.push(`Lelang oleh <b>@${esc(s.owner_username)}</b>`);
-  if (s.url) bits.push(`<a href="${esc(s.url)}" target="_blank" rel="noopener">buka postingannya</a>`);
-  if (m.extracted_at) bits.push(`Ditarik <b>${fmtDateTime(m.extracted_at, state.tz)}</b>`);
-  if (s.reported_comment_count != null) {
-    const gap = s.reported_comment_count - state.primary.comments.length;
-    bits.push(gap > 0
-      ? `Instagram menghitung <b>${s.reported_comment_count}</b> komentar, terambil <b>${state.primary.comments.length}</b> — selisih ${gap} kemungkinan sudah dihapus atau disaring`
-      : `<b>${state.primary.comments.length}</b> komentar terambil`);
-  }
-  $('postcard').innerHTML = bits.join('<span class="soft">&nbsp;&middot;&nbsp;</span>') +
-    (s.caption ? `<div class="cap">${esc(s.caption)}</div>` : '');
-}
-
-function renderVerdict() {
+/** Kartu bukti — bagian yang difoto layar dan dikirim ke penyelenggara. */
+function renderProof() {
   const s = state.result.summary;
-  const problems = [];
+  const w = s.winner;
+  const src = state.primary.source || {};
+  const out = ['<div class="pcard">'];
 
-  if (s.cutoff != null && s.lateBids > 0) {
-    problems.push(`<b>${s.lateBids} tawaran masuk setelah lelang ditutup.</b> ` +
-      `Yang paling telat ${fmtDuration(Math.max(...state.result.rows
-        .filter((r) => r.flags.includes('lewat-cutoff') && r.bid != null).map((r) => r.late)))} lewat.`);
+  out.push('<div class="pcard-top">');
+  if (w) {
+    out.push('<div class="pcard-kicker">Tawaran tertinggi yang sah' +
+      (s.cutoff != null ? ' &mdash; masuk sebelum lelang ditutup' : '') + '</div>');
+    out.push('<div class="pcard-row">' +
+      `<span class="pcard-who">@${esc(w.username || '—')}</span>` +
+      `<span class="pcard-amt">${w.bid != null ? 'Rp' + fmtRupiah(w.bid) : '—'}</span>` +
+      '</div>');
+    const rel = s.cutoff != null && w.created_at <= s.cutoff
+      ? ` &middot; ${fmtDuration(s.cutoff - w.created_at)} sebelum tutup` : '';
+    out.push(`<div class="pcard-when"><b>${fmtDateTime(w.created_at, state.tz)} ` +
+      `${tzShort(w.created_at)}</b>${rel}</div>`);
+    out.push(`<div class="pcard-quote">${esc(w.text)}</div>`);
+  } else {
+    out.push('<div class="pcard-kicker">Belum ada tawaran yang terbaca</div>');
+    out.push('<div class="pcard-row"><span class="pcard-who">Tidak ada angka yang bisa dikenali</span></div>');
+    out.push('<div class="pcard-when">Komentarnya mungkin tidak memuat nilai tawaran ' +
+      'dalam format yang dikenali.</div>');
+  }
+  out.push('</div>');
+
+  // Temuan, paling penting di atas.
+  const flags = [];
+  if (s.cutoff == null) {
+    flags.push(['warn', '!', 'Jam tutup lelang belum diisi.',
+      'Tanpa itu, tawaran yang telat tidak bisa ditandai. Kotaknya ada tepat di bawah kartu ini.']);
+  } else if (s.lateBids > 0) {
+    const worst = Math.max(...state.result.rows
+      .filter((r) => r.flags.includes('lewat-cutoff') && r.bid != null).map((r) => r.late));
+    flags.push(['bad', s.lateBids, `${s.lateBids} tawaran masuk setelah lelang ditutup.`,
+      `Yang paling telat lewat ${fmtDuration(worst)}.`]);
   }
   if (state.diff && state.diff.deleted.length) {
-    problems.push(`<b>${state.diff.deleted.length} komentar dihapus</b> di antara dua penarikan kamu. ` +
-      `Lihat tab &ldquo;Yang dihapus&rdquo;.`);
+    flags.push(['bad', state.diff.deleted.length,
+      `${state.diff.deleted.length} komentar dihapus di antara dua tarikan kamu.`,
+      'Isinya masih tersimpan di tab &ldquo;Yang dihapus&rdquo;.']);
   }
   if (s.tieGroups > 0) {
-    problems.push(`${s.tieRows} tawaran jatuh pada detik yang sama persis — urutannya ` +
-      `ditentukan lewat nomor komentar, bukan jam.`);
+    flags.push(['warn', s.tieRows, `${s.tieRows} tawaran jatuh pada detik yang sama persis.`,
+      'Urutannya diambil dari nomor komentar Instagram, bukan dari jam.']);
   }
   if (s.bidDown > 0) {
-    problems.push(`${s.bidDown} tawaran nilainya lebih rendah dari tawaran tertinggi saat itu.`);
+    flags.push(['warn', s.bidDown, `${s.bidDown} tawaran nilainya lebih rendah dari tawaran tertinggi saat itu.`, '']);
+  }
+  if (s.cutoff != null && !flags.length) {
+    flags.push(['good', '✓', 'Tidak ditemukan kejanggalan.',
+      'Semua tawaran masuk sebelum tutup, tidak ada nilai yang turun, tidak ada detik kembar.']);
   }
 
-  let html = '';
-  if (s.cutoff == null) {
-    html = '<div class="vbox clean" style="background:var(--info-soft);border-color:#cfe0fb">' +
-      '<div class="vtitle" style="color:#1e40af">Isi jam tutup lelang dulu</div>' +
-      '<p class="vhint">Tanpa jam tutup, Ketok belum bisa menilai siapa yang telat. ' +
-      'Kotak <b>Jam lelang ditutup</b> ada tepat di bawah ini' +
-      (state.guessedCutoff ? ' — sudah aku isikan dari caption, tinggal periksa.' : '.') +
-      '</p></div>';
-  } else if (problems.length) {
-    html = '<div class="vbox bad"><div class="vtitle">Ada yang perlu dilihat</div>' +
-      '<ul>' + problems.map((p) => `<li><span>${p}</span></li>`).join('') + '</ul></div>';
-  } else {
-    html = '<div class="vbox clean"><div class="vtitle">Tidak ditemukan kejanggalan</div>' +
-      '<p class="vhint">Semua tawaran masuk sebelum jam tutup, tidak ada nilai yang turun, ' +
-      'dan tidak ada dua tawaran di detik yang sama.</p></div>';
+  if (flags.length) {
+    out.push('<div class="pflags">');
+    for (const [cls, mark, head, sub] of flags) {
+      out.push(`<div class="pflag ${cls}"><span class="pflag-mark">${mark}</span>` +
+        `<span><b>${head}</b>${sub ? ' ' + sub : ''}</span></div>`);
+    }
+    out.push('</div>');
   }
 
-  const w = s.winner;
-  if (w) {
-    html += '<div class="winnerbox">' +
-      `<div class="wlabel">Tawaran tertinggi yang masuk${s.cutoff != null ? ' sebelum tutup' : ''}</div>` +
-      `<div class="wname">@${esc(w.username || '—')}</div>` +
-      `<div class="wamt">${w.bid != null ? 'Rp' + fmtRupiah(w.bid) : '—'}</div>` +
-      `<div class="wmeta">${fmtDateTime(w.created_at, state.tz)}</div>` +
-      '</div>';
-  }
+  const meta = [];
+  meta.push(`<span>${s.total} komentar &middot; ${s.users} peserta</span>`);
+  if (s.cutoff != null) meta.push(`<span>Ditutup <b>${fmtTime(s.cutoff, state.tz)} ${tzShort(s.cutoff)}</b></span>`);
+  if (src.owner_username) meta.push(`<span>Lelang oleh <b>@${esc(src.owner_username)}</b></span>`);
+  if (src.url) meta.push(`<a href="${esc(src.url)}" target="_blank" rel="noopener">buka postingannya</a>`);
+  out.push(`<div class="pcard-meta">${meta.join('')}</div>`);
+
+  out.push('<div class="pcard-act">' +
+    '<button class="btn solid" id="proofcopy">Salin bukti</button>' +
+    '<button class="btn" id="proofjump">Lihat urutan lengkap</button>' +
+    '</div>');
+
+  out.push('</div>');
+
   if (state.guessedCutoff && state.cutoff != null) {
-    html += `<p class="alert warn">Jam tutup <b>${esc(state.guessedCutoff)}</b> aku tebak dari caption ` +
-      `postingannya. Periksa dan perbaiki kalau salah — semua tanda merah bergantung pada angka ini.</p>`;
+    out.push(`<p class="alert warn">Jam tutup <b>${esc(state.guessedCutoff)}</b> ditebak dari ` +
+      'caption postingannya. Periksa dan perbaiki kalau salah &mdash; semua penandaan bergantung padanya.</p>');
   }
-  $('verdict').innerHTML = html;
+
+  $('proof').innerHTML = out.join('');
+  $('proofcopy').onclick = () => copy($('sumtext').textContent, $('proofcopy'));
+  $('proofjump').onclick = () => {
+    document.querySelector('.tabs button[data-tab="chrono"]').click();
+    $('tab-body-chrono').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
 }
 
-function statcard(k, v, s, cls = '') {
-  return `<div class="statcard ${cls}"><div class="k">${k}</div><div class="v">${v}</div>` +
+function chip(n, k, s, cls = '') {
+  return `<div class="chip ${cls}"><div class="n">${n}</div><div class="k">${k}</div>` +
     (s ? `<div class="s">${s}</div>` : '') + '</div>';
 }
 
-function renderCards() {
+function renderChips() {
   const s = state.result.summary;
-  const html = [
-    statcard('Tawaran telat', s.cutoff == null ? '—' : s.lateBids,
-      s.cutoff == null ? 'isi jam tutup dulu'
-        : `${s.late} komentar masuk setelah tutup, ${s.lateBids} di antaranya membawa angka`,
+  const out = [
+    chip(s.cutoff == null ? '—' : s.lateBids, 'Tawaran telat',
+      s.cutoff == null ? 'isi jam tutup dulu' : `dari ${s.late} komentar setelah tutup`,
       s.cutoff != null && s.lateBids > 0 ? 'bad' : ''),
-    statcard('Detik-detik akhir', s.cutoff == null ? '—' : s.snipe,
-      `tawaran dalam ${state.grace} detik terakhir`,
+    chip(s.cutoff == null ? '—' : s.snipe, 'Detik terakhir', `≤ ${state.grace} detik sebelum tutup`,
       s.snipe > 0 ? 'warn' : ''),
-    statcard('Detik yang sama', s.tieRows, `${s.tieGroups} detik berisi lebih dari satu tawaran`,
-      s.tieRows > 0 ? 'warn' : ''),
-    statcard('Nilai turun', s.bidDown, `${s.bidSame} tawaran mengulang nilai yang sama`,
-      s.bidDown > 0 ? 'bad' : ''),
-    statcard('Peserta', s.users, `${s.total} komentar total`),
-    statcard('Lama lelang', fmtDuration(s.span),
-      s.first != null ? `${fmtTime(s.first, state.tz)} sampai ${fmtTime(s.last, state.tz)}` : '')
+    chip(s.tieRows, 'Detik kembar', `dalam ${s.tieGroups} detik`, s.tieRows > 0 ? 'warn' : ''),
+    chip(s.bidDown, 'Nilai turun', `${s.bidSame} mengulang nilai`, s.bidDown > 0 ? 'bad' : ''),
+    chip(fmtDuration(s.span), 'Lama lelang',
+      s.first != null ? `${fmtTime(s.first, state.tz)} – ${fmtTime(s.last, state.tz)}` : '')
   ];
   if (state.diff) {
-    html.push(statcard('Dihapus', state.diff.deleted.length,
-      'antara dua penarikan kamu',
-      state.diff.deleted.length ? 'bad' : 'ok'));
+    out.push(chip(state.diff.deleted.length, 'Dihapus', 'antara dua tarikan',
+      state.diff.deleted.length ? 'bad' : 'good'));
   }
-  $('cards').innerHTML = html.join('');
+  $('cards').innerHTML = out.join('');
 }
 
 const TAGS = {
@@ -469,13 +470,10 @@ const TAGS = {
   'detik-akhir': ['snipe', (r) => `${fmtDuration(r.snipe)} sebelum tutup`,
     'Masuk di detik-detik terakhir sebelum tutup.'],
   'detik-kembar': ['tie', (r) => `detik sama ${r.tieIndex} dari ${r.tieSize}`,
-    'Ada tawaran lain di detik yang sama persis. Urutan diambil dari nomor komentar.'],
-  'bid-turun': ['down', () => 'nilai turun',
-    'Angkanya lebih kecil dari tawaran tertinggi sebelumnya.'],
-  'bid-sama': ['same', () => 'nilai sama',
-    'Angkanya sama persis dengan tawaran tertinggi sebelumnya.'],
-  beruntun: ['burst', () => 'beruntun',
-    'Akun yang sama berkomentar lagi dalam 5 detik.']
+    'Ada tawaran lain di detik yang sama persis; urutan diambil dari nomor komentar.'],
+  'bid-turun': ['down', () => 'nilai turun', 'Lebih kecil dari tawaran tertinggi sebelumnya.'],
+  'bid-sama': ['same', () => 'nilai sama', 'Sama persis dengan tawaran tertinggi sebelumnya.'],
+  beruntun: ['burst', () => 'beruntun', 'Akun yang sama berkomentar lagi dalam 5 detik.']
 };
 
 function tags(r) {
@@ -486,10 +484,11 @@ function tags(r) {
 }
 
 function renderLegend() {
-  $('legend').innerHTML = Object.entries(TAGS).map(([, [cls, , desc]]) =>
-    `<div><span class="tag ${cls}">${cls === 'late' ? 'telat' : cls === 'snipe' ? 'detik akhir'
-      : cls === 'tie' ? 'detik sama' : cls === 'down' ? 'nilai turun'
-      : cls === 'same' ? 'nilai sama' : 'beruntun'}</span>${desc}</div>`).join('');
+  const label = { late: 'telat', snipe: 'detik akhir', tie: 'detik sama',
+    down: 'nilai turun', same: 'nilai sama', burst: 'beruntun' };
+  $('legend').innerHTML = Object.values(TAGS)
+    .map(([cls, , desc]) => `<div><span class="tag ${cls}">${label[cls]}</span> ${desc}</div>`)
+    .join('');
 }
 
 function visibleRows() {
@@ -526,60 +525,83 @@ function sortHeader(cols, which) {
   }).join('') + '</tr>';
 }
 
+/** Komentar dilipat kalau panjang, supaya satu layar memuat seluruh urutan. */
+function msgCell(r) {
+  const long = (r.text || '').length > 90 || (r.text || '').includes('\n');
+  return '<td class="msg">' +
+    `<div class="txt${long ? ' clip' : ''}">${esc(r.text)}</div>` +
+    (long ? '<button class="more" type="button">selengkapnya</button>' : '') +
+    '</td>';
+}
+
+function rowHtml(r, span, extraCls = '', lead = '') {
+  const cls = [extraCls,
+    r.flags.includes('lewat-cutoff') ? 'r-late' : '',
+    r.flags.includes('detik-akhir') ? 'r-snipe' : ''].filter(Boolean).join(' ');
+
+  return `<tr class="${cls}">` +
+    `<td class="n dim">${lead || r.seq}</td>` +
+    `<td class="clock">${fmtTime(r.created_at, state.tz)}</td>` +
+    `<td class="n dim">${r.gap != null ? fmtDuration(r.gap) : '—'}</td>` +
+    `<td class="who">${esc(r.username || '—')}${r.is_reply ? ' <span class="dim">(balasan)</span>' : ''}</td>` +
+    `<td class="money">${r.bid != null ? 'Rp' + fmtRupiah(r.bid) : '<span class="dim">—</span>'}</td>` +
+    (state.tech
+      ? `<td class="n dim">${r.increment != null ? (r.increment > 0 ? '+' : '') + fmtRupiah(r.increment) : ''}</td>` +
+        `<td class="mn">${r.created_at}</td>`
+      : '') +
+    `<td>${tags(r)}</td>` +
+    msgCell(r) +
+    (state.tech ? `<td class="mn">${esc(r.pk)}</td>` : '') +
+    '</tr>';
+}
+
 function renderChrono() {
   const rows = visibleRows();
   $('c-chrono').textContent = rows.length;
 
   const cols = [
-    ['seq', 'Ke-'], ['created_at', 'Jam'], ['gap', 'Selisih'], ['username', 'Akun'],
-    ['bid', 'Nilai'],
+    ['seq', 'Ke-'], ['created_at', 'Jam'], ['gap', 'Selisih'], ['username', 'Akun'], ['bid', 'Nilai'],
     ...(state.tech ? [['increment', 'Naik'], [null, 'Jam mentah']] : []),
     [null, 'Tanda'], [null, 'Komentar'],
     ...(state.tech ? [[null, 'Nomor komentar']] : [])
   ];
   const span = cols.length;
-  $('tbl-chrono').tHead.innerHTML = sortHeader(cols, 'chrono');
+  const tbl = $('tbl-chrono');
+  tbl.tHead.innerHTML = sortHeader(cols, 'chrono');
+  tbl.classList.toggle('wrapall', state.wrap);
 
   if (!rows.length) {
-    $('tbl-chrono').tBodies[0].innerHTML =
+    tbl.tBodies[0].innerHTML =
       `<tr><td colspan="${span}" class="empty">Tidak ada komentar yang cocok dengan pencarian atau saringan kamu.</td></tr>`;
     return;
   }
 
-  let prevDay = null;
   const out = [];
+
+  // Pemenang dipatok di baris teratas — inilah yang dicari orang lebih dulu.
+  const w = state.result.summary.winner;
+  if (w) {
+    out.push(`<tr class="day"><td colspan="${span}">Tawaran pemenang</td></tr>`);
+    out.push(rowHtml(w, span, 'pinned', '<span class="tag win">menang</span>'));
+    out.push(`<tr class="day"><td colspan="${span}">Urutan lengkap</td></tr>`);
+  }
+
+  let prevDay = null;
   for (const r of rows) {
     const day = fmtDate(r.created_at, state.tz);
     if (day !== prevDay) {
-      out.push(`<tr class="daysep"><td colspan="${span}">${day}</td></tr>`);
+      out.push(`<tr class="day"><td colspan="${span}">${day}</td></tr>`);
       prevDay = day;
     }
-    const cls = r.flags.includes('lewat-cutoff') ? 'r-late'
-      : r.flags.includes('detik-akhir') ? 'r-snipe' : '';
-
-    out.push(`<tr class="${cls}">` +
-      `<td class="num soft">${r.seq}</td>` +
-      `<td class="time">${fmtTime(r.created_at, state.tz)}</td>` +
-      `<td class="num soft">${r.gap != null ? fmtDuration(r.gap) : '—'}</td>` +
-      `<td class="acct">${esc(r.username || '—')}${r.is_reply ? ' <span class="soft">(balasan)</span>' : ''}</td>` +
-      `<td class="amt">${r.bid != null ? 'Rp' + fmtRupiah(r.bid) : '<span class="soft">—</span>'}</td>` +
-      (state.tech
-        ? `<td class="num soft">${r.increment != null ? (r.increment > 0 ? '+' : '') + fmtRupiah(r.increment) : ''}</td>` +
-          `<td class="mono soft">${r.created_at}</td>`
-        : '') +
-      `<td>${tags(r)}</td>` +
-      `<td class="msg">${esc(r.text)}</td>` +
-      (state.tech ? `<td class="mono soft">${esc(r.pk)}</td>` : '') +
-      '</tr>');
+    out.push(rowHtml(r, span, w && r.pk === w.pk ? 'pinned' : ''));
   }
-  $('tbl-chrono').tBodies[0].innerHTML = out.join('');
+  tbl.tBodies[0].innerHTML = out.join('');
 }
 
 const ACC_COLS = [
-  ['username', 'Akun'], ['count', 'Komentar'], ['first', 'Tawaran pertama'],
-  ['last', 'Tawaran terakhir'], ['maxBid', 'Nilai tertinggi'],
-  ['lateBidCount', 'Telat'], ['snipeCount', 'Detik akhir'], ['downCount', 'Nilai turun'],
-  [null, 'Catatan']
+  ['username', 'Akun'], ['count', 'Komentar'], ['first', 'Pertama'], ['last', 'Terakhir'],
+  ['maxBid', 'Nilai tertinggi'], ['lateBidCount', 'Telat'], ['snipeCount', 'Detik akhir'],
+  ['downCount', 'Nilai turun'], [null, 'Catatan']
 ];
 
 function renderAccounts() {
@@ -599,19 +621,18 @@ function renderAccounts() {
     if (a.count === 1) notes.push('<span class="tag same">sekali komentar</span>');
     if (a.lateBidCount) notes.push('<span class="tag late">menawar setelah tutup</span>');
     else if (a.lateCount) notes.push('<span class="tag same">bicara setelah tutup</span>');
-    const cell = (n, color) =>
-      `<td class="num" style="color:${n ? color : 'var(--muted)'}">${n || '—'}</td>`;
+    const cell = (n, color) => `<td class="n" style="color:${n ? color : 'var(--mute)'}">${n || '—'}</td>`;
     return '<tr>' +
-      `<td class="acct">${esc(a.username)}` +
-      (a.full_name ? `<div class="soft" style="font-weight:400;font-size:13px">${esc(a.full_name)}</div>` : '') +
+      `<td class="who">${esc(a.username)}` +
+      (a.full_name ? `<div class="dim" style="font-weight:400;font-size:13px">${esc(a.full_name)}</div>` : '') +
       '</td>' +
-      `<td class="num">${a.count}${a.replies ? ` <span class="soft">(${a.replies} balasan)</span>` : ''}</td>` +
-      `<td class="time">${fmtTime(a.first, state.tz)}</td>` +
-      `<td class="time">${fmtTime(a.last, state.tz)}</td>` +
-      `<td class="amt">${a.maxBid != null ? 'Rp' + fmtRupiah(a.maxBid) : '<span class="soft">—</span>'}</td>` +
-      cell(a.lateBidCount, 'var(--danger)') +
+      `<td class="n">${a.count}${a.replies ? ` <span class="dim">(${a.replies} balasan)</span>` : ''}</td>` +
+      `<td class="clock">${fmtTime(a.first, state.tz)}</td>` +
+      `<td class="clock">${fmtTime(a.last, state.tz)}</td>` +
+      `<td class="money">${a.maxBid != null ? 'Rp' + fmtRupiah(a.maxBid) : '<span class="dim">—</span>'}</td>` +
+      cell(a.lateBidCount, 'var(--bad)') +
       cell(a.snipeCount, 'var(--warn)') +
-      cell(a.downCount, 'var(--danger)') +
+      cell(a.downCount, 'var(--bad)') +
       `<td>${notes.join('')}</td>` +
       '</tr>';
   }).join('');
@@ -624,45 +645,39 @@ function renderDiff() {
 
   const info = [];
   if (!d.sameSource) {
-    info.push('<p class="alert danger">Dua file ini berasal dari postingan yang berbeda, ' +
+    info.push('<p class="alert bad">Dua berkas ini dari postingan yang berbeda, ' +
       'jadi perbandingannya tidak berarti apa-apa.</p>');
   }
-  info.push('<p class="tabintro">' +
+  info.push('<p class="tabnote">' +
     `Membandingkan tarikan <b>${d.beforeAt ? fmtDateTime(d.beforeAt, state.tz) : 'lebih awal'}</b> ` +
     `(${d.beforeCount} komentar) dengan <b>${d.afterAt ? fmtDateTime(d.afterAt, state.tz) : 'lebih akhir'}</b> ` +
-    `(${d.afterCount} komentar). Yang ada di tarikan pertama tapi hilang di tarikan kedua ` +
-    'berarti dihapus di antara keduanya.</p>');
+    `(${d.afterCount} komentar). Yang ada di tarikan pertama tapi hilang di tarikan kedua berarti dihapus.</p>`);
   $('diffinfo').innerHTML = info.join('');
 
   $('tbl-diff').tHead.innerHTML =
-    '<tr><th class="nosort">Status</th><th class="nosort">Jam</th><th class="nosort">Akun</th>' +
-    '<th class="nosort">Komentar</th></tr>';
+    '<tr><th class="nosort">Status</th><th class="nosort">Jam</th>' +
+    '<th class="nosort">Akun</th><th class="nosort">Komentar</th></tr>';
 
   const row = (tag, c, extra = '') => '<tr>' +
-    `<td>${tag}</td><td class="time">${fmtDateTime(c.created_at, state.tz)}</td>` +
-    `<td class="acct">${esc(c.username || '—')}</td>` +
-    `<td class="msg">${esc(c.text)}${extra}</td></tr>`;
+    `<td>${tag}</td><td class="clock">${fmtDateTime(c.created_at, state.tz)}</td>` +
+    `<td class="who">${esc(c.username || '—')}</td>` +
+    `<td class="msg"><div class="txt">${esc(c.text)}${extra}</div></td></tr>`;
 
   const body = [
     ...d.deleted.map((c) => row('<span class="tag del">dihapus</span>', c)),
     ...d.changed.map((ch) => row('<span class="tag snipe">diubah</span>', ch.before,
-      `<div class="soft" style="font-size:13px;margin-top:4px">menjadi: ${esc(ch.after.text)}</div>`)),
+      `<div class="dim" style="font-size:13px;margin-top:4px">menjadi: ${esc(ch.after.text)}</div>`)),
     ...d.added.map((c) => row('<span class="tag new">baru</span>', c))
   ];
   $('tbl-diff').tBodies[0].innerHTML = body.length ? body.join('')
     : '<tr><td colspan="4" class="empty">Tidak ada bedanya. Tidak ada komentar yang dihapus di antara dua tarikan kamu.</td></tr>';
 }
 
-function renderEvidence() {
-  $('sumtext').textContent = summaryText(
-    state.result.summary, state.primary.source, state.tz, state.hash);
-}
-
 // ================================================================ ekspor
 
 function baseName() {
   const s = state.primary.source || {};
-  return `ketok_${s.shortcode || s.media_id || 'lelang'}`;
+  return `lelanginsta_${s.shortcode || s.media_id || 'lelang'}`;
 }
 
 function copy(text, btn) {
@@ -673,7 +688,7 @@ function copy(text, btn) {
   });
 }
 
-// ================================================================ event
+// ================================================================ perkabelan
 
 function wire() {
   const drop = $('drop');
@@ -695,12 +710,12 @@ function wire() {
   $('file').onchange = (e) => { if (e.target.files.length) loadFiles(e.target.files); };
   $('demo').onclick = loadDemo;
   $('reset').onclick = () => location.reload();
-  $('go').onclick = runPaste;
-  $('iglink').addEventListener('keydown', (e) => { if (e.key === 'Enter') runPaste(); });
+  $('go').onclick = runTake;
+  $('iglink').addEventListener('keydown', (e) => { if (e.key === 'Enter') runTake(); });
   $('keysave').onclick = applyKey;
   $('ketokkey').addEventListener('keydown', (e) => { if (e.key === 'Enter') applyKey(); });
 
-  for (const el of ['cutoff', 'reps', 'onlyflag', 'tech']) $(el).onchange = render;
+  for (const el of ['cutoff', 'reps', 'onlyflag', 'tech', 'wrap']) $(el).onchange = render;
   $('q').oninput = render;
   $('tz').onchange = () => {
     const prev = datetimeLocalToEpoch($('cutoff').value, state.tz);
@@ -713,8 +728,7 @@ function wire() {
   $('legendtoggle').onclick = () => {
     const l = $('legend');
     l.classList.toggle('hidden');
-    $('legendtoggle').textContent = l.classList.contains('hidden')
-      ? 'Apa arti tanda-tandanya?' : 'Sembunyikan keterangan';
+    $('legendtoggle').textContent = l.classList.contains('hidden') ? 'Arti tanda' : 'Sembunyikan';
   };
 
   document.querySelectorAll('.tabs button').forEach((b) => {
@@ -727,6 +741,13 @@ function wire() {
   });
 
   document.addEventListener('click', (e) => {
+    const more = e.target.closest('.more');
+    if (more) {
+      const txt = more.previousElementSibling;
+      const open = txt.classList.toggle('clip');
+      more.textContent = open ? 'selengkapnya' : 'ringkas';
+      return;
+    }
     const th = e.target.closest('th[data-sort]');
     if (!th) return;
     const st = state.sort[th.dataset.which];
@@ -740,7 +761,7 @@ function wire() {
   $('dlacc').onclick = () =>
     download(`${baseName()}_akun.csv`, accountsCsv(state.result.accounts, state.tz), 'text/csv;charset=utf-8');
   $('dldiff').onclick = () => {
-    if (!state.diff) return alert('Jatuhkan dua file hasil tarikan dulu untuk bisa membandingkan.');
+    if (!state.diff) return alert('Jatuhkan dua berkas hasil tarikan dulu untuk bisa membandingkan.');
     download(`${baseName()}_dihapus.csv`, diffCsv(state.diff, state.tz), 'text/csv;charset=utf-8');
   };
   $('dlraw').onclick = () =>
@@ -767,5 +788,5 @@ initTz();
 initBookmarklet();
 wire();
 wireHandoff();
-initPaste();
+initTake();
 tzNote();

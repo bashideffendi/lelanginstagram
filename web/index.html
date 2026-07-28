@@ -3,259 +3,223 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Ketok — jam pasti komentar lelang Instagram</title>
-<meta name="description" content="Lihat jam persis tiap komentar lelang Instagram dalam zona waktu kamu sendiri, dan cek siapa yang menawar setelah lelang ditutup.">
+<title>Lelang Insta — Cek Pemenang Lelang Instagram</title>
+<meta name="description" content="Buka jam persis tiap komentar lelang Instagram sampai ke detik, dan buktikan siapa yang menawar setelah lelang ditutup.">
 <meta name="robots" content="noindex">
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 
-<header class="topbar">
-  <div class="inner">
-    <a class="brand" href="./"><span class="dot"></span>Ketok</a>
-    <span class="brand-sub">jam pasti komentar lelang Instagram</span>
-    <span class="grow"></span>
-    <button id="reset" class="btn ghost sm hidden">Muat data lain</button>
+<header class="bar">
+  <div class="bar-in">
+    <a class="mark" href="./"><span class="mark-dot"></span>Lelang&nbsp;Insta</a>
+    <span class="mark-sub">Cek Pemenang Lelang Instagram</span>
+    <span class="fill"></span>
+    <button id="reset" class="btn quiet sm hidden">Cek lelang lain</button>
   </div>
 </header>
 
-<!-- ============================================================ HALAMAN AWAL -->
+<!-- =========================================================== HALAMAN AWAL -->
 <main id="landing">
-  <section class="hero">
-    <h1>Siapa yang menawar duluan, dan siapa yang telat.</h1>
-    <p class="lede">
-      Instagram menyembunyikan jam persis tiap komentar &mdash; yang kelihatan cuma
-      &ldquo;3 hari lalu&rdquo;. Ketok membuka jam aslinya sampai ke detik, dalam zona
-      waktu kamu sendiri, lalu menandai tawaran yang masuk setelah lelang ditutup.
+
+  <section class="open">
+    <h1>Buktikan siapa yang menawar duluan.</h1>
+    <p class="lead">
+      Instagram hanya menampilkan &ldquo;3 hari lalu&rdquo;. Lelang Insta membuka jam
+      persis tiap komentar sampai ke detik, dalam zona waktumu sendiri, lalu
+      menandai tawaran yang masuk setelah lelang ditutup.
     </p>
-    <div class="pastebar">
+
+    <div class="take">
       <input type="url" id="iglink" spellcheck="false"
              placeholder="Tempel link postingan lelang di sini">
-      <button id="go" class="btn primary">Ambil komentar</button>
+      <button id="go" class="btn solid">Ambil komentar</button>
     </div>
-    <p class="pastestat" id="paststat">Memeriksa&hellip;</p>
-    <div id="pasteprog" class="pasteprog hidden"><i></i></div>
+    <p class="take-stat" id="paststat">Menyiapkan&hellip;</p>
+    <div id="pasteprog" class="take-prog hidden"><i></i></div>
 
     <div id="keybox" class="keybox hidden">
       <label for="ketokkey">Kunci mode server</label>
       <div class="keyrow">
-        <input type="password" id="ketokkey" placeholder="Kata sandi mode server" autocomplete="off">
+        <input type="password" id="ketokkey" placeholder="Kata sandi" autocomplete="off">
         <button id="keysave" class="btn">Simpan</button>
       </div>
-      <p class="keyhint">Disimpan di browser ini saja, tidak dikirim ke mana-mana selain server Ketok kamu sendiri.</p>
+      <p class="keyhint">Disimpan di browser ini saja.</p>
     </div>
 
-    <div id="extinfo" class="extinfo hidden">
-      <h3>Dua cara mengisi kotak di atas</h3>
-      <p>
-        Halaman web biasa tidak diizinkan browser mengambil komentar dari
-        instagram.com, dan tidak punya akses ke sesi login kamu. Jadi kotak
-        tempel-link butuh salah satu dari dua ini:
-      </p>
-      <p style="margin-top:12px">
-        <b>Extension</b> &mdash; menarik dari browser kamu sendiri, memakai sesi
-        yang sudah ada. Tidak ada cookie yang dibaca, disalin, atau dikirim ke
-        mana pun, dan tidak ada akun lain yang menanggung risiko. Ini yang
-        dipakai lebih dulu kalau terpasang.
-      </p>
-      <p style="margin-top:8px">
-        <b>Mode server</b> &mdash; dipakai kalau extension tidak ada, misalnya
-        saat kamu membuka Ketok dari HP. Server menarik memakai sesi akun
-        Instagram khusus yang kamu setel sendiri. Cara mengaktifkannya ada di
-        <a href="https://github.com/bashideffendi/lelanginstagram#mode-server" target="_blank" rel="noopener">README</a>
-        &mdash; pakai akun terpisah, bukan akun yang kamu pakai ikut lelang.
-      </p>
-      <h3 style="margin-top:18px">Memasang extension</h3>
-      <ol>
-        <li>Unduh atau salin folder <code>extension/</code> dari
-          <a href="https://github.com/bashideffendi/lelanginstagram" target="_blank" rel="noopener">repo Ketok</a></li>
-        <li>Buka <code>chrome://extensions</code></li>
-        <li>Nyalakan <b>Developer mode</b> di pojok kanan atas</li>
-        <li>Klik <b>Load unpacked</b>, pilih folder <code>extension/</code> tadi</li>
-        <li>Kembali ke halaman ini dan muat ulang</li>
-      </ol>
-      <p class="extalt">
-        <b>Tidak mau pasang extension?</b> Pakai tombol seret di Langkah 1 di bawah.
-        Hasilnya sama persis &mdash; bedanya kamu perlu membuka postingannya dulu
-        lalu menekan bookmark, bukan menempel link di sini.
-      </p>
-    </div>
+    <p class="try"><button id="demo" class="link">Lihat contoh hasilnya &rarr;</button></p>
+  </section>
 
-    <div class="hero-cta">
-      <button id="demo" class="btn ghost">Lihat contoh hasilnya dulu</button>
-      <span class="hero-hint">Data lelang contoh &mdash; tanpa perlu memasang apa pun</span>
+  <section class="grid3">
+    <div class="pt">
+      <h3>Jam sampai ke detik</h3>
+      <p>Waktu asli tiap komentar, ditampilkan dalam zona waktu yang kamu pilih.
+        Tidak ada tebak-tebakan soal jam server siapa.</p>
+    </div>
+    <div class="pt">
+      <h3>Yang telat langsung terlihat</h3>
+      <p>Isi jam tutup lelang. Tawaran yang masuk setelahnya ditandai merah,
+        lengkap dengan selisih detiknya.</p>
+    </div>
+    <div class="pt">
+      <h3>Bisa diperiksa ulang</h3>
+      <p>Ekspor memuat jam mentah dan nomor komentar Instagram, jadi penyelenggara
+        bisa memverifikasi sendiri tanpa perlu percaya begitu saja.</p>
     </div>
   </section>
 
-  <section class="steps">
-    <h2 class="section-title">Cara lain, tanpa extension</h2>
-    <ol class="steplist">
-      <li>
-        <div class="step-n">1</div>
-        <div class="step-body">
-          <h3>Pasang tombol Ketok</h3>
-          <p>
-            Cara ini tidak butuh extension. Tekan <kbd>Ctrl</kbd> + <kbd>Shift</kbd> +
-            <kbd>B</kbd> supaya bar bookmark muncul, lalu <b>seret tombol oranye di
-            bawah ini ke bar itu</b>. Sekali saja, selamanya.
-          </p>
-          <a class="bookmarklet" id="bm" href="#" draggable="true">
-            <span class="bm-icon">🔨</span> Ketok
-          </a>
-          <p class="step-note" id="bmnote">Seret &mdash; jangan diklik dari sini.</p>
-        </div>
-      </li>
-      <li>
-        <div class="step-n">2</div>
-        <div class="step-body">
-          <h3>Buka post lelangnya, klik tombol Ketok</h3>
-          <p>
-            Buka postingannya sendiri di Chrome &mdash; alamatnya harus berbentuk
-            <code>instagram.com/p/&hellip;</code>, bukan halaman beranda. Klik bookmark
-            <b>Ketok</b>, lalu tunggu sampai selesai menarik komentar.
-          </p>
-        </div>
-      </li>
-      <li>
-        <div class="step-n">3</div>
-        <div class="step-body">
-          <h3>Klik &ldquo;Buka di Ketok&rdquo;</h3>
-          <p>
-            Hasilnya langsung pindah ke halaman ini. Isi jam tutup lelang, dan
-            tawaran yang telat akan ditandai merah.
-          </p>
-        </div>
-      </li>
-    </ol>
+  <section class="fine">
+    <details id="extinfo">
+      <summary>Cara lain menarik komentar, tanpa lewat server</summary>
+      <div class="fine-body">
+        <p>
+          Kotak di atas memakai server. Kalau kamu lebih suka penarikan berjalan
+          dari browsermu sendiri &mdash; lebih cepat, tanpa batas laju, dan tidak
+          bergantung pada sesi milik orang lain &mdash; ada dua pilihan.
+        </p>
 
-    <div class="dropcard" id="drop">
-      <p><b>Sudah punya file hasil tarikan?</b> Jatuhkan di sini, atau
-        <button id="pick" class="linkbtn">pilih file</button>.
-        Dua file sekaligus untuk mendeteksi komentar yang dihapus.</p>
+        <h4>Extension Chrome</h4>
+        <p>Setelah terpasang, kotak tempel-link di atas otomatis memakainya.</p>
+        <ol>
+          <li>Ambil folder <code>extension/</code> dari
+            <a href="https://github.com/bashideffendi/lelanginstagram" target="_blank" rel="noopener">repo Lelang Insta</a></li>
+          <li>Buka <code>chrome://extensions</code>, nyalakan <b>Developer mode</b></li>
+          <li>Klik <b>Load unpacked</b>, pilih folder tadi, lalu muat ulang halaman ini</li>
+        </ol>
+
+        <h4>Bookmarklet</h4>
+        <p>
+          Tanpa pemasangan. Seret tombol ini ke bar bookmark
+          (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd> untuk memunculkan barnya),
+          buka postingan lelangnya, lalu klik bookmark itu.
+        </p>
+        <a class="bmk" id="bm" href="#" draggable="true">Lelang Insta</a>
+        <p class="note" id="bmnote">Seret ke bar bookmark &mdash; jangan diklik di sini.</p>
+      </div>
+    </details>
+
+    <details>
+      <summary>Apa yang tidak bisa dilakukan alat ini</summary>
+      <div class="fine-body">
+        <p>
+          <b>Ketelitiannya berhenti di detik.</b> Instagram tidak menyimpan pecahan
+          detik. Kalau dua tawaran jatuh di detik yang sama, urutannya diambil dari
+          nomor komentar Instagram, yang selalu naik.
+        </p>
+        <p>
+          <b>Komentar yang sudah dihapus tidak bisa dikembalikan.</b> Satu-satunya
+          cara membuktikannya: tarik dua kali &mdash; sekali saat lelang berjalan,
+          sekali setelah tutup &mdash; lalu jatuhkan kedua berkasnya di sini.
+        </p>
+        <p>
+          <b>Nilai tawaran ditebak dari teks komentar.</b> Format <code>1,5jt</code>,
+          <code>500rb</code>, dan <code>1.500.000</code> dikenali, tapi tetap perlu
+          kamu baca sendiri.
+        </p>
+      </div>
+    </details>
+
+    <div class="dropline" id="drop">
+      Sudah punya berkas hasil tarikan? Jatuhkan di sini, atau
+      <button id="pick" class="link">pilih berkas</button>.
+      Dua berkas sekaligus untuk mendeteksi komentar yang dihapus.
       <input type="file" id="file" accept=".json,application/json" multiple class="hidden">
     </div>
-    <p id="loaderr" class="alert danger hidden"></p>
-  </section>
-
-  <section class="notes">
-    <h2 class="section-title">Yang perlu kamu tahu sejak awal</h2>
-    <div class="notegrid">
-      <div class="note">
-        <h4>Ketelitian sampai detik, bukan lebih</h4>
-        <p>Instagram tidak menyimpan pecahan detik. Kalau dua tawaran jatuh di detik
-          yang sama, Ketok mengurutkannya lewat nomor komentar &mdash; nomor yang lebih
-          kecil pasti dibuat lebih dulu.</p>
-      </div>
-      <div class="note">
-        <h4>Komentar yang sudah dihapus tidak bisa dikembalikan</h4>
-        <p>Satu-satunya cara membuktikannya: tarik dua kali &mdash; sekali saat lelang
-          berjalan, sekali setelah tutup &mdash; lalu jatuhkan dua-duanya di sini.
-          Ketok akan menunjukkan yang hilang.</p>
-      </div>
-      <div class="note">
-        <h4>Datanya tidak ke mana-mana</h4>
-        <p>Semua perhitungan berjalan di browser kamu. Tidak ada yang diunggah,
-          tidak ada server yang menyimpan, dan kata sandi Instagram kamu tidak
-          pernah tersentuh.</p>
-      </div>
-    </div>
+    <p id="loaderr" class="alert bad hidden"></p>
   </section>
 </main>
 
-<!-- ============================================================ HASIL -->
+<!-- =========================================================== HASIL -->
 <main id="app" class="hidden">
 
   <div id="democue"></div>
 
-  <section class="postcard" id="postcard"></section>
+  <!-- kartu bukti: bagian yang difoto layar dan dikirim ke penyelenggara -->
+  <section class="proof" id="proof"></section>
 
-  <section class="verdict" id="verdict"></section>
-
-  <section class="controls">
-    <div class="ctrl">
+  <section class="knobs">
+    <div class="knob">
       <label for="cutoff">Jam lelang ditutup</label>
       <input type="datetime-local" id="cutoff" step="1">
-      <span class="help">Kosongkan kalau belum tahu. Isi ini yang memunculkan tanda merah.</span>
     </div>
-    <div class="ctrl">
+    <div class="knob">
       <label for="tz">Zona waktu</label>
       <select id="tz"></select>
-      <span class="help" id="tznote"></span>
     </div>
-    <div class="ctrl">
+    <div class="knob wide">
       <label for="q">Cari</label>
       <input type="search" id="q" placeholder="nama akun atau isi komentar">
-      <span class="help">&nbsp;</span>
     </div>
+    <p class="knob-note" id="tznote"></p>
   </section>
 
-  <section class="cards" id="cards"></section>
+  <section class="chips" id="cards"></section>
 
   <nav class="tabs">
-    <button data-tab="chrono" class="on">Urutan tawaran <span class="pipcount" id="c-chrono">0</span></button>
-    <button data-tab="accounts">Per akun <span class="pipcount" id="c-accounts">0</span></button>
-    <button data-tab="diff" id="tab-diff" class="hidden">Yang dihapus <span class="pipcount" id="c-diff">0</span></button>
+    <button data-tab="chrono" class="on">Urutan tawaran <span class="pip" id="c-chrono">0</span></button>
+    <button data-tab="accounts">Per akun <span class="pip" id="c-accounts">0</span></button>
+    <button data-tab="diff" id="tab-diff" class="hidden">Yang dihapus <span class="pip" id="c-diff">0</span></button>
     <button data-tab="evidence">Simpan bukti</button>
   </nav>
 
   <section class="tab on" id="tab-body-chrono">
-    <div class="tabbar">
-      <label class="switch"><input type="checkbox" id="onlyflag"> Hanya yang ditandai</label>
-      <label class="switch"><input type="checkbox" id="reps" checked> Ikutkan balasan</label>
-      <label class="switch"><input type="checkbox" id="tech"> Tampilkan kolom teknis</label>
-      <span class="grow"></span>
-      <button id="legendtoggle" class="linkbtn">Apa arti tanda-tandanya?</button>
+    <div class="toolrow">
+      <label class="tog"><input type="checkbox" id="onlyflag"> Hanya yang ditandai</label>
+      <label class="tog"><input type="checkbox" id="reps" checked> Ikutkan balasan</label>
+      <label class="tog"><input type="checkbox" id="tech"> Kolom teknis</label>
+      <label class="tog"><input type="checkbox" id="wrap"> Buka semua komentar</label>
+      <span class="fill"></span>
+      <button id="legendtoggle" class="link">Arti tanda</button>
     </div>
     <div id="legend" class="legend hidden"></div>
-    <div class="tablewrap"><table id="tbl-chrono"><thead></thead><tbody></tbody></table></div>
+    <div class="sheet"><table id="tbl-chrono"><thead></thead><tbody></tbody></table></div>
   </section>
 
   <section class="tab" id="tab-body-accounts">
-    <p class="tabintro">Rekap tiap akun yang ikut berkomentar. Klik judul kolom untuk mengurutkan.</p>
-    <div class="tablewrap"><table id="tbl-accounts"><thead></thead><tbody></tbody></table></div>
+    <div class="sheet"><table id="tbl-accounts"><thead></thead><tbody></tbody></table></div>
   </section>
 
   <section class="tab" id="tab-body-diff">
     <div id="diffinfo"></div>
-    <div class="tablewrap"><table id="tbl-diff"><thead></thead><tbody></tbody></table></div>
+    <div class="sheet"><table id="tbl-diff"><thead></thead><tbody></tbody></table></div>
   </section>
 
   <section class="tab" id="tab-body-evidence">
     <div class="ev">
       <div class="evbox">
         <h3>Ringkasan siap kirim</h3>
-        <p class="evhint">Tempel ke chat atau laporan. Sudah memuat jam, nomor komentar, dan zona waktu.</p>
+        <p class="evsub">Tempel ke chat penyelenggara. Sudah memuat jam, zona waktu, dan nomor komentar.</p>
         <pre id="sumtext"></pre>
-        <div class="btnrow">
-          <button id="copysum" class="btn primary">Salin ringkasan</button>
-          <button id="dlsum" class="btn">Unduh sebagai .txt</button>
+        <div class="row">
+          <button id="copysum" class="btn solid">Salin ringkasan</button>
+          <button id="dlsum" class="btn">Unduh .txt</button>
         </div>
       </div>
       <div class="evbox">
         <h3>Unduh tabel</h3>
-        <p class="evhint">Bisa dibuka di Excel. Selalu memuat jam mentah, jadi orang lain bisa memeriksa ulang.</p>
-        <div class="btnrow">
-          <button id="dlchrono" class="btn">Urutan tawaran (Excel)</button>
-          <button id="dlacc" class="btn">Rekap akun (Excel)</button>
-          <button id="dldiff" class="btn">Yang dihapus (Excel)</button>
+        <p class="evsub">Bisa dibuka di Excel. Selalu memuat jam mentah, jadi bisa diperiksa ulang.</p>
+        <div class="row">
+          <button id="dlchrono" class="btn">Urutan tawaran</button>
+          <button id="dlacc" class="btn">Rekap akun</button>
+          <button id="dldiff" class="btn">Yang dihapus</button>
           <button id="dlraw" class="btn">Data asli (JSON)</button>
         </div>
       </div>
       <div class="evbox">
-        <h3>Sidik jari file</h3>
-        <p class="evhint">
-          Kalau ada yang meragukan datanya sudah kamu ubah, minta dia hitung sidik jari
-          file yang sama. Angkanya harus persis sama.
+        <h3>Sidik jari berkas</h3>
+        <p class="evsub">
+          Kalau penyelenggara meragukan datanya sudah kamu ubah, minta dia menghitung
+          sidik jari berkas yang sama. Angkanya harus persis sama.
         </p>
         <pre id="hash">menghitung&hellip;</pre>
-        <div class="btnrow"><button id="copyhash" class="btn">Salin sidik jari</button></div>
+        <div class="row"><button id="copyhash" class="btn">Salin sidik jari</button></div>
       </div>
     </div>
   </section>
 
   <footer class="foot">
     Jam yang ditampilkan diterjemahkan dari catatan waktu asli Instagram dan tidak
-    pernah diubah &mdash; mengganti zona waktu hanya mengubah cara menampilkannya.
+    pernah diubah. Mengganti zona waktu hanya mengubah cara menampilkannya.
   </footer>
 </main>
 

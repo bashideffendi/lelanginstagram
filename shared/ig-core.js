@@ -89,10 +89,11 @@ export function fetchMediaInfo(api, mediaId, errors) {
     });
 }
 
-export function fetchComments(api, mediaId, onProgress, errors) {
+export function fetchComments(api, mediaId, onProgress, errors, maxPages) {
   var all = [];
   var minId = null;
   var page = 0;
+  var limit = maxPages || MAX_PAGES;
 
   function step() {
     var url = '/api/v1/media/' + mediaId +
@@ -110,9 +111,12 @@ export function fetchComments(api, mediaId, onProgress, errors) {
       var hasMore = j.has_more_comments !== false && !!minId;
       onProgress(all.length, page, hasMore);
 
-      if (hasMore && page < MAX_PAGES) return politeDelay().then(step);
-      if (page >= MAX_PAGES) {
-        errors.push({ stage: 'comments', message: 'Berhenti di batas ' + MAX_PAGES + ' halaman.' });
+      if (hasMore && page < limit) return politeDelay().then(step);
+      if (hasMore && page >= limit) {
+        errors.push({
+          stage: 'comments',
+          message: 'Berhenti di batas ' + limit + ' halaman — komentar tertua tidak ikut terambil.'
+        });
       }
       return all;
     });
@@ -188,7 +192,7 @@ export function extract(opts) {
       report({ stage: 'comments', count: 0, total: info && info.comment_count });
       return fetchComments(api, mediaId, function (n, page) {
         report({ stage: 'comments', count: n, page: page, total: info && info.comment_count });
-      }, errors);
+      }, errors, opts.maxPages);
     })
     .then(function (top) {
       rawTop = top;
