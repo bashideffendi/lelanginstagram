@@ -1,0 +1,11 @@
+# Artefak debug dari build.mjs
+bookmarklet/dist/_gagal.js
+bookmarklet/dist/_decoded.js
+
+# Data uji hasil generate — bikin ulang dengan: node samples/generate.mjs
+samples/contoh-snapshot-*.json
+
+node_modules/
+.vercel
+.DS_Store
+Thumbs.db

@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ketok — analisis waktu komentar lelang Instagram</title>
+<meta name="description" content="Baca waktu asli komentar Instagram dalam timezone apa pun, urutkan bid secara kronologis, dan periksa pelanggaran cutoff lelang.">
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>KETOK</h1>
+    <span class="tag">analisis waktu komentar lelang Instagram</span>
+    <span class="spacer"></span>
+    <a href="#" id="reset" class="hidden">Muat dump lain</a>
+  </header>
+
+  <!-- ------------------------------------------------------------ muat data -->
+  <section id="loader">
+    <div class="drop" id="drop">
+      <h2>Jatuhkan dump JSON dari bookmarklet Ketok</h2>
+      <p>Semua pemrosesan berjalan di browser ini. Tidak ada data yang dikirim ke server mana pun.</p>
+      <p class="or">atau</p>
+      <button class="pri" id="pick">Pilih file&hellip;</button>
+      <input type="file" id="file" accept=".json,application/json" multiple class="hidden">
+      <p class="or">Dua file sekaligus &rarr; mode perbandingan snapshot</p>
+
+      <div class="steps">
+        <ol>
+          <li>Buka permalink post lelang di Chrome &mdash; <code>instagram.com/p/XXXX/</code></li>
+          <li>Klik bookmark <b>Ketok</b>, tunggu penarikan selesai</li>
+          <li>Klik <b>Buka di Ketok</b> (otomatis mengisi halaman ini), atau <b>Simpan JSON</b> lalu jatuhkan di sini</li>
+        </ol>
+      </div>
+    </div>
+    <p id="loaderr" class="warnbox hidden"></p>
+  </section>
+
+  <!-- ------------------------------------------------------------ analisis -->
+  <section id="app" class="hidden">
+
+    <div class="src" id="src"></div>
+
+    <div class="bar">
+      <div class="field">
+        <label for="tz">Timezone tampilan</label>
+        <select id="tz"></select>
+        <span class="note" id="tznote"></span>
+      </div>
+      <div class="field">
+        <label for="cutoff">Jam tutup lelang</label>
+        <input type="datetime-local" id="cutoff" step="1">
+        <span class="note" id="cutoffnote">kosong = tanpa cutoff</span>
+      </div>
+      <div class="field">
+        <label for="grace">Jendela akhir (detik)</label>
+        <input type="number" id="grace" value="60" min="0" step="10">
+      </div>
+      <div class="field">
+        <label for="q">Cari</label>
+        <input type="search" id="q" placeholder="username atau isi komentar">
+      </div>
+      <label class="chk"><input type="checkbox" id="reps" checked> Ikutkan balasan</label>
+      <label class="chk"><input type="checkbox" id="onlyflag"> Hanya yang bertanda</label>
+    </div>
+
+    <div class="cards" id="cards"></div>
+    <div id="winner"></div>
+
+    <div class="tabs">
+      <button data-tab="chrono" class="on">Kronologi <span class="count" id="c-chrono">0</span></button>
+      <button data-tab="accounts">Per akun <span class="count" id="c-accounts">0</span></button>
+      <button data-tab="diff" id="tab-diff">Perbandingan <span class="count" id="c-diff">0</span></button>
+      <button data-tab="evidence">Bukti &amp; ekspor</button>
+    </div>
+
+    <div class="tab on" id="tab-body-chrono">
+      <div class="tablewrap"><table id="tbl-chrono"><thead></thead><tbody></tbody></table></div>
+    </div>
+
+    <div class="tab" id="tab-body-accounts">
+      <div class="tablewrap"><table id="tbl-accounts"><thead></thead><tbody></tbody></table></div>
+    </div>
+
+    <div class="tab" id="tab-body-diff">
+      <div id="diffinfo"></div>
+      <div class="tablewrap"><table id="tbl-diff"><thead></thead><tbody></tbody></table></div>
+    </div>
+
+    <div class="tab" id="tab-body-evidence">
+      <div class="evidence">
+        <div class="ebox">
+          <h3>Ringkasan siap tempel</h3>
+          <pre id="sumtext"></pre>
+          <div class="btns">
+            <button id="copysum">Salin ringkasan</button>
+            <button id="dlsum">Unduh .txt</button>
+          </div>
+        </div>
+        <div class="ebox">
+          <h3>Ekspor tabel</h3>
+          <div class="btns">
+            <button id="dlchrono">CSV kronologi</button>
+            <button id="dlacc">CSV per akun</button>
+            <button id="dldiff">CSV perbandingan</button>
+            <button id="dlraw">JSON mentah (asli)</button>
+          </div>
+        </div>
+        <div class="ebox">
+          <h3>Integritas dump</h3>
+          <p style="color:var(--dim);font-size:13px;margin-bottom:10px">
+            Sidik jari SHA-256 dari file JSON mentah. Siapa pun yang memegang file yang
+            sama akan menghitung nilai yang sama &mdash; kalau berbeda, file sudah diubah.
+          </p>
+          <pre id="hash">menghitung&hellip;</pre>
+          <div class="btns"><button id="copyhash">Salin sidik jari</button></div>
+        </div>
+      </div>
+    </div>
+
+    <footer>
+      Instagram menyimpan waktu komentar sebagai epoch UTC dengan presisi detik.
+      Ketok tidak pernah mengubah nilai itu &mdash; timezone hanya lapisan tampilan.
+      Bid pada detik yang sama diurutkan memakai comment ID.
+    </footer>
+  </section>
+
+</div>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
