@@ -498,8 +498,11 @@ function perAccount(rows, cutoffEpoch) {
 }
 
 function summarize(rows, cutoffEpoch) {
-  const users = new Set(rows.map((r) => r.username || '(tanpa nama)'));
-  const withBid = rows.filter((r) => r.bid != null);
+  // Peserta dan tawaran dihitung tanpa penyelenggara: dia tidak ikut lelang,
+  // dan angka di pengumuman aturannya bukan tawaran.
+  const peserta = rows.filter((r) => !r.isOwner && !r.isAnnouncement);
+  const users = new Set(peserta.map((r) => r.username || '(tanpa nama)'));
+  const withBid = peserta.filter((r) => r.bid != null);
   const tieGroups = new Set(rows.filter((r) => r.tie).map((r) => r.created_at));
 
   return {

@@ -36,7 +36,7 @@ const state = {
   dumps: [], primary: null, diff: null, isDemo: false,
   tz: browserTz(), cutoff: null, captionGuess: null, grace: 60,
   query: '', includeReplies: true, onlyFlagged: false, tech: false, rulesOpen: false,
-  owner: '', sniperMin: 0, wrap: false,
+  owner: '', sniperMin: 0, hideHost: true, wrap: false,
   result: null, hash: null, hashToken: 0, canonicalJson: null, guessedCutoff: false,
   // Tawaran terakhir paling atas: itu yang menentukan hasil lelang,
   // dan yang pertama dicari orang saat membuka bukti.
@@ -387,6 +387,11 @@ function syncCutoffUI() {
       : '';
   }
 
+  // Keterangan tebakan menempel di kolomnya, tidak jadi pita sendiri.
+  if (state.guessedCutoff && state.cutoff != null) {
+    $('cutoffTime').title = `Ditebak ${state.guessedCutoff} dari caption postingan — perbaiki kalau salah`;
+  }
+
   const picks = cutoffPicks();
   $('cutoffPicks').innerHTML = picks.length
     ? '<span class="picklbl">Cepat:</span>' + picks.map((p) =>
@@ -621,6 +626,7 @@ async function computeHash() {
 function render() {
   state.sniperMin = Math.max(0, Math.min(120, +$('sniper').value || 0));
   state.includeReplies = $('reps').checked;
+  state.hideHost = $('nohost').checked;
   state.onlyFlagged = $('onlyflag').checked;
   state.tech = $('tech').checked;
   state.wrap = $('wrap').checked;
@@ -776,35 +782,44 @@ function renderProof() {
 
   out.push('</div>');
 
-  // Sniper zone menggeser waktu tutup yang berlaku, jadi perpanjangannya
-  // dirinci — pembaca bukti harus bisa menghitung ulang sendiri.
+  // Cara membaca yang dipakai — skala angka dan sniper zone — memang harus
+  // dinyatakan, tapi tempatnya satu baris kecil, bukan pita kuning berjajar.
+  const cara = [];
   const sn = s.sniper;
   if (sn && sn.putaran.length) {
-    const rinci = sn.putaran.map((p) =>
-      `tawaran ${fmtTime(p.karena, state.tz)} &rarr; tutup jadi ${fmtTime(p.ke, state.tz)}`).join('; ');
-    out.push(`<p class="alert warn">Aturan sniper zone ${state.sniperMin} menit diterapkan: ` +
-      `waktu tutup mundur dari <b>${fmtTime(s.cutoffAsli, state.tz)}</b> ke ` +
-      `<b>${fmtTime(sn.efektif, state.tz)}</b> lewat ${sn.putaran.length} perpanjangan ` +
-      `(${rinci}).</p>`);
+    cara.push(`sniper zone ${state.sniperMin} menit memundurkan tutup ke ` +
+      `<b>${fmtTime(sn.efektif, state.tz)}</b> (${sn.putaran.length}&times;)`);
   }
-
-  // Menaikkan skala angka telanjang mengubah nilai yang tertulis di bukti,
-  // jadi ia harus dinyatakan, bukan terjadi diam-diam.
   if (s.bidScale && s.bidScale !== 1) {
-    const contoh = state.result.rows.find((r) => r.bidScaled);
-    out.push(`<p class="alert warn">Tawaran yang ditulis tanpa satuan dibaca sebagai ` +
-      `<b>${s.bidScale === 1e6 ? 'jutaan' : 'ribuan'}</b>` +
-      (contoh ? ` — &ldquo;${esc(contoh.bidMatched)}&rdquo; jadi ${esc('Rp' + fmtRupiah(contoh.bid))}` : '') +
-      `. Skalanya diambil dari tawaran lain yang menyebut satuannya. ` +
-      `Teks asli tiap komentar tetap tampil apa adanya di tabel.</p>`);
+    cara.push(`angka tanpa satuan dibaca <b>${s.bidScale === 1e6 ? 'jutaan' : 'ribuan'}</b>`);
   }
-
-  if (state.guessedCutoff && state.cutoff != null) {
-    out.push(`<p class="alert warn">Jam tutup <b>${esc(state.guessedCutoff)}</b> ditebak dari ` +
-      'caption postingannya. Periksa dan perbaiki kalau salah &mdash; semua penandaan bergantung padanya.</p>');
+  if (cara.length) {
+    out.push(`<p class="pcard-how">Cara baca: ${cara.join(' &middot; ')}. ` +
+      '<button class="link" id="howmore">Rinciannya</button></p>');
   }
 
   $('proof').innerHTML = out.join('');
+
+  if ($('howmore')) {
+    $('howmore').onclick = () => {
+      const p = [];
+      if (sn && sn.putaran.length) {
+        p.push('Sniper zone ' + state.sniperMin + ' menit:');
+        p.push('  tutup semula ' + fmtTime(s.cutoffAsli, state.tz));
+        for (const x of sn.putaran) {
+          p.push('  tawaran ' + fmtTime(x.karena, state.tz) + ' -> tutup jadi ' + fmtTime(x.ke, state.tz));
+        }
+      }
+      if (s.bidScale && s.bidScale !== 1) {
+        const c = state.result.rows.find((r) => r.bidScaled);
+        p.push('Skala angka telanjang: x' + fmtRupiah(s.bidScale) +
+          (c ? ' — "' + c.bidMatched + '" jadi Rp' + fmtRupiah(c.bid) : ''));
+        p.push('  Diambil dari tawaran lain yang menyebut satuannya.');
+        p.push('  Teks asli tiap komentar tetap tampil apa adanya di tabel.');
+      }
+      alert(p.join('\n'));
+    };
+  }
   $('proofcopy').onclick = () => copy($('sumtext').textContent, $('proofcopy'));
   $('proofjump').onclick = () => {
     document.querySelector('.tabs button[data-tab="chrono"]').click();
@@ -817,21 +832,27 @@ function chip(n, k, cls = '') {
   return `<div class="chip ${cls}"><div class="n">${n}</div><div class="k">${k}</div></div>`;
 }
 
+/**
+ * Hanya angka yang benar-benar mengatakan sesuatu yang dapat kotak sendiri.
+ * Deretan nol memenuhi layar tanpa memberi tahu apa pun, dan justru membuat
+ * satu temuan sungguhan tenggelam di antaranya.
+ */
 function renderChips() {
   const s = state.result.summary;
-  const out = [
-    chip(s.cutoff == null ? '—' : s.lateBids, 'Tawaran telat',
-      s.cutoff != null && s.lateBids > 0 ? 'bad' : ''),
-    chip(s.cutoff == null ? '—' : s.snipe, 'Detik terakhir', s.snipe > 0 ? 'warn' : ''),
-    chip(s.tieRows, 'Detik kembar', s.tieRows > 0 ? 'warn' : ''),
-    chip(s.bidDown, 'Nilai turun', s.bidDown > 0 ? 'bad' : ''),
-    chip(s.users, 'Peserta', 'on'),
-    chip(fmtDuration(s.span), 'Lama lelang', 'on')
-  ];
-  if (state.diff) {
-    out.push(chip(state.diff.deleted.length, 'Dihapus',
-      state.diff.deleted.length ? 'bad' : 'good'));
+  const out = [];
+
+  if (s.cutoff != null && s.lateBids > 0) out.push(chip(s.lateBids, 'Tawaran telat', 'bad'));
+  if (s.snipe > 0) out.push(chip(s.snipe, 'Detik terakhir', 'warn'));
+  if (s.tieRows > 0) out.push(chip(s.tieRows, 'Detik kembar', 'warn'));
+  if (s.bidDown > 0) out.push(chip(s.bidDown, 'Nilai turun', 'bad'));
+  if (state.diff && state.diff.deleted.length) {
+    out.push(chip(state.diff.deleted.length, 'Dihapus', 'bad'));
   }
+
+  out.push(chip(s.parsedBids, 'Tawaran', 'on'));
+  out.push(chip(s.users, 'Peserta', 'on'));
+  out.push(chip(fmtDuration(s.span), 'Lama lelang', 'on'));
+
   $('cards').innerHTML = out.join('');
 }
 
@@ -873,6 +894,9 @@ function renderLegend() {
 
 function visibleRows() {
   let rows = state.result.rows;
+  // Komentar penyelenggara dan pengumuman aturan bukan tawaran, jadi secara
+  // bawaan tidak ikut memenuhi daftar. Tetap bisa dimunculkan untuk diperiksa.
+  if (state.hideHost) rows = rows.filter((r) => !r.isOwner && !r.isAnnouncement);
   if (state.onlyFlagged) rows = rows.filter((r) => r.flags.length);
   if (state.query) {
     const q = state.query;
@@ -1109,7 +1133,7 @@ function wire() {
   $('keysave').onclick = applyKey;
   $('ketokkey').addEventListener('keydown', (e) => { if (e.key === 'Enter') applyKey(); });
 
-  for (const el of ['reps', 'onlyflag', 'tech', 'wrap', 'sniper']) $(el).onchange = render;
+  for (const el of ['reps', 'nohost', 'onlyflag', 'tech', 'wrap', 'sniper']) $(el).onchange = render;
   $('sniper').addEventListener('input', render);
   $('q').oninput = render;
 
