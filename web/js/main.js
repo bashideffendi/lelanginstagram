@@ -574,26 +574,24 @@ function renderProof() {
   };
 }
 
-function chip(n, k, s, cls = '') {
-  return `<div class="chip ${cls}"><div class="n">${n}</div><div class="k">${k}</div>` +
-    (s ? `<div class="s">${s}</div>` : '') + '</div>';
+/** Nol dibiarkan kelabu; hanya angka yang berarti sesuatu yang diberi warna. */
+function chip(n, k, cls = '') {
+  return `<div class="chip ${cls}"><div class="n">${n}</div><div class="k">${k}</div></div>`;
 }
 
 function renderChips() {
   const s = state.result.summary;
   const out = [
     chip(s.cutoff == null ? '—' : s.lateBids, 'Tawaran telat',
-      s.cutoff == null ? 'isi jam tutup dulu' : `dari ${s.late} komentar setelah tutup`,
       s.cutoff != null && s.lateBids > 0 ? 'bad' : ''),
-    chip(s.cutoff == null ? '—' : s.snipe, 'Detik terakhir', `≤ ${state.grace} detik sebelum tutup`,
-      s.snipe > 0 ? 'warn' : ''),
-    chip(s.tieRows, 'Detik kembar', `dalam ${s.tieGroups} detik`, s.tieRows > 0 ? 'warn' : ''),
-    chip(s.bidDown, 'Nilai turun', `${s.bidSame} mengulang nilai`, s.bidDown > 0 ? 'bad' : ''),
-    chip(fmtDuration(s.span), 'Lama lelang',
-      s.first != null ? `${fmtTime(s.first, state.tz)} – ${fmtTime(s.last, state.tz)}` : '')
+    chip(s.cutoff == null ? '—' : s.snipe, 'Detik terakhir', s.snipe > 0 ? 'warn' : ''),
+    chip(s.tieRows, 'Detik kembar', s.tieRows > 0 ? 'warn' : ''),
+    chip(s.bidDown, 'Nilai turun', s.bidDown > 0 ? 'bad' : ''),
+    chip(s.users, 'Peserta', 'on'),
+    chip(fmtDuration(s.span), 'Lama lelang', 'on')
   ];
   if (state.diff) {
-    out.push(chip(state.diff.deleted.length, 'Dihapus', 'antara dua tarikan',
+    out.push(chip(state.diff.deleted.length, 'Dihapus',
       state.diff.deleted.length ? 'bad' : 'good'));
   }
   $('cards').innerHTML = out.join('');
@@ -674,10 +672,12 @@ function rowHtml(r, span, extraCls = '', lead = '') {
     r.flags.includes('lewat-cutoff') ? 'r-late' : '',
     r.flags.includes('detik-akhir') ? 'r-snipe' : ''].filter(Boolean).join(' ');
 
+  // Di baris pemenang yang dipatok, "selisih" tidak punya arti — barisnya
+  // dicabut dari urutannya.
   return `<tr class="${cls}">` +
     `<td class="n dim">${lead || r.seq}</td>` +
     `<td class="clock">${fmtTime(r.created_at, state.tz)}</td>` +
-    `<td class="n dim">${r.gap != null ? fmtDuration(r.gap) : '—'}</td>` +
+    `<td class="n dim">${lead ? '—' : (r.gap != null ? fmtDuration(r.gap) : '—')}</td>` +
     `<td class="who">${esc(r.username || '—')}${r.is_reply ? ' <span class="dim">(balasan)</span>' : ''}</td>` +
     `<td class="money">${r.bid != null ? 'Rp' + fmtRupiah(r.bid) : '<span class="dim">—</span>'}</td>` +
     (state.tech
