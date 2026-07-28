@@ -12,6 +12,7 @@ import {
   pingExtension, extractViaExtension, looksLikePostUrl,
   probeServer, extractViaServer, savedKey, saveKey
 } from './ext.js';
+import { gambarBukti } from './gambar.js';
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) =>
@@ -1244,6 +1245,45 @@ function wire() {
     download(`${baseName()}_asli.json`,
       state.canonicalJson ?? JSON.stringify(state.primary.original, null, 2),
       'application/json');
+  // Gambar bukti: dibuat saat diminta, karena menggambar kanvas tidak murah.
+  const buatGambar = async (tombol) => {
+    const semula = tombol.textContent;
+    tombol.disabled = true;
+    tombol.textContent = 'Menggambar…';
+    try {
+      // Pastikan hurufnya sudah termuat, kalau tidak kanvas memakai huruf cadangan.
+      if (document.fonts?.ready) await document.fonts.ready;
+      return await gambarBukti({
+        result: state.result, primary: state.primary, diff: state.diff,
+        tz: state.tz, tzShort: tzShort(state.result.summary.first),
+        hash: state.hash, sniperMin: state.sniperMin
+      });
+    } finally {
+      tombol.disabled = false;
+      tombol.textContent = semula;
+    }
+  };
+
+  $('dlimg').onclick = async () => {
+    const blob = await buatGambar($('dlimg'));
+    download(`${baseName()}_bukti.png`, blob, 'image/png');
+    $('imgprev').innerHTML =
+      `<img class="imgprev" src="${URL.createObjectURL(blob)}" alt="Pratinjau gambar bukti">`;
+  };
+
+  $('copyimg').onclick = async () => {
+    const blob = await buatGambar($('copyimg'));
+    try {
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+      const b = $('copyimg');
+      b.textContent = 'Tersalin';
+      setTimeout(() => { b.textContent = 'Salin gambar'; }, 1400);
+    } catch {
+      // Sebagian browser menolak menyalin gambar; unduh saja supaya tetap dapat.
+      download(`${baseName()}_bukti.png`, blob, 'image/png');
+    }
+  };
+
   $('dlsum').onclick = () => download(`${baseName()}_ringkasan.txt`, $('sumtext').textContent);
   $('copysum').onclick = () => copy($('sumtext').textContent, $('copysum'));
   $('copyhash').onclick = () => copy(state.hash || '', $('copyhash'));
