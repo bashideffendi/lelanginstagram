@@ -696,6 +696,28 @@ function renderCaption() {
     '</section>';
 }
 
+/**
+ * Gambar bukti dibuat saat diminta, karena menggambar kanvas tidak murah —
+ * dan sebagian besar orang tidak selalu membutuhkannya.
+ */
+async function buatGambar(tombol) {
+  const semula = tombol.textContent;
+  tombol.disabled = true;
+  tombol.textContent = 'Menggambar…';
+  try {
+    // Pastikan hurufnya sudah termuat, kalau tidak kanvas memakai huruf cadangan.
+    if (document.fonts?.ready) await document.fonts.ready;
+    return await gambarBukti({
+      result: state.result, primary: state.primary, diff: state.diff,
+      tz: state.tz, tzShort: tzShort(state.result.summary.first),
+      hash: state.hash, sniperMin: state.sniperMin
+    });
+  } finally {
+    tombol.disabled = false;
+    tombol.textContent = semula;
+  }
+}
+
 /** Kartu bukti — bagian yang difoto layar dan dikirim ke penyelenggara. */
 function renderProof() {
   const s = state.result.summary;
@@ -781,7 +803,8 @@ function renderProof() {
   out.push(`<div class="pcard-meta">${meta.join('')}</div>`);
 
   out.push('<div class="pcard-act">' +
-    '<button class="btn solid" id="proofcopy">Salin bukti</button>' +
+    '<button class="btn solid" id="proofimg">Simpan gambar bukti</button>' +
+    '<button class="btn" id="proofcopy">Salin ringkasan</button>' +
     '<button class="btn" id="proofjump">Lihat urutan lengkap</button>' +
     '</div>');
 
@@ -835,6 +858,10 @@ function renderProof() {
     };
   }
   $('proofcopy').onclick = () => copy($('sumtext').textContent, $('proofcopy'));
+  $('proofimg').onclick = async () => {
+    const blob = await buatGambar($('proofimg'));
+    download(`${baseName()}_bukti.png`, blob, 'image/png');
+  };
   $('proofjump').onclick = () => {
     document.querySelector('.tabs button[data-tab="chrono"]').click();
     $('tab-body-chrono').scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -1245,25 +1272,6 @@ function wire() {
     download(`${baseName()}_asli.json`,
       state.canonicalJson ?? JSON.stringify(state.primary.original, null, 2),
       'application/json');
-  // Gambar bukti: dibuat saat diminta, karena menggambar kanvas tidak murah.
-  const buatGambar = async (tombol) => {
-    const semula = tombol.textContent;
-    tombol.disabled = true;
-    tombol.textContent = 'Menggambar…';
-    try {
-      // Pastikan hurufnya sudah termuat, kalau tidak kanvas memakai huruf cadangan.
-      if (document.fonts?.ready) await document.fonts.ready;
-      return await gambarBukti({
-        result: state.result, primary: state.primary, diff: state.diff,
-        tz: state.tz, tzShort: tzShort(state.result.summary.first),
-        hash: state.hash, sniperMin: state.sniperMin
-      });
-    } finally {
-      tombol.disabled = false;
-      tombol.textContent = semula;
-    }
-  };
-
   $('dlimg').onclick = async () => {
     const blob = await buatGambar($('dlimg'));
     download(`${baseName()}_bukti.png`, blob, 'image/png');
