@@ -141,9 +141,12 @@
             <div class="knob-hint picks" id="cutoffPicks"></div>
           </div>
           <div class="knob">
-            <label for="owner">Penyelenggara</label>
-            <div class="knob-in"><select id="owner"></select></div>
-            <div class="knob-hint" id="ownernote"></div>
+            <label for="sniper">Sniper zone</label>
+            <div class="knob-in">
+              <input type="number" id="sniper" min="0" max="120" step="1" value="0">
+              <span class="knob-on">menit</span>
+            </div>
+            <div class="knob-hint" id="snipernote">0 = tidak ada aturan ini</div>
           </div>
           <div class="knob">
             <label for="tz">Zona waktu</label>

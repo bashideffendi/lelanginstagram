@@ -177,7 +177,45 @@ function pilihTerbesar(list) {
 }
 
 function bersih(c) {
-  return { value: c.value, confidence: c.confidence, matched: c.matched };
+  return { value: c.value, confidence: c.confidence, matched: c.matched, kuat: !!c.kuat };
+}
+
+function median(arr) {
+  if (!arr.length) return null;
+  const s = arr.slice().sort((a, b) => a - b);
+  return s[Math.floor(s.length / 2)];
+}
+
+/**
+ * Tentukan skala untuk angka telanjang.
+ *
+ * Di lelang Indonesia orang menulis "750" untuk tujuh ratus lima puluh ribu —
+ * tidak ada jam tangan seharga Rp750. Tapi mengalikan seribu begitu saja bisa
+ * salah untuk barang mahal yang ditawar "16" berarti enam belas juta.
+ *
+ * Jadi skalanya dikalibrasi dari data itu sendiri: angka yang menyebut
+ * satuannya ("750K", "1,5jt", "Rp750.000") memberi tahu besaran yang benar,
+ * termasuk yang tertulis di pengumuman aturan. Angka telanjang lalu dinaikkan
+ * ke besaran yang sama.
+ */
+export function hitungSkala(nilaiKuat, nilaiTelanjang) {
+  if (!nilaiTelanjang.length) return 1;
+
+  const acuan = median(nilaiKuat);
+  const polos = median(nilaiTelanjang);
+  if (!polos) return 1;
+
+  // Tanpa acuan sama sekali: angka di bawah sepuluh ribu hampir pasti ribuan.
+  if (!acuan) return polos < 10000 ? 1000 : 1;
+
+  const pilihan = [1, 1e3, 1e6];
+  let terbaik = 1;
+  let jarakTerdekat = Infinity;
+  for (const m of pilihan) {
+    const jarak = Math.abs(Math.log10(polos * m) - Math.log10(acuan));
+    if (jarak < jarakTerdekat) { jarakTerdekat = jarak; terbaik = m; }
+  }
+  return terbaik;
 }
 
 export function fmtRupiah(v) {
@@ -194,10 +232,72 @@ export function fmtRupiah(v) {
  *   graceSec     jendela "detik-detik akhir" sebelum cutoff (default 60)
  *   includeReplies  ikutkan balasan bersarang
  */
+/**
+ * Cari harga pembukaan yang tertulis di caption atau aturan lelang.
+ * Bentuk yang lazim: "OB : 750K", "Open Bid 750rb", "OB Rp750.000".
+ */
+export function cariOpenBid(teks) {
+  if (!teks) return null;
+  const re = /\b(?:ob|open\s*bid|opening\s*bid)\b\s*[:=.]?\s*((?:rp\.?\s*)?[\d.,]+\s*(?:jt|juta|jeti|mio|rb|ribu|k)?)/gi;
+  let m;
+  while ((m = re.exec(String(teks))) !== null) {
+    const nilai = parseBid(m[1]);
+    if (nilai.value != null) return nilai.value;
+  }
+  return null;
+}
+
+/**
+ * Komentar yang isinya cuma "OB" berarti menawar di harga pembukaan —
+ * bukan komentar kosong tanpa angka.
+ */
+function menawarDiPembukaan(teks) {
+  const s = String(teks || '').trim();
+  if (s.length > 40) return false;
+  if (/\d/.test(s)) return false;                    // ada angka sendiri, bukan ini
+  return /\b(ob|open\s*bid)\b/i.test(s);
+}
+
+/**
+ * Terapkan aturan sniper zone.
+ *
+ * Banyak lelang Instagram memakai aturan anti-sniping: kalau ada tawaran masuk
+ * dalam N menit terakhir, waktu tutup diundur N menit dari tawaran itu, dan
+ * berulang sampai tidak ada lagi tawaran di zona tersebut. Tanpa ini, orang
+ * yang menawar di detik akhir otomatis menang.
+ *
+ * Aturan ini mengubah siapa yang dianggap telat, jadi hasilnya dilaporkan
+ * lengkap dengan tiap perpanjangannya supaya bisa diperiksa.
+ */
+export function hitungCutoffEfektif(rows, cutoff, sniperSec) {
+  if (cutoff == null || !sniperSec) {
+    return { efektif: cutoff, perpanjangan: 0, putaran: [] };
+  }
+
+  let eff = cutoff;
+  const putaran = [];
+
+  for (let aman = 0; aman < 500; aman++) {
+    const diZona = rows.filter((r) =>
+      r.bid != null && !r.isOwner && !r.isAnnouncement &&
+      r.created_at <= eff && r.created_at > eff - sniperSec);
+    if (!diZona.length) break;
+
+    const terakhir = Math.max(...diZona.map((r) => r.created_at));
+    const baru = terakhir + sniperSec;
+    if (baru <= eff) break;
+
+    putaran.push({ dari: eff, ke: baru, karena: terakhir });
+    eff = baru;
+  }
+
+  return { efektif: eff, perpanjangan: eff - cutoff, putaran };
+}
+
 export function analyze(comments, opts = {}) {
   const {
     cutoffEpoch = null, graceSec = 60, includeReplies = true,
-    ownerUsername = null
+    ownerUsername = null, sniperSec = 0, captionText = null
   } = opts;
 
   const owner = ownerUsername ? String(ownerUsername).toLowerCase() : null;
@@ -215,6 +315,61 @@ export function analyze(comments, opts = {}) {
     bySecond.get(r.created_at).push(r);
   }
 
+  // --- Lintasan pertama: baca angka apa adanya, kenali peran tiap komentar.
+  for (const r of rows) {
+    // Penyelenggara bukan peserta. Pengumuman aturan lelang hampir selalu
+    // memuat angka — harga awal, kelipatan — dan kalau angka itu ikut dihitung,
+    // penyelenggaranya sendiri bisa dinobatkan sebagai pemenang, lalu semua
+    // tawaran asli dicap "nilai turun" karena dibandingkan dengannya.
+    r.isOwner = !!owner && String(r.username || '').toLowerCase() === owner;
+
+    // Pengumuman aturan dikenali dari bentuknya sendiri, jadi tetap tertangkap
+    // walaupun Instagram tidak memberi tahu siapa pemilik postingannya.
+    r.isAnnouncement = isAnnouncement(r.text);
+
+    const bid = parseBid(r.text);
+    r.bidRaw = bid.value;
+    r.bidStrong = bid.kuat;
+    r.bidConfidence = bid.confidence;
+    r.bidMatched = bid.matched;
+  }
+
+  // Harga pembukaan: dari caption, atau dari komentar aturan lelang.
+  const openBid = cariOpenBid(captionText) ||
+    cariOpenBid(rows.filter((r) => r.isAnnouncement || r.isOwner).map((r) => r.text).join('\n'));
+
+  // Komentar "OB" tanpa angka berarti menawar di harga pembukaan itu.
+  if (openBid != null) {
+    for (const r of rows) {
+      if (r.bidRaw == null && !r.isAnnouncement && menawarDiPembukaan(r.text)) {
+        r.bidRaw = openBid;
+        r.bidStrong = true;                 // nilainya dari angka bersatuan di aturan
+        r.bidConfidence = 'high';
+        r.bidMatched = 'OB';
+        r.isOpenBid = true;
+      }
+    }
+  }
+
+  // --- Kalibrasi skala. Angka bersatuan dari mana pun boleh jadi acuan,
+  // termasuk "OB : 750K" di pengumuman aturan — itu justru acuan terbaik.
+  const acuan = rows.filter((r) => r.bidRaw != null && r.bidStrong).map((r) => r.bidRaw);
+  const polos = rows
+    .filter((r) => r.bidRaw != null && !r.bidStrong && !r.isOwner && !r.isAnnouncement)
+    .map((r) => r.bidRaw);
+  const skala = hitungSkala(acuan, polos);
+
+  for (const r of rows) {
+    r.bid = r.bidRaw == null ? null : (r.bidStrong ? r.bidRaw : r.bidRaw * skala);
+    r.bidScaled = r.bidRaw != null && !r.bidStrong && skala !== 1;
+  }
+
+  // --- Sniper zone mengubah waktu tutup yang berlaku, jadi dihitung sebelum
+  // ada satu pun tawaran dinilai telat.
+  const sniper = hitungCutoffEfektif(rows, cutoffEpoch, sniperSec);
+  const cutoffBerlaku = sniper.efektif;
+
+  // --- Lintasan kedua: urutan, penandaan, dan tangga tawaran.
   let prevHighBid = null;
   let prev = null;
 
@@ -227,31 +382,16 @@ export function analyze(comments, opts = {}) {
     r.tieSize = group.length;
     r.tieIndex = group.indexOf(r) + 1;
 
-    // Penyelenggara bukan peserta. Pengumuman aturan lelang hampir selalu
-    // memuat angka — harga awal, kelipatan — dan kalau angka itu ikut dihitung,
-    // penyelenggaranya sendiri bisa dinobatkan sebagai pemenang, lalu semua
-    // tawaran asli dicap "nilai turun" karena dibandingkan dengannya.
-    r.isOwner = !!owner && String(r.username || '').toLowerCase() === owner;
-
-    // Pengumuman aturan dikenali dari bentuknya sendiri, jadi tetap tertangkap
-    // walaupun Instagram tidak memberi tahu siapa pemilik postingannya.
-    r.isAnnouncement = isAnnouncement(r.text);
-
-    const bid = parseBid(r.text);
-    r.bid = bid.value;
-    r.bidConfidence = bid.confidence;
-    r.bidMatched = bid.matched;
-
     r.flags = [];
     if (r.isOwner) r.flags.push('penyelenggara');
     else if (r.isAnnouncement) r.flags.push('pengumuman');
 
-    if (cutoffEpoch != null) {
-      if (r.created_at > cutoffEpoch) {
-        r.late = r.created_at - cutoffEpoch;
+    if (cutoffBerlaku != null) {
+      if (r.created_at > cutoffBerlaku) {
+        r.late = r.created_at - cutoffBerlaku;
         r.flags.push('lewat-cutoff');
-      } else if (cutoffEpoch - r.created_at <= graceSec) {
-        r.snipe = cutoffEpoch - r.created_at;
+      } else if (cutoffBerlaku - r.created_at <= graceSec) {
+        r.snipe = cutoffBerlaku - r.created_at;
         r.flags.push('detik-akhir');
       }
     }
@@ -282,7 +422,14 @@ export function analyze(comments, opts = {}) {
     lastByUser.set(u, r.created_at);
   }
 
-  return { rows, accounts: perAccount(rows, cutoffEpoch), summary: summarize(rows, cutoffEpoch) };
+  return {
+    rows,
+    accounts: perAccount(rows, cutoffBerlaku),
+    summary: {
+      ...summarize(rows, cutoffBerlaku),
+      bidScale: skala, cutoffAsli: cutoffEpoch, sniper, openBid
+    }
+  };
 }
 
 function perAccount(rows, cutoffEpoch) {

@@ -235,22 +235,25 @@ input:focus, select:focus {
   padding: 11px 15px; margin-bottom: 22px; font-size: 13.5px; color: var(--ink-soft);
 }
 
-/* Aturan lelang — di bawah kartu pemenang, karena pemenang yang jadi sorotan. */
-.rules { border: 1px solid var(--line); border-radius: var(--r); margin: 0 0 24px; }
+/*
+ * Aturan lelang — di bawah kartu pemenang, karena pemenang yang jadi sorotan.
+ * Selebar penuh seperti kendali dan tabel di bawahnya, dan tidak dilipat:
+ * tingginya sudah dibatasi dan isinya bergulir sendiri.
+ */
+.rules {
+  display: block; width: 100%;
+  border: 1px solid var(--line); border-radius: var(--r); margin: 0 0 24px;
+}
 .rules-top {
-  display: flex; align-items: center; gap: 12px; width: 100%;
-  background: var(--surface-2); border: 0; border-radius: var(--r);
-  padding: 11px 16px; cursor: pointer; text-align: left;
+  display: flex; align-items: center; gap: 12px;
+  background: var(--surface-2); border-bottom: 1px solid var(--line);
+  border-radius: var(--r) var(--r) 0 0; padding: 10px 16px;
 }
-.rules.open .rules-top { border-radius: var(--r) var(--r) 0 0; border-bottom: 1px solid var(--line); }
-.rules-top:hover .rules-act { color: var(--primary-700); }
-.rules-act { margin-left: auto; font-size: 12.5px; font-weight: 600; color: var(--primary); }
 .rules-body {
-  display: none; padding: 14px 16px; font-size: 13.5px; line-height: 1.6;
+  display: block; padding: 14px 16px; font-size: 13.5px; line-height: 1.6;
   color: var(--ink-soft); white-space: pre-wrap; word-break: break-word;
-  max-height: 340px; overflow: auto;
+  max-height: 260px; overflow-y: auto;
 }
-.rules.open .rules-body { display: block; }
 
 .pcard { border-top: 2px solid var(--ink); padding-top: 18px; margin-bottom: 22px; }
 .pcard-label { margin-bottom: 14px; }

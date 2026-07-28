@@ -36,9 +36,11 @@ const state = {
   dumps: [], primary: null, diff: null, isDemo: false,
   tz: browserTz(), cutoff: null, captionGuess: null, grace: 60,
   query: '', includeReplies: true, onlyFlagged: false, tech: false, rulesOpen: false,
-  owner: '', wrap: false,
+  owner: '', sniperMin: 0, wrap: false,
   result: null, hash: null, hashToken: 0, canonicalJson: null, guessedCutoff: false,
-  sort: { chrono: { key: 'seq', dir: 1 }, accounts: { key: 'count', dir: -1 } }
+  // Tawaran terakhir paling atas: itu yang menentukan hasil lelang,
+  // dan yang pertama dicari orang saat membuka bukti.
+  sort: { chrono: { key: 'seq', dir: -1 }, accounts: { key: 'count', dir: -1 } }
 };
 
 // ================================================================ bookmarklet
@@ -617,6 +619,7 @@ async function computeHash() {
 // ================================================================ gambar ulang
 
 function render() {
+  state.sniperMin = Math.max(0, Math.min(120, +$('sniper').value || 0));
   state.includeReplies = $('reps').checked;
   state.onlyFlagged = $('onlyflag').checked;
   state.tech = $('tech').checked;
@@ -627,11 +630,12 @@ function render() {
     cutoffEpoch: state.cutoff,
     graceSec: state.grace,
     includeReplies: state.includeReplies,
-    ownerUsername: state.owner || null
+    ownerUsername: state.owner || null,
+    sniperSec: state.sniperMin * 60,
+    captionText: state.primary.source?.caption || null
   });
 
   tzNote();
-  syncOwnerUI();
   syncCutoffUI();
   renderProof();
   renderCaption();          // butuh state.result untuk cadangan komentar aturan
@@ -648,42 +652,6 @@ function renderEvidence() {
   if (!state.result) return;
   $('sumtext').textContent = summaryText(
     state.result.summary, state.primary.source, state.tz, state.hash);
-}
-
-/**
- * Pilihan penyelenggara.
- *
- * Instagram tidak selalu mengembalikan pemilik postingan — panggilan info
- * postingan dibiarkan gagal tanpa menghentikan penarikan, jadi namanya bisa
- * kosong. Kalau pengecualian penyelenggara hanya bergantung pada itu, ia diam
- * -diam tidak melakukan apa-apa dan panitia tetap dinobatkan sebagai pemenang.
- * Karena itu selalu bisa dipilih sendiri.
- */
-function syncOwnerUI() {
-  const sel = $('owner');
-  const hitung = new Map();
-  for (const c of state.primary.comments) {
-    const u = c.username;
-    if (u) hitung.set(u, (hitung.get(u) || 0) + 1);
-  }
-  const daftar = [...hitung.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
-
-  const kunci = daftar.map(([u]) => u).join('|');
-  if (sel.dataset.built !== kunci) {
-    sel.innerHTML = '<option value="">(tidak ada / tidak tahu)</option>' +
-      daftar.map(([u, n]) =>
-        `<option value="${esc(u)}">${esc(u)} — ${n} komentar</option>`).join('');
-    sel.dataset.built = kunci;
-  }
-  sel.value = state.owner || '';
-
-  const catatan = {
-    ig: 'Terbaca otomatis dari postingan.',
-    aturan: 'Ditebak dari komentar aturan lelang — ganti kalau salah.',
-    manual: 'Kamu yang memilih.',
-    none: '<span style="color:var(--amber)">Tidak terbaca otomatis — pilih sendiri.</span>'
-  };
-  $('ownernote').innerHTML = catatan[state.ownerSource] || catatan.none;
 }
 
 /**
@@ -712,19 +680,13 @@ function renderCaption() {
   }
   if (!teks) { $('caption').innerHTML = ''; return; }
 
+  // Tanpa tombol lipat: isinya sudah dibatasi tinggi dan bergulir sendiri,
+  // jadi ia tidak pernah mendorong apa pun keluar layar.
   $('caption').innerHTML =
-    '<section class="rules' + (state.rulesOpen ? ' open' : '') + '">' +
-    '<button class="rules-top" id="rulestoggle" aria-expanded="' + !!state.rulesOpen + '">' +
-    '<span class="label">' + asal + '</span>' +
-    '<span class="rules-act">' + (state.rulesOpen ? 'Sembunyikan' : 'Tampilkan') + '</span>' +
-    '</button>' +
+    '<section class="rules">' +
+    '<div class="rules-top"><span class="label">' + asal + '</span></div>' +
     '<div class="rules-body">' + esc(teks) + '</div>' +
     '</section>';
-
-  $('rulestoggle').onclick = () => {
-    state.rulesOpen = !state.rulesOpen;
-    renderCaption();
-  };
 }
 
 /** Kartu bukti — bagian yang difoto layar dan dikirim ke penyelenggara. */
@@ -746,7 +708,13 @@ function renderProof() {
       ? ` &middot; ${fmtDuration(s.cutoff - w.created_at)} sebelum tutup` : '';
     out.push(`<div class="pcard-when"><b>${fmtDateTime(w.created_at, state.tz)} ` +
       `${tzShort(w.created_at)}</b>${rel}</div>`);
-    out.push(`<div class="pcard-quote">${esc(w.text)}</div>`);
+    // Kutipan hanya berguna kalau komentarnya memuat lebih dari angkanya
+    // sendiri. Kalau isinya persis "750", ia cuma mengulang nilai di atasnya.
+    const polos = String(w.text || '').replace(/[^\dA-Za-z]/g, '');
+    const angka = String(w.bidMatched || '').replace(/[^\dA-Za-z]/g, '');
+    if (polos && polos !== angka) {
+      out.push(`<div class="pcard-quote">${esc(w.text)}</div>`);
+    }
   } else {
     out.push('<div class="pcard-kicker">Belum ada tawaran yang terbaca</div>');
     out.push('<div class="pcard-row"><span class="pcard-who">Tidak ada angka yang bisa dikenali</span></div>');
@@ -807,6 +775,29 @@ function renderProof() {
     '</div>');
 
   out.push('</div>');
+
+  // Sniper zone menggeser waktu tutup yang berlaku, jadi perpanjangannya
+  // dirinci — pembaca bukti harus bisa menghitung ulang sendiri.
+  const sn = s.sniper;
+  if (sn && sn.putaran.length) {
+    const rinci = sn.putaran.map((p) =>
+      `tawaran ${fmtTime(p.karena, state.tz)} &rarr; tutup jadi ${fmtTime(p.ke, state.tz)}`).join('; ');
+    out.push(`<p class="alert warn">Aturan sniper zone ${state.sniperMin} menit diterapkan: ` +
+      `waktu tutup mundur dari <b>${fmtTime(s.cutoffAsli, state.tz)}</b> ke ` +
+      `<b>${fmtTime(sn.efektif, state.tz)}</b> lewat ${sn.putaran.length} perpanjangan ` +
+      `(${rinci}).</p>`);
+  }
+
+  // Menaikkan skala angka telanjang mengubah nilai yang tertulis di bukti,
+  // jadi ia harus dinyatakan, bukan terjadi diam-diam.
+  if (s.bidScale && s.bidScale !== 1) {
+    const contoh = state.result.rows.find((r) => r.bidScaled);
+    out.push(`<p class="alert warn">Tawaran yang ditulis tanpa satuan dibaca sebagai ` +
+      `<b>${s.bidScale === 1e6 ? 'jutaan' : 'ribuan'}</b>` +
+      (contoh ? ` — &ldquo;${esc(contoh.bidMatched)}&rdquo; jadi ${esc('Rp' + fmtRupiah(contoh.bid))}` : '') +
+      `. Skalanya diambil dari tawaran lain yang menyebut satuannya. ` +
+      `Teks asli tiap komentar tetap tampil apa adanya di tabel.</p>`);
+  }
 
   if (state.guessedCutoff && state.cutoff != null) {
     out.push(`<p class="alert warn">Jam tutup <b>${esc(state.guessedCutoff)}</b> ditebak dari ` +
@@ -1118,16 +1109,12 @@ function wire() {
   $('keysave').onclick = applyKey;
   $('ketokkey').addEventListener('keydown', (e) => { if (e.key === 'Enter') applyKey(); });
 
-  for (const el of ['reps', 'onlyflag', 'tech', 'wrap']) $(el).onchange = render;
+  for (const el of ['reps', 'onlyflag', 'tech', 'wrap', 'sniper']) $(el).onchange = render;
+  $('sniper').addEventListener('input', render);
   $('q').oninput = render;
 
   // Zona waktu hanya mengubah cara menampilkan; momen tutupnya tidak bergeser.
   $('tz').onchange = () => { state.tz = $('tz').value; render(); };
-  $('owner').onchange = () => {
-    state.owner = $('owner').value;
-    state.ownerSource = 'manual';
-    render();
-  };
 
   $('cutoffTime').addEventListener('input', (e) => {
     applyMask(e.target);
