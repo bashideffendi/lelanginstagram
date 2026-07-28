@@ -531,3 +531,113 @@ tbody tr.r-snipe td { background: var(--warn-soft); }
   margin-top: 34px; padding-top: 18px; border-top: 1px solid var(--line);
   color: var(--faint); font-size: 12.5px; max-width: 720px;
 }
+
+/* ============================================================ layar kecil
+ *
+ * Sebagian besar orang membuka ini dari ponsel, dan tabel tujuh kolom
+ * memaksa menggeser kanan-kiri untuk membaca satu baris. Di bawah 640px
+ * tiap baris berubah jadi kartu bertumpuk: nilai turun ke bawah namanya,
+ * dan seluruh halaman cukup digulir satu arah.
+ */
+@media (max-width: 640px) {
+  body { font-size: 14px; }
+  .wrap { padding: 20px 16px 72px; }
+  .mast-in { padding: 12px 16px; }
+
+  .open { padding: 26px 0 4px; }
+  .open h1 { font-size: 27px; letter-spacing: -.025em; }
+  .lead { font-size: 15px; }
+  .take { flex-wrap: wrap; }
+  .take input, .take .btn { width: 100%; }
+  .take input { text-align: left; }
+
+  .pcard { padding: 18px 18px 14px; border-radius: 12px; }
+  .pcard-row { gap: 4px; }
+  .pcard-who { font-size: 24px; word-break: break-all; }
+  .pcard-amt { font-size: 22px; }
+  .pcard-when { font-size: 12px; }
+  .pcard-act { flex-direction: column; }
+  .pcard-act .btn { width: 100%; }
+  .pcard-meta { gap: 4px 14px; font-size: 12px; }
+
+  .knobs { padding: 14px 16px; gap: 14px; }
+  .knob { width: 100%; }
+  .knob-in > select, .knob-in > input { width: 100%; }
+  .knob-in #tz { min-width: 0; }
+  .knob-in #cutoffTime { width: 92px; flex: none; }
+  .knob-in #cutoffDate { flex: 1 1 auto; min-width: 0; }
+
+  .chips { gap: 8px; }
+  .chip { flex: 1 1 calc(50% - 4px); padding: 12px 14px; }
+  .chip .n { font-size: 20px; }
+
+  .tabs { gap: 0; overflow-x: auto; flex-wrap: nowrap; -webkit-overflow-scrolling: touch; }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tabs button { padding: 10px 12px; font-size: 13.5px; white-space: nowrap; }
+
+  .toolrow { gap: 10px 16px; }
+  .tog { font-size: 13px; }
+
+  /* Tabel jadi daftar kartu. */
+  .sheet { border: 0; border-radius: 0; overflow: visible; max-height: none; }
+  .sheet table, .sheet tbody, .sheet tr, .sheet td { display: block; width: 100%; }
+  .sheet thead { display: none; }
+
+  .sheet tbody tr {
+    border: 1px solid var(--line); border-radius: var(--r);
+    margin-bottom: 8px; padding: 4px 0; background: var(--surface);
+  }
+  .sheet tbody tr:hover td { background: transparent; }
+
+  .sheet tbody td {
+    border: 0; padding: 3px 14px;
+    display: grid; grid-template-columns: 82px 1fr; gap: 10px; align-items: start;
+  }
+  .sheet tbody td::before {
+    content: attr(data-l);
+    font-family: var(--mono); font-size: 9.5px; font-weight: 500;
+    letter-spacing: .1em; text-transform: uppercase; color: var(--muted);
+    padding-top: 2px;
+  }
+  .sheet tbody td:empty { display: none; }
+  .sheet .msg { max-width: none; }
+
+  /* Jam jadi kepala kartu; nomor urut tidak dibutuhkan saat menggulir. */
+  .sheet tbody td[data-l="Ke-"] { display: none; }
+  .sheet tbody td[data-l="Jam"] {
+    display: flex; align-items: baseline; gap: 10px;
+    padding: 8px 14px 4px; font-size: 16px; font-weight: 600;
+  }
+  .sheet tbody td[data-l="Jam"]::before { content: none; }
+  .sheet tbody td[data-l="Selisih"] {
+    margin-top: -26px; padding-bottom: 6px;
+    grid-template-columns: 1fr; justify-items: end; text-align: right;
+  }
+  .sheet tbody td[data-l="Selisih"]::before { content: none; }
+  .sheet tbody td[data-l="Akun"] { padding-top: 6px; font-size: 14.5px; }
+  .sheet tbody td[data-l="Nilai"] { font-size: 15px; }
+
+  /* Baris pemisah tetap melintang penuh, tanpa label. */
+  .sheet tbody tr.day, .sheet tbody tr.closed, .sheet tbody tr.zone {
+    border: 0; border-radius: var(--r-sm); margin: 14px 0 8px; padding: 0;
+  }
+  .sheet tbody tr.day td, .sheet tbody tr.closed td, .sheet tbody tr.zone td {
+    display: block; grid-template-columns: none; padding: 8px 12px;
+  }
+  .sheet tbody tr.day td::before,
+  .sheet tbody tr.closed td::before,
+  .sheet tbody tr.zone td::before { content: none; }
+
+  .sheet tbody tr.pinned { border-color: var(--primary); background: var(--primary-soft); }
+  .sheet tbody tr.pinned td { background: transparent; }
+  .sheet tbody tr.r-late { border-color: rgba(192, 67, 47, .35); background: var(--danger-soft); }
+  .sheet tbody tr.r-late td { background: transparent; }
+  .sheet tbody tr.r-snipe { border-color: rgba(197, 137, 27, .35); background: var(--warn-soft); }
+  .sheet tbody tr.r-snipe td { background: transparent; }
+
+  .legend { grid-template-columns: 1fr; padding: 14px 16px; }
+  .evbox { padding: 18px 0; }
+  .evbox pre { font-size: 11px; }
+  .row .btn { flex: 1 1 100%; }
+  .rules-body { max-height: 160px; }
+}

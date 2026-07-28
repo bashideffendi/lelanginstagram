@@ -976,7 +976,7 @@ function sortHeader(cols, which) {
 /** Komentar dilipat kalau panjang, supaya satu layar memuat seluruh urutan. */
 function msgCell(r) {
   const long = (r.text || '').length > 90 || (r.text || '').includes('\n');
-  return '<td class="msg">' +
+  return '<td class="msg" data-l="Komentar">' +
     `<div class="txt${long ? ' clip' : ''}">${esc(r.text)}</div>` +
     (long ? '<button class="more" type="button">selengkapnya</button>' : '') +
     '</td>';
@@ -989,22 +989,24 @@ function rowHtml(r, span, extraCls = '', lead = '') {
 
   // Di baris pemenang yang dipatok, "selisih" tidak punya arti — barisnya
   // dicabut dari urutannya.
+  // data-l dipakai tampilan layar kecil: di sana tabel berubah jadi kartu
+  // bertumpuk, dan tiap nilai harus membawa nama kolomnya sendiri.
   return `<tr class="${cls}">` +
-    `<td class="n dim">${lead || r.seq}</td>` +
-    `<td class="clock">${fmtTime(r.created_at, state.tz)}</td>` +
-    `<td class="n dim">${lead ? '—' : (r.gap != null ? fmtDuration(r.gap) : '—')}</td>` +
-    `<td class="who">${esc(r.username || '—')}${r.is_reply ? ' <span class="dim">(balasan)</span>' : ''}</td>` +
+    `<td class="n dim" data-l="Ke-">${lead || r.seq}</td>` +
+    `<td class="clock" data-l="Jam">${fmtTime(r.created_at, state.tz)}</td>` +
+    `<td class="n dim" data-l="Selisih">${lead ? '—' : (r.gap != null ? fmtDuration(r.gap) : '—')}</td>` +
+    `<td class="who" data-l="Akun">${esc(r.username || '—')}${r.is_reply ? ' <span class="dim">(balasan)</span>' : ''}</td>` +
     // Angka di komentar penyelenggara bukan tawaran, jadi jangan ditampilkan
     // seolah-olah tawaran — itu yang tadinya membuatnya tampak sebagai pemenang.
-    `<td class="money">${r.bid != null && !r.isOwner
+    `<td class="money" data-l="Nilai">${r.bid != null && !r.isOwner
       ? 'Rp' + fmtRupiah(r.bid) : '<span class="dim">—</span>'}</td>` +
     (state.tech
-      ? `<td class="n dim">${r.increment != null ? (r.increment > 0 ? '+' : '') + fmtRupiah(r.increment) : ''}</td>` +
-        `<td class="mn">${r.created_at}</td>`
+      ? `<td class="n dim" data-l="Naik">${r.increment != null ? (r.increment > 0 ? '+' : '') + fmtRupiah(r.increment) : ''}</td>` +
+        `<td class="mn" data-l="Jam mentah">${r.created_at}</td>`
       : '') +
-    `<td>${tags(r)}</td>` +
+    `<td data-l="Tanda">${tags(r)}</td>` +
     msgCell(r) +
-    (state.tech ? `<td class="mn">${esc(r.pk)}</td>` : '') +
+    (state.tech ? `<td class="mn" data-l="Nomor komentar">${esc(r.pk)}</td>` : '') +
     '</tr>';
 }
 
