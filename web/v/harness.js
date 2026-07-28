@@ -194,9 +194,11 @@ export function mountSwitcher(active) {
   bar.id = 'vswitch';
   bar.innerHTML =
     '<span>Bandingkan tampilan:</span>' +
+    // Tanpa akhiran .html — Vercel mengalihkannya, dan pengalihan tiap klik
+    // membuat perbandingan terasa lambat.
     [['dokumen', 'Dokumen bukti'], ['rapat', 'Satu layar rapat'], ['lega', 'Lega & tenang']]
       .map(([id, label]) =>
-        `<a href="${id}.html"${id === active ? ' class="on"' : ''}>${label}</a>`).join('') +
-    '<span class="sp"></span><a href="../index.html" class="alt">Tampilan sekarang</a>';
+        `<a href="${id}"${id === active ? ' class="on"' : ''}>${label}</a>`).join('') +
+    '<span class="sp"></span><a href="../" class="alt">Tampilan sekarang</a>';
   document.body.appendChild(bar);
 }
