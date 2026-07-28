@@ -294,9 +294,10 @@ input:focus, select:focus {
   position: absolute; left: 1px; right: 1px; bottom: 1px; height: 42px;
   border-radius: 0 0 var(--r) var(--r);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0), var(--surface) 84%);
-  opacity: 0; transition: opacity .15s; pointer-events: none;
+  /* Tanpa transisi: nilainya disetel dari JavaScript dan harus langsung
+     berlaku. Transisi membuatnya tidak pernah mencapai nilai yang disetel. */
+  opacity: 0; pointer-events: none;
 }
-.rules.bisa-gulir .rules-fade { opacity: 1; }
 
 /*
  * Kartu pemenang: satu-satunya yang diangkat penuh. Tingkatan dibuat lewat
