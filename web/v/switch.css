@@ -1,0 +1,20 @@
+/* Bilah pemilih versi — sengaja netral supaya tidak mempengaruhi penilaian. */
+#vswitch {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 999;
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 10px 18px;
+  background: #16181c; color: #9aa2ad;
+  font: 13px/1 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  box-shadow: 0 -2px 14px rgba(0, 0, 0, .18);
+}
+#vswitch span { color: #6e7681; }
+#vswitch .sp { flex: 1 1 auto; }
+#vswitch a {
+  color: #d7dbe0; text-decoration: none;
+  padding: 6px 13px; border-radius: 7px; border: 1px solid #2c3138;
+}
+#vswitch a:hover { border-color: #4a515a; color: #fff; }
+#vswitch a.on { background: #fff; border-color: #fff; color: #16181c; font-weight: 650; }
+#vswitch a.alt { border-style: dashed; color: #8b939d; }
+
+body { padding-bottom: 64px; }

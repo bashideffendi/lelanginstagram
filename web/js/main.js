@@ -18,6 +18,20 @@ const esc = (s) =>
   String(s ?? '').replace(/[&<>"']/g, (c) =>
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
+/**
+ * Alamat hanya boleh http/https. Berkas dump bisa datang dari mana saja —
+ * termasuk dari orang lain — dan `javascript:` di dalam href akan berjalan
+ * begitu diklik. esc() menutup pelarian atribut, bukan skema.
+ */
+const safeUrl = (u) => {
+  try {
+    const p = new URL(String(u), location.href);
+    return p.protocol === 'http:' || p.protocol === 'https:' ? p.href : null;
+  } catch {
+    return null;
+  }
+};
+
 const state = {
   dumps: [], primary: null, diff: null, isDemo: false,
   tz: browserTz(), cutoff: null, captionGuess: null, grace: 60,
@@ -600,7 +614,8 @@ function renderProof() {
   meta.push(`<span>${s.total} komentar &middot; ${s.users} peserta</span>`);
   if (s.cutoff != null) meta.push(`<span>Ditutup <b>${fmtTime(s.cutoff, state.tz)} ${tzShort(s.cutoff)}</b></span>`);
   if (src.owner_username) meta.push(`<span>Lelang oleh <b>@${esc(src.owner_username)}</b></span>`);
-  if (src.url) meta.push(`<a href="${esc(src.url)}" target="_blank" rel="noopener">buka postingannya</a>`);
+  const url = safeUrl(src.url);
+  if (url) meta.push(`<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">buka postingannya</a>`);
   out.push(`<div class="pcard-meta">${meta.join('')}</div>`);
 
   out.push('<div class="pcard-act">' +

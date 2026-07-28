@@ -1,0 +1,275 @@
+/*
+ * Lelang Insta — tampilan "dokumen bukti".
+ *
+ * Aturan yang dipegang di seluruh berkas ini:
+ *   1. Tanpa kotak berbingkai, tanpa bayangan, tanpa sudut membulat.
+ *      Pemisah hanya garis tipis mendatar.
+ *   2. Hampir seluruhnya hitam–putih–kelabu. Satu warna aksen (--tanda)
+ *      dan hanya untuk menandai pelanggaran.
+ *   3. Setiap pelanggaran juga diberi tanda salib (†) supaya tetap
+ *      terbaca saat dicetak hitam putih.
+ *   4. Tanpa huruf serif di mana pun.
+ */
+
+:root {
+  color-scheme: light;
+
+  --kertas: #ffffff;
+  --tinta: #14161a;
+  --tinta-2: #3c4149;
+  --kelabu: #6d737c;
+  --kelabu-2: #949aa3;
+  --garis: #dfe0e2;
+  --garis-tebal: #14161a;
+
+  /* satu-satunya warna. dipakai hanya untuk pelanggaran. */
+  --tanda: #a32017;
+
+  --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+          "Helvetica Neue", Arial, sans-serif;
+  --mesin: ui-monospace, SFMono-Regular, "Cascadia Mono", Menlo, Consolas, monospace;
+
+  /* irama ukuran huruf — hanya enam langkah, tidak ada di luar ini */
+  --f0: 11px;    /* judul bagian & penanda */
+  --f1: 12.5px;  /* keterangan kecil */
+  --f2: 14px;    /* isi tabel */
+  --f3: 15.5px;  /* teks biasa */
+  --f4: 18px;    /* penekanan sedang */
+  --f5: 30px;    /* nama pemenang & nilainya */
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--kertas);
+  color: var(--tinta);
+  font: var(--f3)/1.55 var(--sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+#app {
+  max-width: 780px;
+  margin: 0 auto;
+  padding: 40px 24px 72px;
+}
+
+a { color: inherit; text-underline-offset: 2px; text-decoration-color: var(--garis); }
+a:hover { text-decoration-color: var(--tinta); }
+
+.mesin { font-family: var(--mesin); font-variant-numeric: tabular-nums; }
+.mute { color: var(--kelabu); }
+.kecil { font-size: var(--f1); }
+
+/* --------------------------------------------------------------- kepala */
+
+.kop { display: flex; align-items: flex-start; gap: 20px; }
+.kop-kiri { flex: 1 1 auto; min-width: 0; }
+.kop-kanan { flex: 0 0 auto; text-align: right; }
+
+.kop-nama {
+  font-size: var(--f4); font-weight: 700; letter-spacing: -.01em; line-height: 1.2;
+}
+.kop-sub { font-size: var(--f1); color: var(--kelabu); margin-top: 2px; }
+.kop-tanggal { font-size: var(--f1); margin-top: 7px; white-space: nowrap; }
+.kop-objek {
+  font-size: var(--f1); color: var(--tinta-2); margin-top: 10px;
+  overflow-wrap: anywhere;
+}
+.kop-objek .sep { color: var(--kelabu-2); padding: 0 6px; }
+
+/* garis tebal penutup kepala dokumen */
+.garis {
+  height: 0; border-top: 2px solid var(--garis-tebal);
+  margin: 16px 0 0;
+}
+
+/* --------------------------------------------------------------- bagian */
+
+.sec { padding-top: 26px; margin-top: 26px; border-top: 1px solid var(--garis); }
+.sec:first-of-type { border-top: 0; margin-top: 0; }
+
+/* judul bagian: huruf kecil, tebal, renggang, kelabu */
+.lbl {
+  font-size: var(--f0); font-weight: 700; line-height: 1;
+  letter-spacing: .16em; text-transform: uppercase; color: var(--kelabu);
+}
+.lbl-sisi { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.lbl-sisi .n { font: var(--f1)/1 var(--mesin); color: var(--kelabu-2); letter-spacing: 0; }
+
+/* --------------------------------------------------------------- pemenang */
+
+.menang { display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap; margin: 22px 0 0; }
+.menang-nama {
+  flex: 1 1 auto; min-width: 0;
+  font-size: var(--f5); font-weight: 600; letter-spacing: -.02em; line-height: 1.1;
+  overflow-wrap: anywhere;
+}
+.menang-nilai {
+  flex: 0 0 auto;
+  font-size: var(--f5); font-weight: 600; letter-spacing: -.02em; line-height: 1.1;
+}
+.menang-kutip {
+  margin-top: 12px; font-size: var(--f3); color: var(--tinta-2);
+  overflow-wrap: anywhere;
+}
+.menang-kosong { margin-top: 18px; font-size: var(--f4); color: var(--kelabu); }
+
+/* daftar keterangan: label kiri, isi kanan, garis tipis per baris */
+.ket { margin-top: 22px; }
+.ket > div {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 16px;
+  padding: 9px 0; border-top: 1px solid var(--garis);
+}
+.ket dt { font-size: var(--f1); color: var(--kelabu); flex: 0 0 auto; }
+.ket dd { font-size: var(--f2); text-align: right; overflow-wrap: anywhere; }
+
+/* --------------------------------------------------------------- catatan */
+
+.temu { list-style: none; margin-top: 18px; }
+.temu li {
+  display: flex; gap: 14px; align-items: baseline;
+  padding: 12px 0; border-top: 1px solid var(--garis);
+}
+.temu li:first-child { border-top: 0; padding-top: 4px; }
+.t-no {
+  flex: 0 0 auto; font: var(--f1)/1.5 var(--mesin); color: var(--kelabu-2);
+  min-width: 2.4em;
+}
+.t-teks { font-size: var(--f3); line-height: 1.45; }
+.t-sub { font-size: var(--f1); color: var(--kelabu); margin-top: 3px; }
+.t-bad .t-no { color: var(--tanda); }
+.t-bad .t-teks { font-weight: 600; }
+
+/* --------------------------------------------------------------- ikhtisar */
+
+.ikh {
+  margin-top: 18px;
+  display: grid; grid-template-columns: repeat(3, 1fr); column-gap: 28px;
+}
+.ikh > div {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+  padding: 9px 0; border-top: 1px solid var(--garis);
+}
+.ikh dt { font-size: var(--f1); color: var(--kelabu); }
+.ikh dd { font: 600 var(--f2)/1 var(--mesin); font-variant-numeric: tabular-nums; }
+.ikh .i-off dd { color: var(--kelabu-2); font-weight: 400; }
+.ikh .i-bad dd { color: var(--tanda); }
+
+/* --------------------------------------------------------------- tabel */
+
+table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+thead th {
+  font-size: var(--f0); font-weight: 700; letter-spacing: .12em; text-transform: uppercase;
+  color: var(--kelabu); text-align: left; padding: 0 10px 8px 0;
+  border-bottom: 1px solid var(--tinta);
+  white-space: nowrap;
+}
+tbody td { font-size: var(--f2); padding: 10px 10px 10px 0; border-bottom: 1px solid var(--garis); vertical-align: top; }
+th:last-child, td:last-child { padding-right: 0; }
+.kanan { text-align: right; }
+
+/* kolom daftar komentar */
+.c-no   { width: 34px; font-family: var(--mesin); font-size: var(--f1); color: var(--kelabu-2); }
+.c-jam  { width: 96px; font-family: var(--mesin); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.c-jam .gap { display: block; font-size: var(--f1); color: var(--kelabu-2); }
+.c-akun { width: 150px; overflow-wrap: anywhere; }
+.c-akun .balas { display: block; font-size: var(--f1); color: var(--kelabu-2); }
+.c-nilai{ width: 108px; font-family: var(--mesin); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+.c-tanda{ width: 116px; }
+
+/* baris pemenang: dijepit dua garis tegas, bukan warna latar */
+tr.win td { border-top: 2px solid var(--tinta); border-bottom: 2px solid var(--tinta); font-weight: 600; }
+tr.win .c-no { color: var(--tinta); }
+
+/* penanda */
+.tag { display: block; font-size: var(--f0); letter-spacing: .06em; color: var(--kelabu); line-height: 1.7; }
+.tag-win { color: var(--tinta); font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+.tag-bad { color: var(--tanda); font-weight: 600; }
+.salib { font-family: var(--mesin); }
+
+/* komentar terpotong dua baris */
+.say-t {
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+  overflow: hidden; overflow-wrap: anywhere;
+}
+.say.open .say-t { display: block; overflow: visible; }
+.say-b {
+  margin-top: 4px; padding: 0; border: 0; background: none; cursor: pointer;
+  font: var(--f1)/1.4 var(--sans); color: var(--kelabu);
+  text-decoration: underline; text-underline-offset: 2px;
+}
+.say-b:hover { color: var(--tinta); }
+
+/* kolom ringkasan akun */
+.a-user { overflow-wrap: anywhere; }
+.a-max  { font-family: var(--mesin); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+.a-n    { font-family: var(--mesin); text-align: right; }
+.a-rg   { font-family: var(--mesin); font-size: var(--f1); white-space: nowrap; text-align: right; color: var(--tinta-2); }
+.a-late { font-family: var(--mesin); text-align: right; }
+.a-late.ada { color: var(--tanda); font-weight: 600; }
+
+/* --------------------------------------------------------------- kaki */
+
+.kaki { padding-top: 26px; margin-top: 26px; border-top: 1px solid var(--garis); }
+.kaki .cap { margin-top: 14px; font-size: var(--f2); color: var(--tinta-2); }
+.kaki .catatan { margin-top: 14px; font-size: var(--f1); color: var(--kelabu); }
+
+/* --------------------------------------------------------------- sempit */
+
+@media (max-width: 720px) {
+  #app { padding: 28px 16px 64px; }
+  :root { --f5: 26px; }
+
+  .ikh { grid-template-columns: repeat(2, 1fr); column-gap: 20px; }
+
+  /* tabel berubah jadi catatan bertingkat supaya terbaca di 380px */
+  table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  table, tbody, tr, td { display: block; width: auto; }
+
+  .reg tr {
+    display: grid; grid-template-columns: 2.2rem 1fr auto;
+    column-gap: 12px; row-gap: 3px;
+    padding: 12px 0; border-bottom: 1px solid var(--garis);
+  }
+  /* lebar kolom meja tulis dilepas, biar ikut lebar layar */
+  .reg td, .acc td { width: auto; }
+  .reg td { padding: 0; border: 0; }
+  .reg .c-no   { grid-area: 1 / 1 / 3 / 2; }
+  .reg .c-jam  { grid-area: 1 / 2 / 2 / 3; }
+  .reg .c-nilai{ grid-area: 1 / 3 / 2 / 4; }
+  .reg .c-akun { grid-area: 2 / 2 / 3 / 4; }
+  .reg .c-say  { grid-area: 3 / 2 / 4 / 4; color: var(--tinta-2); }
+  .reg .c-tanda{ grid-area: 4 / 2 / 5 / 4; }
+  .reg .c-jam .gap { display: inline; margin-left: 8px; }
+  .reg tr.win { border-top: 2px solid var(--tinta); border-bottom: 2px solid var(--tinta); }
+  .reg tr.win td { border: 0; }
+  .reg .tag { display: inline; margin-right: 10px; }
+
+  .acc tr {
+    display: grid; grid-template-columns: 1fr auto;
+    column-gap: 12px; row-gap: 2px;
+    padding: 11px 0; border-bottom: 1px solid var(--garis);
+  }
+  .acc td { padding: 0; border: 0; text-align: left; }
+  .acc .a-user { grid-area: 1 / 1; font-weight: 600; }
+  .acc .a-max  { grid-area: 1 / 2; text-align: right; }
+  .acc .a-n    { grid-area: 2 / 1; font-size: var(--f1); color: var(--kelabu); text-align: left; }
+  .acc .a-rg   { grid-area: 2 / 2; text-align: right; }
+  .acc .a-late { grid-area: 3 / 1 / 4 / 3; font-size: var(--f1); text-align: left; }
+  .acc .a-n::before   { content: attr(data-l) " "; }
+  .acc .a-late::before{ content: attr(data-l) " "; }
+  .acc .a-late:empty  { display: none; }
+}
+
+/* --------------------------------------------------------------- cetak */
+
+@media print {
+  #vswitch { display: none !important; }
+  body { padding-bottom: 0 !important; }
+  #app { max-width: none; padding: 0; }
+  .say-b { display: none; }
+  .say-t { display: block; overflow: visible; }
+  /* aksen jadi hitam; tanda salib yang membawa artinya */
+  .t-bad .t-no, .ikh .i-bad dd, .tag-bad, .a-late.ada { color: #000 !important; }
+  tr, li, .sec { break-inside: avoid; }
+}

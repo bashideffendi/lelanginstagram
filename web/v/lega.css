@@ -1,0 +1,428 @@
+/* ============================================================
+   Lega & tenang — satu hal per waktu.
+
+   Prinsip:
+   - Tanpa kotak, tanpa bayangan, tanpa bingkai. Pemisah hanya garis rambut.
+   - Warna hampir tidak dipakai. Satu warna tegas saja, untuk hal yang telat.
+   - Skala huruf sengaja berjarak jauh supaya irama terasa.
+   - Ruang kosong adalah elemen desainnya, bukan sisa.
+   ============================================================ */
+
+:root {
+  color-scheme: light;
+
+  /* Tinta dan kertas. Hangat sedikit supaya tidak terasa layar klinik. */
+  --paper:  #fcfbf9;
+  --tint:   #f2f0eb;   /* dasar baris pemenang, nyaris tak terlihat */
+  --ink:    #16171a;
+  --ink-2:  #5a5f66;
+  --ink-3:  #9a9ea5;
+  --line:   #e4e2dc;
+  --line-2: #cfccc4;
+  --alert:  #9c3323;   /* satu-satunya warna; hanya untuk yang lewat batas */
+
+  /* Skala huruf. Jarak antar tingkat sengaja lebar. */
+  --t-hero:   clamp(2.5rem, 10.5vw, 6.25rem);
+  --t-amount: clamp(1.75rem, 5.5vw, 3.25rem);
+  --t-stat:   clamp(1.6rem, 4vw, 2.25rem);
+  --t-head:   clamp(1.2rem, 2.4vw, 1.45rem);
+  --t-body:   1rem;
+  --t-small:  0.8125rem;
+  --t-fine:   0.6875rem;
+
+  /* Skala jarak. */
+  --s1: 6px;  --s2: 12px; --s3: 22px; --s4: 36px;
+  --s5: 60px; --s6: 96px;
+  --gut: clamp(22px, 6vw, 92px);   /* margin kiri-kanan halaman */
+  --bar: 64px;                     /* tinggi bilah pemilih versi */
+
+  --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+          "Helvetica Neue", Arial, sans-serif;
+  --mono: ui-monospace, "SFMono-Regular", "Cascadia Mono", Consolas,
+          "Liberation Mono", monospace;
+}
+
+* { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font: 400 var(--t-body)/1.6 var(--sans);
+  letter-spacing: -0.005em;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection { background: #e7e3d8; }
+
+a { color: inherit; }
+
+/* Semua angka sejajar lebarnya. Penting karena ini dokumen bukti. */
+.num, .t, .amt, .stat-n, .hero-amt { font-variant-numeric: tabular-nums; }
+
+/* ---------- kerangka bagian ---------- */
+
+.wrap { max-width: 1120px; margin: 0 auto; padding-inline: var(--gut); }
+
+.sec { padding-block: clamp(64px, 13vh, 132px); }
+
+/* Garis rambut pemisah bagian — satu-satunya "bingkai" di halaman ini. */
+.sec + .sec > .wrap { border-top: 1px solid var(--line); padding-top: clamp(52px, 9vh, 96px); }
+
+.ovl {
+  margin: 0;
+  font-size: var(--t-fine);
+  font-weight: 500;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.h2 {
+  margin: var(--s2) 0 0;
+  font-size: var(--t-head);
+  font-weight: 500;
+  letter-spacing: -0.015em;
+}
+
+.h2 + .lead {
+  margin: var(--s1) 0 0;
+  max-width: 46ch;
+  font-size: var(--t-small);
+  color: var(--ink-2);
+}
+
+/* ============================================================
+   1. Layar pertama — hampir seluruhnya milik satu pernyataan
+   ============================================================ */
+
+.hero {
+  min-height: calc(100vh - var(--bar));
+  min-height: calc(100svh - var(--bar));
+  display: grid;
+  grid-template-rows: 1fr auto;
+  padding-block: clamp(48px, 9vh, 96px) var(--s5);
+}
+
+.hero > .wrap { width: 100%; align-self: center; }
+
+.hero-name {
+  margin: clamp(18px, 4vh, 40px) 0 0;
+  font-size: var(--t-hero);
+  font-weight: 500;
+  line-height: 0.95;
+  letter-spacing: -0.04em;
+  overflow-wrap: anywhere;
+}
+
+.hero-at { color: var(--ink-3); font-weight: 400; }
+
+.hero-amt {
+  margin: clamp(16px, 3.5vh, 32px) 0 0;
+  font-size: var(--t-amount);
+  font-weight: 400;
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+}
+
+.hero-quote {
+  margin: var(--s3) 0 0;
+  max-width: 42ch;
+  font-size: var(--t-small);
+  color: var(--ink-2);
+  overflow-wrap: anywhere;
+}
+
+.hero-when {
+  margin: clamp(26px, 5vh, 48px) 0 0;
+  font-size: var(--t-body);
+  font-variant-numeric: tabular-nums;
+}
+
+.hero-when b { font-weight: 500; }
+
+.hero-when small {
+  display: block;
+  margin-top: var(--s1);
+  font-size: var(--t-small);
+  color: var(--ink-2);
+}
+
+/* Temuan: kalimat tenang, bukan kotak peringatan. */
+.temuan {
+  margin: clamp(30px, 6vh, 56px) 0 0;
+  padding: 0;
+  list-style: none;
+  max-width: 56ch;
+}
+
+.temuan li {
+  position: relative;
+  padding-left: 20px;
+  font-size: var(--t-small);
+  color: var(--ink-2);
+}
+
+.temuan li + li { margin-top: var(--s2); }
+
+.temuan li::before {
+  content: "";
+  position: absolute;
+  left: 0; top: 0.62em;
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: var(--ink-3);
+}
+
+.temuan li.bad::before { background: var(--alert); }
+.temuan li.bad strong { color: var(--ink); font-weight: 500; }
+
+/* Isyarat gulir — halus, tidak menuntut perhatian. */
+.turun {
+  align-self: end;
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+  font-size: var(--t-fine);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.turun:hover { color: var(--ink); }
+
+.turun i {
+  display: block;
+  width: 1px; height: 30px;
+  background: linear-gradient(var(--line-2), var(--ink-3));
+  animation: tarik 2.6s ease-in-out infinite;
+  transform-origin: top;
+}
+
+@keyframes tarik {
+  0%, 100% { transform: scaleY(0.55); opacity: 0.5; }
+  50%      { transform: scaleY(1);    opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .turun i { animation: none; }
+}
+
+/* ============================================================
+   2. Angka ringkas
+   ============================================================ */
+
+.angka {
+  margin: clamp(40px, 7vh, 72px) 0 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  column-gap: clamp(24px, 4vw, 56px);
+  row-gap: clamp(38px, 6vw, 64px);
+}
+
+.stat-n {
+  display: block;
+  font-size: var(--t-stat);
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: -0.03em;
+}
+
+.stat-n.teks { font-size: clamp(1.1rem, 2.2vw, 1.35rem); letter-spacing: -0.01em; }
+.stat-n.mati { color: var(--ink-3); }
+.stat-n.awas { color: var(--alert); }
+
+.stat-k {
+  display: block;
+  margin-top: var(--s2);
+  font-size: var(--t-fine);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+/* ============================================================
+   3. Tabel yang bernapas
+   ============================================================ */
+
+.tbl {
+  display: block;
+  width: 100%;
+  margin: clamp(32px, 5vh, 56px) 0 0;
+  border-collapse: collapse;
+}
+
+.tbl thead, .tbl tbody { display: block; }
+
+.tbl tr {
+  display: grid;
+  grid-template-columns: 128px minmax(130px, 1fr) 132px minmax(0, 2.1fr);
+  column-gap: clamp(16px, 2.4vw, 34px);
+  align-items: baseline;
+  border-left: 3px solid transparent;
+  padding: 22px 0 22px 15px;
+  border-top: 1px solid var(--line);
+}
+
+.tbl thead tr {
+  border-top: 0;
+  padding-block: 0 12px;
+  border-bottom: 1px solid var(--line-2);
+}
+
+.tbl th {
+  text-align: left;
+  font-size: var(--t-fine);
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.tbl td { display: block; min-width: 0; }
+
+.tbl .kanan { text-align: right; }
+
+/* Kolom waktu */
+.t {
+  font-family: var(--mono);
+  font-size: var(--t-small);
+  letter-spacing: -0.02em;
+}
+
+.t small {
+  display: block;
+  margin-top: 5px;
+  font-family: var(--sans);
+  font-size: var(--t-fine);
+  color: var(--ink-3);
+}
+
+/* Kolom akun */
+.u { overflow-wrap: anywhere; }
+.u b { font-weight: 400; }
+
+.tanda {
+  display: block;
+  margin-top: 5px;
+  font-size: var(--t-fine);
+  letter-spacing: 0.03em;
+  color: var(--ink-3);
+}
+
+.tanda .telat { color: var(--alert); }
+
+/* Kolom nilai */
+.amt { font-weight: 400; letter-spacing: -0.02em; }
+.amt.kosong { color: var(--ink-3); }
+
+/* Kolom komentar */
+.cmt { font-size: var(--t-small); color: var(--ink-2); }
+
+.cmt p {
+  margin: 0;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+}
+
+.cmt p.buka { display: block; -webkit-line-clamp: unset; line-clamp: unset; }
+
+.lipat {
+  margin-top: var(--s1);
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--t-fine);
+  letter-spacing: 0.06em;
+  color: var(--ink-3);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.lipat:hover { color: var(--ink); }
+.lipat[hidden] { display: none; }
+
+/* Baris pemenang — jelas, tapi tetap tenang. */
+.tbl tr.menang {
+  border-left-color: var(--ink);
+  background: var(--tint);
+}
+
+.tbl tr.menang .u b { font-weight: 600; }
+.tbl tr.menang .amt { font-weight: 500; }
+.tbl tr.menang .juara { color: var(--ink); letter-spacing: 0.14em; text-transform: uppercase; }
+
+/* ============================================================
+   4. Akun
+   ============================================================ */
+
+.akun tr { grid-template-columns: minmax(140px, 1fr) 96px 140px 120px; }
+
+@media (max-width: 760px) {
+  .akun tr { grid-template-columns: 1fr auto; row-gap: 8px; }
+  .akun thead { display: none; }
+  .akun td:nth-child(1) { grid-column: 1; }
+  .akun td:nth-child(2) { grid-column: 2; text-align: right; }
+  .akun td:nth-child(3) { grid-column: 1; }
+  .akun td:nth-child(4) { grid-column: 2; text-align: right; }
+}
+
+/* ============================================================
+   5. Sumber
+   ============================================================ */
+
+.sumber { font-size: var(--t-small); color: var(--ink-2); }
+
+.sumber dl {
+  margin: clamp(28px, 5vh, 48px) 0 0;
+  display: grid;
+  grid-template-columns: 118px minmax(0, 1fr);
+  column-gap: clamp(18px, 3vw, 40px);
+  row-gap: var(--s3);
+  max-width: 720px;
+}
+
+.sumber dt {
+  font-size: var(--t-fine);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.sumber dd { margin: 0; overflow-wrap: anywhere; }
+
+.sumber dd a { text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--line-2); }
+.sumber dd a:hover { text-decoration-color: var(--ink); }
+
+/* ============================================================
+   Layar kecil — tetap lega, tidak jadi konyol
+   ============================================================ */
+
+@media (max-width: 760px) {
+  .urut tr {
+    grid-template-columns: 1fr auto;
+    row-gap: 10px;
+    padding-block: 20px;
+  }
+
+  .urut thead { display: none; }
+
+  .urut td.t   { grid-column: 1; grid-row: 1; }
+  .urut td.amt { grid-column: 2; grid-row: 1; text-align: right; }
+  .urut td.u   { grid-column: 1 / -1; grid-row: 2; }
+  .urut td.cmt { grid-column: 1 / -1; grid-row: 3; }
+
+  .urut td.t small { display: inline; margin-left: 8px; }
+
+  .sumber dl { grid-template-columns: 1fr; row-gap: var(--s2); }
+  .sumber dt { margin-top: var(--s2); }
+}
