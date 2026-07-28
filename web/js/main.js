@@ -287,8 +287,21 @@ export function maskClock(raw) {
   const s = String(raw ?? '');
 
   if (/[.:]/.test(s)) {
-    const parts = s.replace(/[^\d.:]/g, '').split(/[.:]/).slice(0, 3);
-    return parts.map((p, i) => (i === 0 ? p.slice(0, 2) : p.slice(0, 2))).join(':');
+    // Kelompok yang penuh harus melimpah ke kelompok berikutnya. Sebelumnya
+    // tiap kelompok dipotong dua angka begitu saja, sehingga mengetik
+    // "215059" berhenti di "21:50" — dua angka terakhir hilang tanpa jejak.
+    const parts = s.replace(/[^\d.:]/g, '').split(/[.:]/);
+    const hLen = Math.min(2, (parts[0] || '').length) || 1;
+    const angka = parts.join('').slice(0, 6);
+
+    const h = angka.slice(0, hLen);
+    const sisa = angka.slice(hLen);
+    const mi = sisa.slice(0, 2);
+    const sec = sisa.slice(2, 4);
+
+    return h +
+      (mi || parts.length > 1 ? ':' + mi : '') +
+      (sec ? ':' + sec : '');
   }
 
   const d = s.replace(/\D/g, '').slice(0, 6);
