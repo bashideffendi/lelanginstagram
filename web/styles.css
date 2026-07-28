@@ -235,8 +235,8 @@ input:focus, select:focus {
   padding: 11px 15px; margin-bottom: 22px; font-size: 13.5px; color: var(--ink-soft);
 }
 
-/* Aturan lelang dari caption — terlipat, satu klik dari pandangan. */
-.rules { border: 1px solid var(--line); border-radius: var(--r); margin-bottom: 22px; }
+/* Aturan lelang — di bawah kartu pemenang, karena pemenang yang jadi sorotan. */
+.rules { border: 1px solid var(--line); border-radius: var(--r); margin: 0 0 24px; }
 .rules-top {
   display: flex; align-items: center; gap: 12px; width: 100%;
   background: var(--surface-2); border: 0; border-radius: var(--r);
@@ -252,7 +252,7 @@ input:focus, select:focus {
 }
 .rules.open .rules-body { display: block; }
 
-.pcard { border-top: 2px solid var(--ink); padding-top: 18px; margin-bottom: 30px; }
+.pcard { border-top: 2px solid var(--ink); padding-top: 18px; margin-bottom: 22px; }
 .pcard-label { margin-bottom: 14px; }
 .pcard-row { display: flex; align-items: baseline; gap: 18px; flex-wrap: wrap; }
 .pcard-who {
