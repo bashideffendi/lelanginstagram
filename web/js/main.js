@@ -995,15 +995,40 @@ function renderChrono() {
     out.push(`<tr class="day"><td colspan="${span}">Urutan lengkap</td></tr>`);
   }
 
+  // Garis penutupan: pembatas antara tawaran yang masih sah dan yang telat.
+  // Hanya berarti kalau tabelnya memang urut waktu — kalau diurutkan menurut
+  // nama akun atau nilai, letaknya tidak punya makna apa pun.
+  const cutoff = state.result.summary.cutoff;
+  const urutWaktu = state.sort.chrono.key === 'seq' || state.sort.chrono.key === 'created_at';
+  const posisiTutup = cutoff != null && urutWaktu
+    ? (state.sort.chrono.dir === -1
+        ? rows.filter((r) => r.created_at > cutoff).length     // terbaru di atas
+        : rows.filter((r) => r.created_at <= cutoff).length)   // terlama di atas
+    : -1;
+
+  const barisTutup = () => {
+    const sn = state.result.summary.sniper;
+    const mundur = sn && sn.putaran.length
+      ? ` &middot; dimundurkan dari ${fmtTime(state.result.summary.cutoffAsli, state.tz)} oleh sniper zone`
+      : '';
+    return `<tr class="closed"><td colspan="${span}">` +
+      `Lelang ditutup ${fmtTime(cutoff, state.tz)} ${tzShort(cutoff)}${mundur}` +
+      '</td></tr>';
+  };
+
   let prevDay = null;
-  for (const r of rows) {
+  rows.forEach((r, i) => {
+    if (i === posisiTutup) { out.push(barisTutup()); prevDay = null; }
+
     const day = fmtDate(r.created_at, state.tz);
     if (day !== prevDay) {
       out.push(`<tr class="day"><td colspan="${span}">${day}</td></tr>`);
       prevDay = day;
     }
     out.push(rowHtml(r, span, w && r.pk === w.pk ? 'pinned' : ''));
-  }
+  });
+  if (posisiTutup === rows.length) out.push(barisTutup());
+
   tbl.tBodies[0].innerHTML = out.join('');
 }
 

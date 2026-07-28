@@ -400,6 +400,16 @@ tbody tr.day td {
   border-top: 1px solid var(--line);
 }
 tbody tr.day:hover td { background: var(--paper-2); }
+/* Garis penutupan lelang — pembatas sah dan telat, satu-satunya merah tegas. */
+tbody tr.closed td {
+  background: var(--danger-soft);
+  border-top: 2px solid var(--danger); border-bottom: 1px solid var(--danger-line, rgba(192, 67, 47, .3));
+  color: var(--danger); padding: 7px 13px;
+  font-family: var(--mono); font-size: 10.5px; font-weight: 500;
+  letter-spacing: .12em; text-transform: uppercase;
+}
+tbody tr.closed:hover td { background: var(--danger-soft); }
+
 tbody tr.pinned td { background: var(--primary-soft); }
 tbody tr.pinned:hover td { background: var(--primary-soft); }
 tbody tr.r-late td { background: var(--danger-soft); }
