@@ -8,6 +8,9 @@ import {
 import {
   download, sha256Hex, commentsCsv, accountsCsv, diffCsv, summaryText
 } from './export.js';
+import {
+  pingExtension, extractViaExtension, looksLikePostUrl
+} from './ext.js';
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) =>
@@ -40,6 +43,83 @@ async function initBookmarklet() {
     $('bmnote').textContent = 'Tombol ini harus diseret ke bar bookmark, bukan diklik di sini.';
     $('bmnote').style.color = 'var(--danger)';
   });
+}
+
+// ================================================================ kotak paste
+
+let extVersion = null;
+
+function setStat(text, cls = '') {
+  const el = $('paststat');
+  el.className = 'pastestat ' + cls;
+  el.innerHTML = text;
+}
+
+function showExtInfo() {
+  $('extinfo').classList.remove('hidden');
+  $('extinfo').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+async function initPaste() {
+  setStat('Memeriksa apakah extension Ketok terpasang&hellip;');
+  extVersion = await pingExtension();
+
+  if (extVersion) {
+    setStat(`Extension aktif (v${esc(extVersion)}) — tempel link postingannya, lalu tekan Ambil komentar.`, 'ready');
+  } else {
+    setStat(
+      'Extension Ketok belum terpasang, jadi kotak ini belum bisa dipakai. ' +
+      '<button class="linkbtn" id="whyext">Kenapa perlu extension?</button>', 'warn');
+    $('whyext').onclick = showExtInfo;
+  }
+}
+
+async function runPaste() {
+  const url = $('iglink').value.trim();
+
+  if (!url) { setStat('Tempel dulu link postingannya.', 'bad'); return; }
+  if (!looksLikePostUrl(url)) {
+    setStat('Itu bukan link postingan. Bentuknya harus <code>instagram.com/p/XXXX/</code> — ' +
+      'buka postingannya dulu, lalu salin alamat dari bilah alamat browser.', 'bad');
+    return;
+  }
+  if (!extVersion) {
+    extVersion = await pingExtension();
+    if (!extVersion) {
+      setStat('Extension Ketok belum terpasang. Petunjuk pemasangannya ada di bawah.', 'bad');
+      showExtInfo();
+      return;
+    }
+  }
+
+  const btn = $('go');
+  btn.disabled = true;
+  $('pasteprog').classList.remove('hidden');
+  const fill = $('pasteprog').querySelector('i');
+  fill.style.width = '0%';
+
+  try {
+    const dump = await extractViaExtension(url, (p) => {
+      if (p.stage === 'info') setStat('Mengambil keterangan postingan&hellip;');
+      else if (p.stage === 'comments') {
+        setStat(`Menarik komentar&hellip; ${p.count} terkumpul` + (p.total ? ` dari sekitar ${p.total}` : ''));
+        fill.style.width = (p.total ? Math.min(95, (p.count / p.total) * 100) : Math.min(90, (p.page || 0) * 8)) + '%';
+      } else if (p.stage === 'replies') {
+        setStat(`Mengambil balasan&hellip; utas ${p.page} dari ${p.total}`);
+      }
+    });
+    fill.style.width = '100%';
+    activate([parseDump(dump, 'lewat extension')]);
+  } catch (e) {
+    let hint = '';
+    if (e.status === 401 || e.status === 403) hint = ' Buka instagram.com di tab lain dan pastikan kamu sudah login.';
+    else if (e.status === 429) hint = ' Instagram sedang membatasi permintaan. Tunggu beberapa menit.';
+    else if (e.status === 404) hint = ' Postingannya mungkin sudah dihapus, atau akunnya privat.';
+    setStat('Gagal: ' + esc(e.message) + hint, 'bad');
+  } finally {
+    btn.disabled = false;
+    setTimeout(() => $('pasteprog').classList.add('hidden'), 800);
+  }
 }
 
 // ================================================================ timezone
@@ -543,6 +623,8 @@ function wire() {
   $('file').onchange = (e) => { if (e.target.files.length) loadFiles(e.target.files); };
   $('demo').onclick = loadDemo;
   $('reset').onclick = () => location.reload();
+  $('go').onclick = runPaste;
+  $('iglink').addEventListener('keydown', (e) => { if (e.key === 'Enter') runPaste(); });
 
   for (const el of ['cutoff', 'reps', 'onlyflag', 'tech']) $(el).onchange = render;
   $('q').oninput = render;
@@ -611,4 +693,5 @@ initTz();
 initBookmarklet();
 wire();
 wireHandoff();
+initPaste();
 tzNote();

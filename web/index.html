@@ -28,23 +28,54 @@
       &ldquo;3 hari lalu&rdquo;. Ketok membuka jam aslinya sampai ke detik, dalam zona
       waktu kamu sendiri, lalu menandai tawaran yang masuk setelah lelang ditutup.
     </p>
+    <div class="pastebar">
+      <input type="url" id="iglink" spellcheck="false"
+             placeholder="Tempel link postingan lelang di sini">
+      <button id="go" class="btn primary">Ambil komentar</button>
+    </div>
+    <p class="pastestat" id="paststat">Memeriksa&hellip;</p>
+    <div id="pasteprog" class="pasteprog hidden"><i></i></div>
+
+    <div id="extinfo" class="extinfo hidden">
+      <h3>Kotak di atas butuh extension Ketok</h3>
+      <p>
+        Halaman web biasa tidak diizinkan browser mengambil komentar dari
+        instagram.com, dan tidak punya akses ke sesi login kamu. Extension inilah
+        yang punya izin itu &mdash; sesi login kamu tetap di browser, tidak ada
+        kata sandi atau cookie yang dibaca maupun dikirim ke mana pun.
+      </p>
+      <ol>
+        <li>Unduh atau salin folder <code>extension/</code> dari
+          <a href="https://github.com/bashideffendi/lelanginstagram" target="_blank" rel="noopener">repo Ketok</a></li>
+        <li>Buka <code>chrome://extensions</code></li>
+        <li>Nyalakan <b>Developer mode</b> di pojok kanan atas</li>
+        <li>Klik <b>Load unpacked</b>, pilih folder <code>extension/</code> tadi</li>
+        <li>Kembali ke halaman ini dan muat ulang</li>
+      </ol>
+      <p class="extalt">
+        <b>Tidak mau pasang extension?</b> Pakai tombol seret di Langkah 1 di bawah.
+        Hasilnya sama persis &mdash; bedanya kamu perlu membuka postingannya dulu
+        lalu menekan bookmark, bukan menempel link di sini.
+      </p>
+    </div>
+
     <div class="hero-cta">
-      <button id="demo" class="btn primary lg">Lihat contoh hasilnya</button>
-      <span class="hero-hint">Tanpa perlu pasang apa pun &mdash; pakai data lelang contoh</span>
+      <button id="demo" class="btn ghost">Lihat contoh hasilnya dulu</button>
+      <span class="hero-hint">Data lelang contoh &mdash; tanpa perlu memasang apa pun</span>
     </div>
   </section>
 
   <section class="steps">
-    <h2 class="section-title">Untuk memakainya di lelang beneran</h2>
+    <h2 class="section-title">Cara lain, tanpa extension</h2>
     <ol class="steplist">
       <li>
         <div class="step-n">1</div>
         <div class="step-body">
           <h3>Pasang tombol Ketok</h3>
           <p>
-            Tekan <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>B</kbd> supaya bar bookmark
-            muncul, lalu <b>seret tombol oranye di bawah ini ke bar itu</b>.
-            Sekali saja, selamanya.
+            Cara ini tidak butuh extension. Tekan <kbd>Ctrl</kbd> + <kbd>Shift</kbd> +
+            <kbd>B</kbd> supaya bar bookmark muncul, lalu <b>seret tombol oranye di
+            bawah ini ke bar itu</b>. Sekali saja, selamanya.
           </p>
           <a class="bookmarklet" id="bm" href="#" draggable="true">
             <span class="bm-icon">🔨</span> Ketok

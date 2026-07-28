@@ -8,16 +8,32 @@ server mereka tanpa keterangan, sehingga tidak bisa dipakai membandingkan urutan
 bid. Ketok menyimpan **epoch mentah** dari Instagram dan memperlakukan timezone
 murni sebagai lapisan tampilan.
 
-## Dua bagian
+Live: <https://lelanginsta.tempuscollective.com>
+
+## Tiga bagian
 
 | Bagian | Isi | Jalan di mana |
 |---|---|---|
-| **Bookmarklet** | Menarik komentar dari post yang sedang kamu buka | Tab Instagram, pakai sesi login kamu |
-| **Web app** | Analisis, cutoff, perbandingan snapshot, ekspor | Browser, tanpa server |
+| **Web app** | Analisis, jam tutup, perbandingan snapshot, ekspor | Browser, tanpa server |
+| **Extension** | Kotak tempel-link: menarik komentar dari alamat yang kamu tempel | Chrome, izin ke instagram.com |
+| **Bookmarklet** | Alternatif tanpa pasang apa pun: menarik dari post yang sedang dibuka | Tab Instagram |
 
-Tidak ada server perantara dan tidak ada kredensial yang keluar dari browser.
-Web app tidak pernah menerima data lewat jaringan — dump berpindah lewat file
-atau `postMessage` antar tab.
+Extension dan bookmarklet sama-sama memakai sesi login browser kamu sendiri.
+Tidak ada server perantara, dan tidak ada kredensial yang dibaca atau keluar
+dari browser. Web app tidak pernah menerima data lewat jaringan — hasil
+berpindah lewat `postMessage` di dalam browser, atau lewat berkas.
+
+### Kenapa kotak tempel-link butuh extension
+
+Halaman web biasa tidak bisa mengambil komentar dari instagram.com: browser
+memblokirnya lewat CORS, dan halaman itu juga tidak punya akses ke sesi login
+kamu. Satu-satunya cara memberi kotak tempel-link kemampuan itu tanpa
+menitipkan cookie Instagram ke sebuah server adalah lewat extension, yang
+punya izin host ke instagram.com dan menarik data langsung dari browser kamu.
+
+Logika penarikannya sendiri hanya ada di `shared/ig-core.js`, dipakai bersama
+oleh extension dan bookmarklet — jadi kalau Instagram mengubah endpoint,
+perbaikannya cukup di satu tempat.
 
 ## Pakai
 
@@ -34,7 +50,22 @@ memahami tampilannya.
 Kalau di-deploy (Vercel, `outputDirectory` = `web`), langkah ini tidak perlu
 sama sekali.
 
-### Pakai di lelang beneran
+### Pasang extension (untuk kotak tempel-link)
+
+Belum lewat Chrome Web Store, jadi pasangnya manual — sekali saja:
+
+1. `chrome://extensions` → nyalakan **Developer mode** (pojok kanan atas)
+2. **Load unpacked** → pilih folder `extension/` di repo ini
+3. Muat ulang halaman Ketok
+
+Setelah itu kotak di halaman utama akan menyala hijau (`Extension aktif`), dan
+kamu tinggal menempel link postingan lalu menekan **Ambil komentar**.
+
+Kalau menambah alamat baru tempat web app di-hosting, daftarkan di
+`content_scripts.matches` pada `extension/manifest.json` — bridge hanya
+disuntikkan ke alamat yang terdaftar di sana.
+
+### Alternatif tanpa extension: bookmarklet
 
 1. Di halaman awal, seret tombol oranye **Ketok** ke bar bookmark — sekali saja
 2. Buka permalink post lelang: `instagram.com/p/XXXX/`, bukan feed atau story
@@ -108,9 +139,17 @@ memegang file yang sama akan menghitung nilai yang sama.
 ## Struktur
 
 ```
+shared/
+  ig-core.js         INTI PENARIKAN — satu-satunya tempat memperbaiki
+                     kalau Instagram mengubah endpoint
+extension/
+  manifest.json      izin host + daftar alamat web app
+  background.js      satu-satunya yang menyentuh instagram.com
+  bridge.js          jembatan halaman <-> extension (tanpa perlu ID extension)
+  ig-core.js         salinan shared/ — dihasilkan build.mjs
 bookmarklet/
-  src/ketok.js       sumber (baca ini kalau endpoint berubah)
-  build.mjs          minifikasi + cek sintaks + halaman pemasangan
+  src/ketok.js       panel dan penyerahan hasil (intinya ditanam saat build)
+  build.mjs          tanam inti + minifikasi + cek sintaks + salin ke extension
   dist/              hasil build
 web/
   index.html

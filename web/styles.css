@@ -129,8 +129,54 @@ code {
   margin-bottom: 18px;
 }
 .lede { font-size: 17.5px; color: var(--text-2); line-height: 1.62; }
-.hero-cta { margin-top: 30px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.hero-cta { margin-top: 26px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
 .hero-hint { color: var(--muted); font-size: 14px; }
+
+/* ---------------------------------------------------------------- paste bar */
+
+.pastebar {
+  margin-top: 30px;
+  display: flex; gap: 10px; flex-wrap: wrap;
+}
+.pastebar input {
+  flex: 1 1 340px;
+  font-size: 15.5px; padding: 13px 16px;
+  border-radius: 9px;
+  box-shadow: var(--shadow);
+}
+.pastebar input::placeholder { color: #98a2b0; }
+.pastebar .btn { padding: 13px 24px; font-size: 15px; white-space: nowrap; }
+
+.pastestat { margin-top: 10px; font-size: 14px; color: var(--muted); }
+.pastestat.ready { color: var(--ok); }
+.pastestat.warn { color: var(--warn); }
+.pastestat.bad { color: var(--danger); }
+.pastestat .linkbtn { font-size: 14px; margin-left: 4px; }
+
+.pasteprog {
+  height: 6px; background: #e7eaee; border-radius: 3px;
+  overflow: hidden; margin-top: 12px;
+}
+.pasteprog i {
+  display: block; height: 100%; width: 0;
+  background: var(--accent); transition: width .25s;
+}
+
+.extinfo {
+  margin-top: 18px;
+  background: var(--surface); border: 1px solid var(--line);
+  border-left: 3px solid var(--info);
+  border-radius: var(--r); padding: 20px 24px;
+  box-shadow: var(--shadow);
+}
+.extinfo h3 { font-size: 16px; font-weight: 650; margin-bottom: 8px; }
+.extinfo p { font-size: 14.5px; color: var(--text-2); }
+.extinfo ol { margin: 14px 0 0 20px; color: var(--text-2); font-size: 14.5px; }
+.extinfo li { margin-bottom: 7px; }
+.extinfo .extalt {
+  margin-top: 16px; padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
 
 .section-title {
   font-size: 13px; font-weight: 700; letter-spacing: .08em;

@@ -1,0 +1,26 @@
+{
+  "manifest_version": 3,
+  "name": "Ketok — penarik komentar lelang Instagram",
+  "version": "1.0.0",
+  "description": "Menarik komentar postingan lelang Instagram beserta jam aslinya, lalu menyerahkannya ke Ketok untuk dianalisis.",
+  "host_permissions": [
+    "https://www.instagram.com/*",
+    "https://instagram.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://lelanginsta.tempuscollective.com/*",
+        "https://lelanginstagram.vercel.app/*",
+        "http://localhost:8777/*",
+        "http://127.0.0.1:8777/*"
+      ],
+      "js": ["bridge.js"],
+      "run_at": "document_start"
+    }
+  ]
+}
