@@ -263,7 +263,15 @@ input[type="datetime-local"] { font-family: var(--mono); font-size: 14px; }
 .pflag.warn { background: var(--warn-wash); color: #71490d; }
 .pflag.good { background: var(--good-wash); color: #12523a; }
 .pflag b { font-weight: 650; }
-.pflag-mark { font-weight: 700; flex: 0 0 auto; font-variant-numeric: tabular-nums; }
+.pflag-mark {
+  flex: 0 0 20px; height: 20px; margin-top: 2px;
+  display: grid; place-items: center;
+  border-radius: 50%; font: 700 12px var(--sans);
+  color: #fff;
+}
+.pflag.bad .pflag-mark { background: var(--bad); }
+.pflag.warn .pflag-mark { background: var(--warn); }
+.pflag.good .pflag-mark { background: var(--good); }
 
 .pcard-act { padding: 15px 30px; border-top: 1px solid var(--line); display: flex; gap: 9px; flex-wrap: wrap; }
 

@@ -510,37 +510,38 @@ function renderProof() {
   out.push('</div>');
 
   // Temuan, paling penting di atas.
+  // Penandanya sengaja bukan angka: jumlahnya sudah disebut di kalimatnya,
+  // dan dua angka berdampingan terbaca sebagai satu bilangan ("2 2").
   const flags = [];
   if (s.cutoff == null) {
-    flags.push(['warn', '!', 'Jam tutup lelang belum diisi.',
+    flags.push(['warn', 'Jam tutup lelang belum diisi.',
       'Tanpa itu, tawaran yang telat tidak bisa ditandai. Kotaknya ada tepat di bawah kartu ini.']);
   } else if (s.lateBids > 0) {
     const worst = Math.max(...state.result.rows
       .filter((r) => r.flags.includes('lewat-cutoff') && r.bid != null).map((r) => r.late));
-    flags.push(['bad', s.lateBids, `${s.lateBids} tawaran masuk setelah lelang ditutup.`,
+    flags.push(['bad', `${s.lateBids} tawaran masuk setelah lelang ditutup.`,
       `Yang paling telat lewat ${fmtDuration(worst)}.`]);
   }
   if (state.diff && state.diff.deleted.length) {
-    flags.push(['bad', state.diff.deleted.length,
-      `${state.diff.deleted.length} komentar dihapus di antara dua tarikan kamu.`,
+    flags.push(['bad', `${state.diff.deleted.length} komentar dihapus di antara dua tarikan kamu.`,
       'Isinya masih tersimpan di tab &ldquo;Yang dihapus&rdquo;.']);
   }
   if (s.tieGroups > 0) {
-    flags.push(['warn', s.tieRows, `${s.tieRows} tawaran jatuh pada detik yang sama persis.`,
+    flags.push(['warn', `${s.tieRows} tawaran jatuh pada detik yang sama persis.`,
       'Urutannya diambil dari nomor komentar Instagram, bukan dari jam.']);
   }
   if (s.bidDown > 0) {
-    flags.push(['warn', s.bidDown, `${s.bidDown} tawaran nilainya lebih rendah dari tawaran tertinggi saat itu.`, '']);
+    flags.push(['warn', `${s.bidDown} tawaran nilainya lebih rendah dari tawaran tertinggi saat itu.`, '']);
   }
   if (s.cutoff != null && !flags.length) {
-    flags.push(['good', '✓', 'Tidak ditemukan kejanggalan.',
+    flags.push(['good', 'Tidak ditemukan kejanggalan.',
       'Semua tawaran masuk sebelum tutup, tidak ada nilai yang turun, tidak ada detik kembar.']);
   }
 
   if (flags.length) {
     out.push('<div class="pflags">');
-    for (const [cls, mark, head, sub] of flags) {
-      out.push(`<div class="pflag ${cls}"><span class="pflag-mark">${mark}</span>` +
+    for (const [cls, head, sub] of flags) {
+      out.push(`<div class="pflag ${cls}"><span class="pflag-mark">${cls === 'good' ? '✓' : '!'}</span>` +
         `<span><b>${head}</b>${sub ? ' ' + sub : ''}</span></div>`);
     }
     out.push('</div>');
