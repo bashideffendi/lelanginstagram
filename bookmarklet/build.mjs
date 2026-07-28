@@ -46,6 +46,16 @@ const bookmarklet = 'javascript:' + encodeURIComponent(min);
 mkdirSync(join(here, 'dist'), { recursive: true });
 writeFileSync(join(here, 'dist', 'bookmarklet.txt'), bookmarklet, 'utf8');
 
+// Tanam bookmarklet ke web app supaya pengguna bisa menyeretnya langsung dari
+// halaman utama — tanpa perlu menjalankan build ini sendiri.
+writeFileSync(
+  join(here, '..', 'web', 'bookmarklet.js'),
+  '// Dihasilkan oleh bookmarklet/build.mjs — jangan diedit langsung.\n' +
+  'export const BOOKMARKLET = ' + JSON.stringify(bookmarklet) + ';\n' +
+  'export const TARGET = ' + JSON.stringify(WEB_APP) + ';\n',
+  'utf8'
+);
+
 const installHtml = `<!doctype html>
 <html lang="id">
 <meta charset="utf-8">

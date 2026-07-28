@@ -21,39 +21,50 @@ atau `postMessage` antar tab.
 
 ## Pakai
 
-### 1. Pasang bookmarklet
-
-```bash
-cd bookmarklet && node build.mjs
-```
-
-Buka `bookmarklet/dist/install.html`, seret tombol kuning ke bookmark bar.
-
-Untuk menargetkan web app lokal saat pengembangan:
-
-```bash
-node build.mjs http://localhost:8777
-```
-
-### 2. Tarik komentar
-
-1. Buka **permalink** post lelang — `instagram.com/p/XXXX/`, bukan feed atau story
-2. Klik bookmark **Ketok**
-3. Tunggu panel selesai menarik
-4. **Buka di Ketok** (langsung ke web app) atau **Simpan JSON** (arsip bukti)
-
-### 3. Analisis
+### Jalankan
 
 ```bash
 python -m http.server 8777 --directory web
 ```
 
-Buka <http://localhost:8777>, jatuhkan file JSON. Isi jam tutup lelang untuk
-mengaktifkan deteksi pelanggaran.
+Buka <http://localhost:8777>. Klik **Lihat contoh hasilnya** — tool langsung
+terisi data lelang contoh, tanpa perlu memasang apa pun. Ini cara tercepat
+memahami tampilannya.
 
-Untuk mencoba tanpa menyentuh Instagram, jatuhkan dua file di `samples/`
-(buat dulu dengan `node samples/generate.mjs`). Keduanya berisi skenario lelang
-lengkap dengan setiap kelainan yang dideteksi Ketok.
+Kalau di-deploy (Vercel, `outputDirectory` = `web`), langkah ini tidak perlu
+sama sekali.
+
+### Pakai di lelang beneran
+
+1. Di halaman awal, seret tombol oranye **Ketok** ke bar bookmark — sekali saja
+2. Buka permalink post lelang: `instagram.com/p/XXXX/`, bukan feed atau story
+3. Klik bookmark **Ketok**, tunggu panel selesai menarik
+4. Klik **Buka di Ketok** — hasilnya pindah sendiri ke web app
+
+Jam tutup lelang ditebak otomatis dari caption postingan (`CLOSED 21.00 WIB`
+dan sejenisnya) lalu ditandai jelas sebagai tebakan. Perbaiki kalau salah;
+semua tanda merah bergantung pada angka itu.
+
+### Membangun ulang bookmarklet
+
+Tombol seret di halaman awal berasal dari `web/bookmarklet.js`, yang dihasilkan
+oleh:
+
+```bash
+node bookmarklet/build.mjs
+```
+
+Untuk menargetkan web app lokal saat pengembangan:
+
+```bash
+node bookmarklet/build.mjs http://localhost:8777
+```
+
+Perintah yang sama juga menulis `bookmarklet/dist/install.html`, halaman
+pemasangan berdiri sendiri kalau web app-nya belum jalan.
+
+Data contoh (`web/contoh/`) dan berkas uji lengkap (`samples/`) dihasilkan oleh
+`node samples/generate.mjs`.
 
 ## Yang dideteksi
 
@@ -104,6 +115,8 @@ bookmarklet/
 web/
   index.html
   styles.css
+  bookmarklet.js     dihasilkan build.mjs — sumber tombol seret di halaman awal
+  contoh/            data peraga tombol "Lihat contoh"
   js/
     main.js          UI dan perkabelan
     dump.js          pembacaan & validasi dump

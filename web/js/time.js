@@ -155,16 +155,25 @@ export function fmtIsoUtc(epochSec) {
   return new Date(epochSec * 1000).toISOString().replace('.000Z', 'Z');
 }
 
-/** Durasi detik -> "1j 04m 12d" / "4m 12d" / "12d". */
+/**
+ * Durasi detik -> "1 jam 6 menit" / "4 menit 12 detik" / "12 detik".
+ * Sengaja dieja penuh: singkatan seperti "41d" terbaca sebagai "41 hari"
+ * padahal maksudnya detik, dan angka ini dipakai untuk menuduh orang telat.
+ */
 export function fmtDuration(sec) {
   if (sec == null || !Number.isFinite(sec)) return '';
   const neg = sec < 0;
   let s = Math.abs(Math.round(sec));
   const h = Math.floor(s / 3600); s -= h * 3600;
   const m = Math.floor(s / 60); s -= m * 60;
-  let out;
-  if (h) out = `${h}j ${String(m).padStart(2, '0')}m ${String(s).padStart(2, '0')}d`;
-  else if (m) out = `${m}m ${String(s).padStart(2, '0')}d`;
-  else out = `${s}d`;
-  return (neg ? '-' : '') + out;
+
+  const parts = [];
+  if (h) parts.push(`${h} jam`);
+  if (m) parts.push(`${m} menit`);
+  // Detik disembunyikan kalau durasinya sudah lebih dari sejam — tidak relevan
+  // di skala itu, dan bikin kolom tabel kepanjangan.
+  if (s && !h) parts.push(`${s} detik`);
+  if (!parts.length) parts.push('0 detik');
+
+  return (neg ? 'minus ' : '') + parts.join(' ');
 }

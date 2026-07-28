@@ -9,7 +9,7 @@
  * beruntun, akun yang baru muncul di menit akhir, dan satu komentar yang
  * dihapus di antara dua penarikan.
  */
-import { writeFileSync } from 'node:fs';
+import { writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -174,6 +174,17 @@ writeFileSync(
   join(here, 'contoh-snapshot-2.json'),
   JSON.stringify(build(snap2, replies, CUTOFF + 86400), null, 2)
 );
+
+// Versi ramping untuk tombol "Lihat contoh" di web app: payload asli dibuang
+// supaya ukurannya sepertiga, karena hanya dipakai memperagakan tampilan.
+const slim = (d) => {
+  const { raw, ...rest } = d;
+  return { ...rest, contoh: true };
+};
+const webDir = join(here, '..', 'web', 'contoh');
+mkdirSync(webDir, { recursive: true });
+writeFileSync(join(webDir, 'lelang-1.json'), JSON.stringify(slim(build(snap1, replies, CUTOFF + 300))));
+writeFileSync(join(webDir, 'lelang-2.json'), JSON.stringify(slim(build(snap2, replies, CUTOFF + 86400))));
 
 console.log(`Mulai lelang : ${new Date(START * 1000).toISOString()}  (20:00 WIB)`);
 console.log(`Cutoff       : ${new Date(CUTOFF * 1000).toISOString()}  (21:00 WIB) = epoch ${CUTOFF}`);
