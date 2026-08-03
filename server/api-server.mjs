@@ -51,11 +51,14 @@ const HEADER_IG = {
   'user-agent': IG_UA,
   accept: '*/*',
   'accept-language': 'id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7',
+  // Referer tetap dikirim walau identitasnya aplikasi. Diuji: tanpa ini
+  // Instagram menjawab "SecFetch Policy violation"; dengan ini diterima.
+  referer: 'https://www.instagram.com/',
   'x-asbd-id': '129477',
   'x-ig-www-claim': '0',
-  // Header khas peramban hanya masuk akal kalau identitasnya memang peramban.
+  // Hanya trio sec-fetch yang khas peramban; mengirimnya bersama identitas
+  // aplikasi justru yang memicu penolakan kebijakan itu.
   ...(PERAMBAN ? {
-    referer: 'https://www.instagram.com/',
     'sec-fetch-site': 'same-origin',
     'sec-fetch-mode': 'cors',
     'sec-fetch-dest': 'empty'

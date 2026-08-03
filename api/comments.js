@@ -45,10 +45,11 @@ const HEADER_IG = {
   'user-agent': IG_UA,
   accept: '*/*',
   'accept-language': 'id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7',
+  // Tanpa referer, Instagram menjawab "SecFetch Policy violation" — terukur.
+  referer: 'https://www.instagram.com/',
   'x-asbd-id': '129477',
   'x-ig-www-claim': '0',
   ...(PERAMBAN ? {
-    referer: 'https://www.instagram.com/',
     'sec-fetch-site': 'same-origin',
     'sec-fetch-mode': 'cors',
     'sec-fetch-dest': 'empty'
