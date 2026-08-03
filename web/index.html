@@ -16,6 +16,10 @@
       <span class="mark">Lelang<b>Insta</b></span>
       <span class="sub">Cek Pemenang Lelang Instagram</span>
     </a>
+    <nav class="mainnav" id="nav-utama">
+      <button data-view="cek" class="on">Cek pemenang</button>
+      <button data-view="pantau">Pantauan <span class="pip" id="c-pantau"></span></button>
+    </nav>
     <span class="fill"></span>
     <button id="reset" class="btn quiet sm hidden">Cek lelang lain</button>
   </div>
@@ -253,6 +257,44 @@
           Jam diterjemahkan dari catatan waktu asli Instagram dan tidak pernah diubah &mdash;
           mengganti zona waktu hanya mengubah cara menampilkan, bukan momennya.
           Tawaran pada detik yang sama diurutkan memakai nomor komentar Instagram.
+        </p>
+      </section>
+
+      <!-- ================================================== pantauan -->
+      <section id="pantau" class="hidden">
+        <div class="ptop">
+          <p class="label">Jangan sampai kelewatan</p>
+          <h2>Pantauan lelang</h2>
+          <p class="lead">
+            Tempel link lelang yang kamu incar. Jam tutupnya dibaca sendiri dari
+            caption postingan, lalu bisa dikirim ke kalender ponselmu lengkap dengan
+            alarm &mdash; sehingga tetap berbunyi walau browser tertutup.
+          </p>
+        </div>
+
+        <div class="take padd">
+          <input type="url" id="paddlink" spellcheck="false"
+                 placeholder="Tempel link lelang yang mau dipantau">
+          <button id="paddgo" class="btn solid">Tambah</button>
+        </div>
+        <p class="take-stat" id="paddstat"></p>
+
+        <div class="pbar">
+          <label class="pakun-l" for="pakun">Akun Instagram-mu</label>
+          <input type="text" id="pakun" placeholder="tanpa @" autocomplete="off">
+          <span class="fill"></span>
+          <button id="pics" class="btn sm">Kirim semua ke kalender</button>
+          <button id="pekspor" class="btn sm quiet">Ekspor</button>
+          <button id="pimpor" class="btn sm quiet">Impor</button>
+          <input type="file" id="pimporfile" accept=".json,application/json" class="hidden">
+        </div>
+
+        <div id="plist"></div>
+        <section id="priwayat"></section>
+
+        <p class="foot-note">
+          Daftar ini tersimpan di browser ini saja &mdash; tidak ada server yang
+          menyimpannya. Pakai <b>Ekspor</b> untuk memindahkannya ke perangkat lain.
         </p>
       </section>
 

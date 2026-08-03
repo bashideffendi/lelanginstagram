@@ -13,6 +13,7 @@ import {
   probeServer, extractViaServer, savedKey, saveKey
 } from './ext.js';
 import { gambarBukti } from './gambar.js';
+import * as PantauUI from './pantau-ui.js';
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) =>
@@ -37,7 +38,7 @@ const state = {
   dumps: [], primary: null, diff: null, isDemo: false,
   tz: browserTz(), cutoff: null, captionGuess: null, grace: 60,
   query: '', includeReplies: true, onlyFlagged: false, tech: false, rulesOpen: false,
-  owner: '', sniperMin: 0, hideHost: true, wrap: false,
+  owner: '', sniperMin: 0, hideHost: true, view: 'cek', wrap: false,
   result: null, hash: null, hashToken: 0, canonicalJson: null, guessedCutoff: false,
   // Tawaran terakhir paling atas: itu yang menentukan hasil lelang,
   // dan yang pertama dicari orang saat membuka bukti.
@@ -522,6 +523,28 @@ function guessCutoff(caption, comments, tz) {
 function showError(msg) {
   $('loaderr').textContent = msg;
   $('loaderr').classList.remove('hidden');
+}
+
+/**
+ * Dua pekerjaan berbeda dalam satu aplikasi: memeriksa hasil lelang yang sudah
+ * lewat, dan memantau lelang yang belum tutup. Keduanya berbagi mesin penarik
+ * komentar yang sama, jadi tidak ada yang disalin.
+ */
+function pilihView(nama) {
+  state.view = nama;
+  document.querySelectorAll('#nav-utama button').forEach((b) =>
+    b.classList.toggle('on', b.dataset.view === nama));
+
+  const cek = nama === 'cek';
+  $('pantau').classList.toggle('hidden', cek);
+  $('landing').classList.toggle('hidden', !cek || !!state.primary);
+  $('app').classList.toggle('hidden', !cek || !state.primary);
+  $('tabs').classList.toggle('hidden', !cek || !state.primary);
+  $('reset').classList.toggle('hidden', !cek || !state.primary);
+
+  if (!cek) PantauUI.render();
+  PantauUI.mulaiDetak(!cek);
+  window.scrollTo(0, 0);
 }
 
 function pilihTab(nama) {
@@ -1280,8 +1303,11 @@ function wire() {
     $('legendtoggle').textContent = l.classList.contains('hidden') ? 'Arti tanda' : 'Sembunyikan';
   };
 
-  document.querySelectorAll('.tabs button').forEach((b) => {
+  document.querySelectorAll('#tabs button').forEach((b) => {
     b.onclick = () => pilihTab(b.dataset.tab);
+  });
+  document.querySelectorAll('#nav-utama button').forEach((b) => {
+    b.onclick = () => pilihView(b.dataset.view);
   });
 
   document.addEventListener('click', (e) => {
@@ -1352,9 +1378,45 @@ function wireHandoff() {
   }
 }
 
+/**
+ * Pantauan memakai mesin yang sudah ada lewat titipan ini, bukan salinannya:
+ * satu jalur penarikan, satu penebak jam tutup, satu tempat yang perlu
+ * diperbaiki kalau Instagram berubah.
+ */
+function initPantauan() {
+  PantauUI.initPantau({
+    tz: () => state.tz,
+    unduh: download,
+    linkSah: looksLikePostUrl,
+
+    tarik: async (url, onProgress) => {
+      if (!extVersion) extVersion = await pingExtension();
+      if (extVersion) return extractViaExtension(url, onProgress || (() => {}));
+
+      if (serverState !== 'ready') serverState = await probeServer(savedKey());
+      if (serverState === 'ready') return extractViaServer(url, savedKey());
+
+      throw new Error(
+        'Belum ada cara penarikan yang siap. Pasang extension Lelang Insta, ' +
+        'atau isi kunci mode server di halaman Cek pemenang.'
+      );
+    },
+
+    hitungTutup: (caption, comments) => guessCutoff(caption, comments, state.tz),
+
+    bukaAnalisis: (url) => {
+      pilihView('cek');
+      $('iglink').value = url;
+      runTake();
+    }
+  });
+  PantauUI.render();
+}
+
 initTz();
 initBookmarklet();
 wire();
 wireHandoff();
 initTake();
+initPantauan();
 tzNote();

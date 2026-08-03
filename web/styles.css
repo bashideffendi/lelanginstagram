@@ -558,6 +558,95 @@ tbody tr.r-snipe td { background: var(--warn-soft); }
   color: var(--faint); font-size: 12.5px; max-width: 720px;
 }
 
+/* ============================================================ pantauan */
+
+.mainnav { display: flex; gap: 2px; margin-left: 22px; }
+.mainnav button {
+  background: none; border: 0; cursor: pointer;
+  font: 600 14px var(--sans); color: var(--muted);
+  padding: 8px 14px; border-radius: 99px;
+  display: flex; align-items: center; gap: 7px;
+}
+.mainnav button:hover { color: var(--ink); background: var(--surface-2); }
+.mainnav button.on { background: var(--primary); color: #fff; }
+.mainnav button.on .pip { background: rgba(255, 255, 255, .25); color: #fff; }
+
+.ptop { max-width: 700px; padding: 34px 0 4px; }
+.ptop h2 {
+  font-family: var(--display); font-weight: 800;
+  font-size: clamp(24px, 3vw, 32px); letter-spacing: -.025em; margin: 12px 0 14px;
+}
+.take.padd { margin: 26px 0 0; max-width: 700px; }
+.take.padd input { text-align: left; }
+
+.pbar {
+  display: flex; align-items: center; gap: 9px; flex-wrap: wrap;
+  padding: 16px 0 20px; margin-bottom: 6px;
+  border-bottom: 1px solid var(--line);
+}
+.pakun-l { font-size: 13px; font-weight: 600; color: var(--ink-2); }
+#pakun { width: 150px; }
+
+#plist { display: grid; gap: 10px; margin: 18px 0 30px; }
+.kosong {
+  padding: 40px 22px; text-align: center; color: var(--muted); font-size: 14px;
+  border: 1px dashed var(--line-2); border-radius: var(--r); background: var(--surface-2);
+}
+
+.pcard-item {
+  background: var(--surface); border: 1px solid var(--line);
+  border-left: 3px solid var(--line-2);
+  border-radius: var(--r); padding: 16px 18px; box-shadow: var(--shadow-sm);
+}
+/* Kurang dari sejam lagi — inilah yang membuat orang kalah karena lupa. */
+.pcard-item.mendesak { border-left-color: var(--amber); background: var(--warn-soft); }
+.pcard-item.lewat { border-left-color: var(--line-2); opacity: .72; }
+
+.pcard-item header { display: flex; align-items: flex-start; gap: 14px; }
+.pjudul { min-width: 0; flex: 1 1 auto; }
+.pjudul h3 {
+  font-size: 16px; font-weight: 700; letter-spacing: -.01em;
+  overflow-wrap: anywhere; margin-bottom: 2px;
+}
+.pjudul p { font-size: 12.5px; }
+.psisa {
+  font-family: var(--mono); font-size: 13px; font-weight: 600;
+  color: var(--ink-soft); white-space: nowrap; flex: none;
+}
+.psisa.mendesak { color: var(--amber); }
+.psisa.lewat { color: var(--muted); font-weight: 400; }
+
+.pinfo {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 2px 20px; margin: 12px 0 14px; font-size: 13.5px;
+}
+.pinfo .pl {
+  display: inline-block; width: 86px;
+  font-family: var(--mono); font-size: 9.5px; font-weight: 500;
+  letter-spacing: .1em; text-transform: uppercase; color: var(--muted);
+}
+
+.paksi { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+.psel { font-size: 12.5px; padding: 6px 8px; }
+.pharga { width: 130px; font-family: var(--mono); font-size: 12.5px; padding: 6px 9px; }
+
+.psub {
+  font-size: 17px; font-weight: 700; letter-spacing: -.01em;
+  margin: 34px 0 6px; padding-top: 24px; border-top: 1px solid var(--line);
+}
+
+@media (max-width: 640px) {
+  .mast-in { flex-wrap: wrap; row-gap: 10px; }
+  .mainnav { margin-left: 0; width: 100%; }
+  .mainnav button { flex: 1 1 auto; justify-content: center; }
+  .ptop { padding-top: 22px; }
+  .pcard-item header { flex-direction: column; gap: 6px; }
+  .pinfo { grid-template-columns: 1fr; }
+  .paksi .btn, .paksi .psel, .paksi .pharga { flex: 1 1 calc(50% - 4px); }
+  .pbar { gap: 8px; }
+  #pakun { flex: 1 1 auto; width: auto; }
+}
+
 /* ============================================================ layar kecil
  *
  * Sebagian besar orang membuka ini dari ponsel, dan tabel tujuh kolom
