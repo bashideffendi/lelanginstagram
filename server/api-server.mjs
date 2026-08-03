@@ -32,18 +32,34 @@ const MAX_PAGES = Number(process.env.MAX_PAGES || 60);
 const RATE_WINDOW_MS = 10 * 60 * 1000;
 const RATE_MAX = Number(process.env.RATE_MAX || 20);
 
-const HEADER_PERAMBAN = {
-  'user-agent':
-    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
-    '(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+/**
+ * Instagram mengikat sesi pada identitas peramban yang membuatnya, dan
+ * menolak yang lain dengan "useragent mismatch" — bukan dengan pengalihan
+ * ke login. Diuji langsung: semua identitas peramban ditolak, identitas
+ * aplikasi Instagram diterima. Karena itu ini bawaannya.
+ *
+ * Kalau sesimu dibuat dari peramban, isi IG_USER_AGENT dengan identitas
+ * peramban itu persis (Console: navigator.userAgent).
+ */
+const IG_UA = process.env.IG_USER_AGENT ||
+  'Instagram 275.0.0.27.98 Android (33/13; 420dpi; 1080x2400; samsung; ' +
+  'SM-G991B; o1s; exynos2100; en_US; 458229237)';
+
+const PERAMBAN = /Mozilla/.test(IG_UA);
+
+const HEADER_IG = {
+  'user-agent': IG_UA,
   accept: '*/*',
   'accept-language': 'id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7',
-  referer: 'https://www.instagram.com/',
-  'sec-fetch-site': 'same-origin',
-  'sec-fetch-mode': 'cors',
-  'sec-fetch-dest': 'empty',
   'x-asbd-id': '129477',
-  'x-ig-www-claim': '0'
+  'x-ig-www-claim': '0',
+  // Header khas peramban hanya masuk akal kalau identitasnya memang peramban.
+  ...(PERAMBAN ? {
+    referer: 'https://www.instagram.com/',
+    'sec-fetch-site': 'same-origin',
+    'sec-fetch-mode': 'cors',
+    'sec-fetch-dest': 'empty'
+  } : {})
 };
 
 // ---------------------------------------------------------------- bantu
@@ -166,7 +182,7 @@ const server = http.createServer(async (req, res) => {
       includeRaw: url.searchParams.get('raw') !== '0',
       maxPages: MAX_PAGES,
       manualRedirect: true,
-      headers: { ...HEADER_PERAMBAN, cookie }
+      headers: { ...HEADER_IG, cookie }
     });
     return kirim(res, 200, dump, asal);
   } catch (e) {
@@ -209,5 +225,6 @@ server.listen(PORT, HOST, () => {
   console.log(`[lelanginsta] mendengar di http://${HOST}:${PORT}`);
   console.log(`[lelanginsta] asal diizinkan: ${ASAL.join(', ')}`);
   console.log(`[lelanginsta] cookie tersedia: ${cookieTerkirim().join(', ') || 'BELUM ADA'}`);
+  console.log(`[lelanginsta] identitas: ${PERAMBAN ? 'peramban' : 'aplikasi Instagram'}`);
   console.log(`[lelanginsta] gembok: ${process.env.KETOK_KEY ? 'aktif' : 'terbuka untuk umum'}`);
 });

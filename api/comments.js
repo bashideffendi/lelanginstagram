@@ -29,19 +29,30 @@ const IG_BASE = 'https://www.instagram.com';
  * mengirim User-Agent apa adanya, dan Instagram memutus sambungan sebelum
  * sempat menjawab, yang muncul sebagai "fetch failed" tanpa kode status.
  */
-const HEADER_PERAMBAN = {
-  'user-agent':
-    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
-    '(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+/**
+ * Instagram mengikat sesi pada identitas peramban yang membuatnya, dan
+ * menolak yang lain dengan "useragent mismatch". Diuji langsung terhadap
+ * sesi sungguhan: seluruh identitas peramban ditolak, identitas aplikasi
+ * Instagram diterima. Karena itu ini bawaannya.
+ */
+const IG_UA = process.env.IG_USER_AGENT ||
+  'Instagram 275.0.0.27.98 Android (33/13; 420dpi; 1080x2400; samsung; ' +
+  'SM-G991B; o1s; exynos2100; en_US; 458229237)';
+
+const PERAMBAN = /Mozilla/.test(IG_UA);
+
+const HEADER_IG = {
+  'user-agent': IG_UA,
   accept: '*/*',
   'accept-language': 'id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7',
-  referer: 'https://www.instagram.com/',
-  origin: 'https://www.instagram.com',
-  'sec-fetch-site': 'same-origin',
-  'sec-fetch-mode': 'cors',
-  'sec-fetch-dest': 'empty',
   'x-asbd-id': '129477',
-  'x-ig-www-claim': '0'
+  'x-ig-www-claim': '0',
+  ...(PERAMBAN ? {
+    referer: 'https://www.instagram.com/',
+    'sec-fetch-site': 'same-origin',
+    'sec-fetch-mode': 'cors',
+    'sec-fetch-dest': 'empty'
+  } : {})
 };
 
 // Batas kasar untuk penggunaan terbuka. Satu postingan lelang yang wajar jauh
@@ -150,7 +161,7 @@ export default async function handler(req, res) {
       includeRaw: req.query.raw !== '0',
       maxPages: MAX_PAGES,
       manualRedirect: true,
-      headers: { ...HEADER_PERAMBAN, cookie }
+      headers: { ...HEADER_IG, cookie }
     });
     return res.status(200).json(dump);
   } catch (e) {
