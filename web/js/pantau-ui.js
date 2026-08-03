@@ -7,6 +7,7 @@
  */
 
 import * as P from './pantau.js';
+import * as G from './gcal.js';
 import { analyze, parseBid, fmtRupiah } from './analysis.js';
 import { fmtDateTime, fmtTime, fmtDate, fmtDuration, wallTimeToEpoch } from './time.js';
 
@@ -52,6 +53,8 @@ export function initPantau(d) {
     stat(`${aktif.length} lelang diekspor ke kalender. Buka berkasnya di ponsel untuk memasangnya.`, 'ready');
   };
 
+  $('pgcal').onclick = () => G.terhubung() ? putusGoogle() : hubungGoogle();
+
   $('pekspor').onclick = () =>
     deps.unduh('lelang-insta-pantauan.json', P.eksporSemua(), 'application/json');
 
@@ -72,11 +75,87 @@ export function initPantau(d) {
   // Satu penangan untuk seluruh daftar; barisnya digambar ulang terus-menerus.
   $('plist').addEventListener('click', tanganiAksi);
   $('plist').addEventListener('change', tanganiUbah);
+
+  tandaiGoogle();
+  // Kalau izinnya sudah pernah diberikan, sambungan dipulihkan tanpa jendela.
+  if (G.siap()) {
+    G.hubungkan({ diam: true })
+      .then(() => { tandaiGoogle(); sinkronSekarang({ diam: true }); })
+      .catch(() => { /* belum diizinkan; tombolnya menunggu */ });
+  }
 }
 
 function stat(teks, kelas = '') {
   $('paddstat').className = 'take-stat ' + kelas;
   $('paddstat').innerHTML = teks;
+}
+
+// ---------------------------------------------------------------- kalender
+
+function tandaiGoogle(pesan, kelas = '') {
+  const b = $('pgcal');
+  const n = $('pgcalnote');
+  if (!G.siap()) {
+    b.textContent = 'Sinkron kalender belum disiapkan';
+    b.classList.add('quiet');
+    n.innerHTML = '<a href="https://github.com/bashideffendi/lelanginstagram/blob/main/PANDUAN-KALENDER.md" ' +
+      'target="_blank" rel="noopener noreferrer">Cara menyiapkannya</a> — sekali saja, sekitar lima menit.';
+    return;
+  }
+  b.textContent = G.terhubung() ? 'Putuskan Google Calendar' : 'Hubungkan Google Calendar';
+  b.classList.toggle('quiet', G.terhubung());
+  n.className = 'pgcal-note ' + kelas;
+  n.textContent = pesan || (G.terhubung()
+    ? 'Tersambung. Perubahan di sini langsung ikut di kalendermu.'
+    : '');
+}
+
+async function hubungGoogle() {
+  try {
+    tandaiGoogle('Menunggu izin dari Google…');
+    await G.hubungkan();
+    tandaiGoogle('Tersambung. Menyamakan isi kalender…');
+    await sinkronSekarang({ diam: false });
+  } catch (e) {
+    tandaiGoogle(e.message === 'belum_diizinkan'
+      ? 'Izin belum diberikan.' : 'Gagal: ' + e.message, 'bad');
+  }
+}
+
+function putusGoogle() {
+  G.putuskan();
+  tandaiGoogle('Sambungan diputus. Acara yang sudah ada di kalender tidak dihapus.');
+}
+
+/**
+ * Samakan kalender dengan daftar pantauan.
+ *
+ * Dipanggil sesudah setiap perubahan, bukan lewat tombol tersendiri —
+ * sinkron yang harus diingat untuk ditekan bukan sinkron namanya.
+ */
+async function sinkronSekarang({ diam = true } = {}) {
+  if (!G.siap()) return;
+  if (!G.terhubung()) {
+    // Kalau izinnya sudah pernah diberikan, ini berjalan tanpa jendela apa pun.
+    try { await G.hubungkan({ diam: true }); } catch { return; }
+  }
+
+  try {
+    const h = await G.sinkron(P.semua(), deps.tz(), { simpan: P.simpan });
+    const bagian = [];
+    if (h.dibuat) bagian.push(`${h.dibuat} ditambahkan`);
+    if (h.diperbarui) bagian.push(`${h.diperbarui} diperbarui`);
+    if (h.dihapus) bagian.push(`${h.dihapus} dihapus`);
+    tandaiGoogle(
+      h.gagal.length
+        ? `${h.gagal.length} gagal disinkronkan: ${h.gagal[0].pesan}`
+        : (bagian.length ? 'Kalender disamakan — ' + bagian.join(', ') + '.' : 'Kalender sudah sama.'),
+      h.gagal.length ? 'bad' : ''
+    );
+    if (!diam) render();
+  } catch (e) {
+    tandaiGoogle('Gagal menyinkronkan: ' + e.message, 'bad');
+  }
 }
 
 // ---------------------------------------------------------------- tambah
@@ -256,6 +335,10 @@ async function tanganiAksi(e) {
       break;
     case 'hapus':
       if (confirm(`Hapus "${item.title || item.id}" dari pantauan?`)) {
+        // Acaranya ikut dihapus dari kalender, bukan ditinggal jadi sampah.
+        if (item.gcalId && G.terhubung()) {
+          G.hapusAcara(item.gcalId).catch(() => {});
+        }
         P.hapus(id);
         render();
       }
@@ -292,8 +375,27 @@ function sisaWaktu(epoch) {
   };
 }
 
+/** Sidik isi daftar; acara kalender hanya perlu disamakan kalau ini berubah. */
+function sidik(daftar) {
+  return daftar.map((x) =>
+    [x.id, x.status, x.closeAt, x.title, x.openBid, x.increment, x.sniperMin, x.topBid]
+      .join('|')).join('||');
+}
+
+let sidikTerakhir = null;
+let tundaSinkron = null;
+
 export function render() {
   const daftar = P.semua();
+
+  // Sinkron dipicu oleh perubahan isi, bukan oleh tombol. Ditunda sebentar
+  // supaya beberapa perubahan beruntun jadi satu putaran saja.
+  const s = sidik(daftar);
+  if (G.siap() && sidikTerakhir !== null && s !== sidikTerakhir) {
+    clearTimeout(tundaSinkron);
+    tundaSinkron = setTimeout(() => sinkronSekarang({ diam: true }), 700);
+  }
+  sidikTerakhir = s;
   $('c-pantau').textContent = daftar.filter((x) => x.status === 'aktif').length || '';
 
   if (!daftar.length) {
