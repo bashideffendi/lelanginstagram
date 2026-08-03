@@ -24,6 +24,26 @@ import { extract } from '../shared/ig-core.js';
 
 const IG_BASE = 'https://www.instagram.com';
 
+/**
+ * Dari browser, header seperti ini terisi sendiri. Dari server tidak — Node
+ * mengirim User-Agent apa adanya, dan Instagram memutus sambungan sebelum
+ * sempat menjawab, yang muncul sebagai "fetch failed" tanpa kode status.
+ */
+const HEADER_PERAMBAN = {
+  'user-agent':
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
+    '(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+  accept: '*/*',
+  'accept-language': 'id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7',
+  referer: 'https://www.instagram.com/',
+  origin: 'https://www.instagram.com',
+  'sec-fetch-site': 'same-origin',
+  'sec-fetch-mode': 'cors',
+  'sec-fetch-dest': 'empty',
+  'x-asbd-id': '129477',
+  'x-ig-www-claim': '0'
+};
+
 // Batas kasar untuk penggunaan terbuka. Satu postingan lelang yang wajar jauh
 // di bawah ini; angkanya ada supaya satu orang tidak bisa menguras akunnya.
 const MAX_PAGES = 60;
@@ -116,10 +136,27 @@ export default async function handler(req, res) {
       via: 'server',
       includeRaw: req.query.raw !== '0',
       maxPages: MAX_PAGES,
-      headers: { cookie }
+      headers: { ...HEADER_PERAMBAN, cookie }
     });
     return res.status(200).json(dump);
   } catch (e) {
+    // Kegagalan di lapisan sambungan tidak punya kode status, dan penyebab
+    // sebenarnya hanya ada di e.cause. Tanpa dicatat, yang terlihat cuma
+    // "fetch failed" yang tidak memberi tahu apa pun.
+    const sebab = e.cause ? (e.cause.code || e.cause.message || String(e.cause)) : null;
+    console.error('[lelanginsta] penarikan gagal:', e.message, sebab ? '| sebab: ' + sebab : '');
+
+    if (!e.status) {
+      return res.status(502).json({
+        error: 'tak_tersambung',
+        sebab,
+        message:
+          'Server tidak berhasil menghubungi Instagram' + (sebab ? ` (${sebab})` : '') +
+          '. Instagram kerap menolak sambungan dari IP pusat data. ' +
+          'Pasang extension Lelang Insta supaya penarikan berjalan dari browser kamu sendiri.'
+      });
+    }
+
     const status = e.status || 500;
     const message =
       status === 401 || status === 403
