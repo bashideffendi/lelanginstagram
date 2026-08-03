@@ -11,7 +11,7 @@
  * IP VPS biasanya diterima. Karena itu server sendiri lebih andal untuk mode
  * tempel-link, walaupun extension tetap yang paling tidak bermasalah.
  */
-export const API_BASE = '';
+export const API_BASE = 'https://lelanginsta-api.tempuscollective.com';
 
 /** Untuk mencoba server lain tanpa mengubah berkas ini: */
 export function apiBase() {
