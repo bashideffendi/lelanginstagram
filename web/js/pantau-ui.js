@@ -8,6 +8,7 @@
 
 import * as P from './pantau.js';
 import * as G from './gcal.js';
+import * as A from './akun.js';
 import { analyze, parseBid, fmtRupiah } from './analysis.js';
 import { fmtDateTime, fmtTime, fmtDate, fmtDuration, wallTimeToEpoch } from './time.js';
 
@@ -76,6 +77,12 @@ export function initPantau(d) {
   $('plist').addEventListener('click', tanganiAksi);
   $('plist').addEventListener('change', tanganiUbah);
 
+  A.keadaan().then((k) => {
+    keadaanAkun = k;
+    gambarMasuk();
+    if (A.sudahMasuk()) samakanServer({ pertamaKali: true });
+  });
+
   tandaiGoogle();
   // Kalau izinnya sudah pernah diberikan, sambungan dipulihkan tanpa jendela.
   if (G.siap()) {
@@ -88,6 +95,97 @@ export function initPantau(d) {
 function stat(teks, kelas = '') {
   $('paddstat').className = 'take-stat ' + kelas;
   $('paddstat').innerHTML = teks;
+}
+
+// ---------------------------------------------------------------- masuk
+
+let keadaanAkun = { ada: false, terpasang: false };
+
+function gambarMasuk(pesan = '', kelas = '') {
+  const kotak = $('pmasuk');
+
+  if (!keadaanAkun.ada) {
+    kotak.innerHTML = '';
+    return;
+  }
+
+  if (A.sudahMasuk()) {
+    kotak.innerHTML =
+      '<div class="pm-in"><span class="pm-ok">Tersambung ke servermu</span>' +
+      '<span class="pm-sub">Daftar ini ikut ke perangkat lain yang kamu masuki dengan sandi yang sama.</span>' +
+      '<span class="fill"></span>' +
+      '<button class="btn sm quiet" id="pmkeluar">Keluar</button></div>' +
+      (pesan ? `<p class="pm-note ${kelas}">${pesan}</p>` : '');
+    $('pmkeluar').onclick = () => {
+      A.keluar();
+      gambarMasuk('Keluar. Daftarnya tetap ada di browser ini.');
+    };
+    return;
+  }
+
+  const pertama = !keadaanAkun.terpasang;
+  kotak.innerHTML =
+    `<div class="pm-in"><span class="pm-judul">${pertama
+      ? 'Buat kata sandi supaya daftarnya ikut ke HP'
+      : 'Masuk supaya daftarnya ikut ke HP'}</span>` +
+    '<span class="fill"></span>' +
+    `<input type="password" id="pmsandi" placeholder="${pertama ? 'minimal 8 huruf' : 'kata sandi'}" autocomplete="current-password">` +
+    `<button class="btn sm solid" id="pmgo">${pertama ? 'Buat' : 'Masuk'}</button></div>` +
+    `<p class="pm-note ${kelas}">${pesan || (pertama
+      ? 'Kata sandi ini kamu tentukan sendiri sekarang, dan hanya tersimpan di servermu.'
+      : 'Kata sandi yang sama seperti di perangkatmu yang lain.')}</p>`;
+
+  const jalan = async () => {
+    const sandi = $('pmsandi').value;
+    if (!sandi) return gambarMasuk('Kata sandinya belum diisi.', 'bad');
+    $('pmgo').disabled = true;
+    try {
+      if (pertama) await A.pasangSandi(sandi);
+      else await A.masuk(sandi);
+      keadaanAkun = await A.keadaan();
+      gambarMasuk('Menyamakan daftar…');
+      await samakanServer({ pertamaKali: true });
+    } catch (e) {
+      gambarMasuk(e.message, 'bad');
+    }
+  };
+  $('pmgo').onclick = jalan;
+  $('pmsandi').addEventListener('keydown', (e) => { if (e.key === 'Enter') jalan(); });
+}
+
+/**
+ * Samakan daftar di browser ini dengan yang tersimpan di server.
+ *
+ * Aturannya sederhana karena pemakainya satu orang: yang waktu ubahnya lebih
+ * baru menang seluruhnya. Menggabungkan per lelang akan menghidupkan kembali
+ * yang sengaja dihapus, dan itu lebih membingungkan daripada menimpa.
+ */
+async function samakanServer({ pertamaKali = false } = {}) {
+  if (!A.sudahMasuk()) return;
+
+  try {
+    const jauh = await A.ambilDariServer();
+    const waktuJauh = Number(jauh?.updatedAt || 0);
+    const waktuLokal = P.waktuUbah();
+
+    if (pertamaKali && waktuJauh > waktuLokal && Array.isArray(jauh.items)) {
+      P.timpaSemua(jauh.items, waktuJauh);
+      if (jauh.akun && !P.akunku()) P.setAkunku(jauh.akun);
+      gambarMasuk(`Daftar dari server dipakai — ${jauh.items.length} lelang.`);
+      render();
+      return;
+    }
+
+    await A.kirimKeServer(P.semua(), P.akunku());
+    if (pertamaKali) gambarMasuk('Daftar di browser ini dikirim ke server.');
+  } catch (e) {
+    if (e.status === 401) {
+      A.keluar();
+      gambarMasuk('Sesi berakhir. Masuk lagi ya.', 'bad');
+      return;
+    }
+    gambarMasuk('Gagal menyamakan: ' + e.message, 'bad');
+  }
 }
 
 // ---------------------------------------------------------------- kalender
@@ -391,9 +489,12 @@ export function render() {
   // Sinkron dipicu oleh perubahan isi, bukan oleh tombol. Ditunda sebentar
   // supaya beberapa perubahan beruntun jadi satu putaran saja.
   const s = sidik(daftar);
-  if (G.siap() && sidikTerakhir !== null && s !== sidikTerakhir) {
+  if (sidikTerakhir !== null && s !== sidikTerakhir) {
     clearTimeout(tundaSinkron);
-    tundaSinkron = setTimeout(() => sinkronSekarang({ diam: true }), 700);
+    tundaSinkron = setTimeout(() => {
+      if (G.siap()) sinkronSekarang({ diam: true });
+      if (A.sudahMasuk()) samakanServer();
+    }, 700);
   }
   sidikTerakhir = s;
   $('c-pantau').textContent = daftar.filter((x) => x.status === 'aktif').length || '';

@@ -34,13 +34,28 @@ function baca() {
   }
 }
 
-function tulis(daftar) {
+const KUNCI_WAKTU = 'lelanginsta_pantau_waktu';
+
+function tulis(daftar, { stempel = true } = {}) {
   try {
     localStorage.setItem(KUNCI, JSON.stringify(daftar));
+    // Waktu ubah terakhir dipakai memutuskan mana yang lebih baru saat
+    // isi di browser ini bertemu isi yang tersimpan di server.
+    if (stempel) localStorage.setItem(KUNCI_WAKTU, String(Date.now()));
     return true;
   } catch {
     return false;        // mode privat atau kuota penuh
   }
+}
+
+export function waktuUbah() {
+  try { return Number(localStorage.getItem(KUNCI_WAKTU) || 0); } catch { return 0; }
+}
+
+/** Ganti seluruh isi dengan yang datang dari server, tanpa mengubah stempel. */
+export function timpaSemua(items, waktu) {
+  tulis(Array.isArray(items) ? items : [], { stempel: false });
+  try { localStorage.setItem(KUNCI_WAKTU, String(waktu || Date.now())); } catch { /* diabaikan */ }
 }
 
 export function semua() {

@@ -18,7 +18,85 @@
  *   IG_SESSIONID   wajib, beserta IG_DS_USER_ID dan IG_CSRFTOKEN
  */
 import http from 'node:http';
+import fs from 'node:fs';
+import path from 'node:path';
+import crypto from 'node:crypto';
 import { extract } from '../shared/ig-core.js';
+
+// ---------------------------------------------------------------- akun
+
+/**
+ * Satu pemilik, satu kata sandi.
+ *
+ * Bukan sistem pengguna banyak — ini kotak pribadi. Kata sandinya disimpan
+ * sebagai sidik scrypt bergaram, jadi isi berkasnya tidak bisa dipakai masuk
+ * walau terbaca orang. Kata sandi aslinya tidak pernah ditulis ke mana pun.
+ */
+const DATA_DIR = process.env.DATA_DIR || '/home/ubuntu/lelanginstagram/data';
+const F_AKUN = path.join(DATA_DIR, 'akun.json');
+const F_PANTAU = path.join(DATA_DIR, 'pantau.json');
+
+function pastikanDir() {
+  fs.mkdirSync(DATA_DIR, { recursive: true, mode: 0o700 });
+}
+
+function bacaJson(f, bawaan) {
+  try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch { return bawaan; }
+}
+
+function tulisJson(f, data) {
+  pastikanDir();
+  const tmp = f + '.tmp';
+  fs.writeFileSync(tmp, JSON.stringify(data), { mode: 0o600 });
+  fs.renameSync(tmp, f);          // tulis atomik: berkas tidak pernah separuh
+  // Ditegaskan setelah rename: pilihan mode saat menulis tunduk pada umask,
+  // dan hasilnya bisa 644 — cukup untuk pengguna lain membaca sidik sandinya.
+  try { fs.chmodSync(f, 0o600); } catch { /* diabaikan */ }
+}
+
+function sidikSandi(sandi, garam) {
+  return crypto.scryptSync(String(sandi), garam, 32).toString('hex');
+}
+
+function sandiTerpasang() {
+  return !!bacaJson(F_AKUN, null)?.sidik;
+}
+
+function pasangSandi(sandi) {
+  const garam = crypto.randomBytes(16).toString('hex');
+  tulisJson(F_AKUN, { garam, sidik: sidikSandi(sandi, garam), dibuat: Date.now() });
+}
+
+function sandiCocok(sandi) {
+  const a = bacaJson(F_AKUN, null);
+  if (!a?.sidik) return false;
+  const uji = Buffer.from(sidikSandi(sandi, a.garam), 'hex');
+  const asli = Buffer.from(a.sidik, 'hex');
+  return uji.length === asli.length && crypto.timingSafeEqual(uji, asli);
+}
+
+// Token hanya di memori: restart layanan = semua sesi berakhir. Untuk kotak
+// pribadi satu orang itu pertukaran yang wajar, dan menghindari satu berkas
+// rahasia lagi di disk.
+const sesi = new Map();
+const SESI_MS = 30 * 24 * 3600 * 1000;
+
+function buatSesi() {
+  const t = crypto.randomBytes(24).toString('hex');
+  sesi.set(t, Date.now() + SESI_MS);
+  return t;
+}
+
+function sesiSah(t) {
+  const exp = sesi.get(t);
+  if (!exp) return false;
+  if (Date.now() > exp) { sesi.delete(t); return false; }
+  return true;
+}
+
+function tokenDari(req) {
+  return String(req.headers['x-lelang-token'] || '');
+}
 
 const PORT = Number(process.env.PORT || 8791);
 const HOST = process.env.HOST || '127.0.0.1';
@@ -108,18 +186,37 @@ function samaPanjang(a, b) {
   return d === 0;
 }
 
+const HEADER_DIIZINKAN = 'x-ketok-key, x-lelang-token, content-type';
+
 function kirim(res, kode, data, asal) {
   const body = JSON.stringify(data);
   res.writeHead(kode, {
     'content-type': 'application/json; charset=utf-8',
     'cache-control': 'no-store',
     'access-control-allow-origin': asal || 'null',
-    'access-control-allow-headers': 'x-ketok-key',
+    'access-control-allow-headers': HEADER_DIIZINKAN,
     'access-control-max-age': '86400',
     vary: 'Origin',
     'content-length': Buffer.byteLength(body)
   });
   res.end(body);
+}
+
+function bacaBadan(req, batas = 2 * 1024 * 1024) {
+  return new Promise((resolve, reject) => {
+    let n = 0;
+    const bagian = [];
+    req.on('data', (c) => {
+      n += c.length;
+      if (n > batas) { reject(new Error('Isinya terlalu besar.')); req.destroy(); return; }
+      bagian.push(c);
+    });
+    req.on('end', () => {
+      try { resolve(JSON.parse(Buffer.concat(bagian).toString('utf8') || '{}')); }
+      catch { reject(new Error('Isinya bukan JSON yang sah.')); }
+    });
+    req.on('error', reject);
+  });
 }
 
 // ---------------------------------------------------------------- server
@@ -129,11 +226,11 @@ const server = http.createServer(async (req, res) => {
   const asal = ASAL.includes(req.headers.origin) ? req.headers.origin : null;
 
   if (req.method === 'OPTIONS') {
-    // Halaman mengirim x-ketok-key, jadi peramban selalu bertanya lebih dulu.
+    // Halaman mengirim header sendiri, jadi peramban selalu bertanya dulu.
     res.writeHead(204, {
       'access-control-allow-origin': asal || 'null',
-      'access-control-allow-headers': 'x-ketok-key',
-      'access-control-allow-methods': 'GET, OPTIONS',
+      'access-control-allow-headers': HEADER_DIIZINKAN,
+      'access-control-allow-methods': 'GET, PUT, POST, OPTIONS',
       'access-control-max-age': '86400',
       vary: 'Origin'
     });
@@ -142,6 +239,77 @@ const server = http.createServer(async (req, res) => {
 
   if (url.pathname === '/sehat') {
     return kirim(res, 200, { sehat: true, cookie: cookieTerkirim() }, asal);
+  }
+
+  // ------------------------------------------------------------ akun
+
+  if (url.pathname === '/akun/keadaan') {
+    return kirim(res, 200, { terpasang: sandiTerpasang() }, asal);
+  }
+
+  if (url.pathname === '/akun/pasang' && req.method === 'POST') {
+    // Hanya boleh sekali. Kalau sudah ada, ganti sandi menuntut sandi lama.
+    if (sandiTerpasang()) {
+      return kirim(res, 409, { error: 'sudah_ada', message: 'Kata sandi sudah pernah dibuat.' }, asal);
+    }
+    try {
+      const b = await bacaBadan(req);
+      if (!b.sandi || String(b.sandi).length < 8) {
+        return kirim(res, 400, { error: 'terlalu_pendek', message: 'Kata sandi minimal 8 huruf.' }, asal);
+      }
+      pasangSandi(b.sandi);
+      return kirim(res, 200, { token: buatSesi() }, asal);
+    } catch (e) {
+      return kirim(res, 400, { error: 'isi_salah', message: e.message }, asal);
+    }
+  }
+
+  if (url.pathname === '/akun/masuk' && req.method === 'POST') {
+    try {
+      const b = await bacaBadan(req);
+      // Pembatas laju yang sama dipakai supaya sandi tidak bisa ditebak beruntun.
+      if (terbatas('masuk:' + ipKlien(req))) {
+        return kirim(res, 429, { error: 'terlalu_sering', message: 'Terlalu banyak percobaan. Tunggu beberapa menit.' }, asal);
+      }
+      if (!sandiCocok(b.sandi)) {
+        return kirim(res, 401, { error: 'sandi_salah', message: 'Kata sandi salah.' }, asal);
+      }
+      return kirim(res, 200, { token: buatSesi() }, asal);
+    } catch (e) {
+      return kirim(res, 400, { error: 'isi_salah', message: e.message }, asal);
+    }
+  }
+
+  // ------------------------------------------------------------ pantauan
+
+  if (url.pathname === '/pantau') {
+    if (!sesiSah(tokenDari(req))) {
+      return kirim(res, 401, { error: 'belum_masuk', message: 'Perlu masuk dulu.' }, asal);
+    }
+
+    if (req.method === 'GET') {
+      return kirim(res, 200, bacaJson(F_PANTAU, { items: [], updatedAt: 0 }), asal);
+    }
+
+    if (req.method === 'PUT') {
+      try {
+        const b = await bacaBadan(req);
+        if (!Array.isArray(b.items)) {
+          return kirim(res, 400, { error: 'isi_salah', message: 'items harus berupa daftar.' }, asal);
+        }
+        const isi = {
+          items: b.items,
+          akun: b.akun || null,
+          updatedAt: Date.now()
+        };
+        tulisJson(F_PANTAU, isi);
+        return kirim(res, 200, { updatedAt: isi.updatedAt, jumlah: isi.items.length }, asal);
+      } catch (e) {
+        return kirim(res, 400, { error: 'isi_salah', message: e.message }, asal);
+      }
+    }
+
+    return kirim(res, 405, { error: 'metode', message: 'Hanya GET dan PUT.' }, asal);
   }
 
   if (url.pathname !== '/api/comments') {
