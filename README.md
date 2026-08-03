@@ -86,9 +86,14 @@ Setel di Vercel → Settings → Environment Variables:
 | Variabel | Wajib | Isi |
 |---|---|---|
 | `IG_SESSIONID` | ya | Cookie `sessionid` dari akun khusus tadi |
+| `IG_DS_USER_ID` | ya dalam praktiknya | Cookie `ds_user_id` |
+| `IG_CSRFTOKEN` | ya dalam praktiknya | Cookie `csrftoken` |
 | `KETOK_KEY` | tidak | Kalau diisi, endpoint terkunci dan hanya bisa dipakai yang tahu kuncinya. Kalau dikosongkan, terbuka untuk umum |
-| `IG_DS_USER_ID` | tidak | Cookie `ds_user_id` |
-| `IG_CSRFTOKEN` | tidak | Cookie `csrftoken` |
+
+Ketiga cookie diambil dari sesi yang sama. Mengirim `sessionid` sendirian
+membuat Instagram menganggap sesinya cacat lalu mengalihkan permintaan ke
+halaman login berulang-ulang &mdash; yang muncul sebagai
+`redirect count exceeded`, bukan sebagai penolakan yang jelas.
 
 Mengambil `sessionid`: login dengan akun khusus itu → DevTools (`F12`) →
 Application → Cookies → `https://www.instagram.com` → salin nilai `sessionid`

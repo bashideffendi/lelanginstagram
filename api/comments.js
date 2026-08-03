@@ -136,6 +136,7 @@ export default async function handler(req, res) {
       via: 'server',
       includeRaw: req.query.raw !== '0',
       maxPages: MAX_PAGES,
+      manualRedirect: true,
       headers: { ...HEADER_PERAMBAN, cookie }
     });
     return res.status(200).json(dump);
@@ -160,8 +161,11 @@ export default async function handler(req, res) {
     const status = e.status || 500;
     const message =
       status === 401 || status === 403
-        ? 'Sesi Instagram di server sudah kedaluwarsa. Pemilik situs perlu memperbaruinya. ' +
-          'Sementara ini, pasang extension supaya penarikan memakai sesi kamu sendiri.'
+        ? 'Instagram menolak sesi yang dipakai server. Biasanya karena hanya ' +
+          'IG_SESSIONID yang disetel — lengkapi juga IG_DS_USER_ID dan IG_CSRFTOKEN, ' +
+          'lalu deploy ulang. Kalau sudah lengkap dan tetap ditolak, sesinya sudah ' +
+          'kedaluwarsa atau Instagram menolak pemakaian dari IP pusat data. ' +
+          'Extension Lelang Insta tidak terkena masalah ini karena menarik dari browser kamu.'
         : status === 429
           ? 'Instagram sedang membatasi permintaan dari server ini. Coba beberapa menit lagi, ' +
             'atau pasang extension yang menarik dari browser kamu sendiri.'

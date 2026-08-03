@@ -48,7 +48,9 @@ export function shortcodeFromUrl(href) {
  * `extraHeaders` dipakai server untuk mengirim cookie secara eksplisit —
  * di browser cookie ikut sendiri lewat credentials:'include'.
  */
-export function createApi(base, extraHeaders) {
+export function createApi(base, extraHeaders, opts) {
+  var pilihan = opts || {};
+
   return function api(path) {
     var headers = {
       'x-ig-app-id': APP_ID,
@@ -56,10 +58,21 @@ export function createApi(base, extraHeaders) {
     };
     if (extraHeaders) for (var k in extraHeaders) headers[k] = extraHeaders[k];
 
-    return fetch(base + path, {
-      credentials: 'include',
-      headers: headers
-    }).then(function (r) {
+    var init = { credentials: 'include', headers: headers };
+    // Dari server, pengalihan JANGAN diikuti. Sesi yang ditolak membuat
+    // Instagram melempar ke halaman login berulang kali, dan yang muncul
+    // hanyalah "redirect count exceeded" — kegagalan yang tidak memberi tahu
+    // apa pun. Dengan dihentikan, penolakannya terbaca apa adanya.
+    if (pilihan.manualRedirect) init.redirect = 'manual';
+
+    return fetch(base + path, init).then(function (r) {
+      if (r.status >= 300 && r.status < 400) {
+        var alih = new Error(
+          'Instagram mengalihkan permintaan ke halaman login — sesi tidak diterima.'
+        );
+        alih.status = 401;
+        throw alih;
+      }
       if (!r.ok) {
         var err = new Error('HTTP ' + r.status + ' pada ' + path);
         err.status = r.status;
@@ -230,7 +243,7 @@ export function normalize(c, parentPk) {
  * @param opts.onProgress ({stage, count, page, total}) => void
  */
 export function extract(opts) {
-  var api = createApi(opts.base || '', opts.headers);
+  var api = createApi(opts.base || '', opts.headers, { manualRedirect: opts.manualRedirect });
   var errors = [];
   var report = opts.onProgress || function () {};
 
