@@ -80,6 +80,19 @@ function cookieHeader() {
   return parts.join('; ');
 }
 
+/**
+ * Nama cookie yang berhasil disusun — tanpa nilainya sama sekali.
+ * Tanpa ini, kegagalan sesi tidak bisa dibedakan antara "variabelnya belum
+ * disetel" dan "sesinya memang ditolak", dan keduanya butuh tindakan berbeda.
+ */
+function cookieTerkirim() {
+  return [
+    process.env.IG_SESSIONID ? 'sessionid' : null,
+    process.env.IG_DS_USER_ID ? 'ds_user_id' : null,
+    process.env.IG_CSRFTOKEN ? 'csrftoken' : null
+  ].filter(Boolean);
+}
+
 /** Perbandingan panjang-tetap supaya kunci tidak bisa ditebak lewat waktu respons. */
 function safeEqual(a, b) {
   const x = String(a ?? '');
@@ -145,7 +158,10 @@ export default async function handler(req, res) {
     // sebenarnya hanya ada di e.cause. Tanpa dicatat, yang terlihat cuma
     // "fetch failed" yang tidak memberi tahu apa pun.
     const sebab = e.cause ? (e.cause.code || e.cause.message || String(e.cause)) : null;
-    console.error('[lelanginsta] penarikan gagal:', e.message, sebab ? '| sebab: ' + sebab : '');
+    console.error('[lelanginsta] penarikan gagal:', e.message,
+      sebab ? '| sebab: ' + sebab : '',
+      e.tujuan ? '| dialihkan ke: ' + e.tujuan : '',
+      '| cookie: ' + (cookieTerkirim().join(',') || 'tidak ada'));
 
     if (!e.status) {
       return res.status(502).json({
@@ -159,13 +175,23 @@ export default async function handler(req, res) {
     }
 
     const status = e.status || 500;
+    const dikirim = cookieTerkirim();
+    const lengkap = dikirim.length === 3;
+    const tantangan = /challenge|checkpoint/i.test(e.tujuan || '');
+
     const message =
       status === 401 || status === 403
-        ? 'Instagram menolak sesi yang dipakai server. Biasanya karena hanya ' +
-          'IG_SESSIONID yang disetel — lengkapi juga IG_DS_USER_ID dan IG_CSRFTOKEN, ' +
-          'lalu deploy ulang. Kalau sudah lengkap dan tetap ditolak, sesinya sudah ' +
-          'kedaluwarsa atau Instagram menolak pemakaian dari IP pusat data. ' +
-          'Extension Lelang Insta tidak terkena masalah ini karena menarik dari browser kamu.'
+        ? 'Instagram menolak sesi server. ' +
+          `Cookie yang terkirim: ${dikirim.join(', ') || 'tidak ada'}. ` +
+          (tantangan
+            ? 'Instagram meminta verifikasi pada akun itu — buka Instagram dengan akun ' +
+              'tersebut, selesaikan verifikasinya, lalu ambil ulang cookie-nya.'
+            : !lengkap
+              ? 'Belum lengkap: sesi hanya diterima kalau sessionid, ds_user_id, dan ' +
+                'csrftoken dikirim bersama. Setel yang kurang di Vercel, lalu deploy ulang.'
+              : 'Ketiganya sudah lengkap, jadi sesinya sudah kedaluwarsa atau ditolak ' +
+                'karena dipakai dari IP pusat data. Ambil ulang cookie-nya, atau pakai ' +
+                'extension Lelang Insta yang menarik dari browser kamu sendiri.')
         : status === 429
           ? 'Instagram sedang membatasi permintaan dari server ini. Coba beberapa menit lagi, ' +
             'atau pasang extension yang menarik dari browser kamu sendiri.'

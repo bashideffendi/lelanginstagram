@@ -67,10 +67,16 @@ export function createApi(base, extraHeaders, opts) {
 
     return fetch(base + path, init).then(function (r) {
       if (r.status >= 300 && r.status < 400) {
+        // Tujuan pengalihan membedakan sesi yang ditolak (/accounts/login/)
+        // dari akun yang sedang diminta verifikasi (/challenge/).
+        var tujuan = '';
+        try { tujuan = r.headers.get('location') || ''; } catch (e) { /* diabaikan */ }
+
         var alih = new Error(
           'Instagram mengalihkan permintaan ke halaman login — sesi tidak diterima.'
         );
         alih.status = 401;
+        alih.tujuan = tujuan;
         throw alih;
       }
       if (!r.ok) {
