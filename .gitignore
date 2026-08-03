@@ -1,3 +1,8 @@
+# Sesi Instagram untuk server VPS — jangan pernah ke-commit
+server/lelanginsta.env
+server/*.env
+!server/*.env.contoh
+
 # Artefak debug dari build.mjs
 bookmarklet/dist/_gagal.js
 bookmarklet/dist/_decoded.js

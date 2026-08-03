@@ -6,6 +6,8 @@
  * penarikan dan mengirim hasilnya balik ke sini lewat window.postMessage.
  */
 
+import { apiBase } from '../config.js';
+
 const pending = new Map();
 let seq = 0;
 
@@ -78,7 +80,8 @@ export function saveKey(k) {
 }
 
 async function callServer(path, key) {
-  const r = await fetch(path, { headers: key ? { 'x-ketok-key': key } : {} });
+  // Kosong = fungsi di alamat yang sama; terisi = server sendiri, misalnya VPS.
+  const r = await fetch(apiBase() + path, { headers: key ? { 'x-ketok-key': key } : {} });
   let body = {};
   try { body = await r.json(); } catch { /* bukan JSON */ }
   return { ok: r.ok, status: r.status, body };

@@ -1,0 +1,32 @@
+[Unit]
+Description=Lelang Insta - penarik komentar Instagram
+Documentation=https://github.com/bashideffendi/lelanginstagram
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/lelanginstagram
+
+# Cookie Instagram dan kunci disimpan di berkas terpisah ber-izin 600,
+# bukan di berkas unit ini — unit systemd terbaca semua pengguna.
+EnvironmentFile=/home/ubuntu/lelanginstagram/server/lelanginsta.env
+
+ExecStart=/usr/bin/node server/api-server.mjs
+Restart=always
+RestartSec=5
+
+# Layanan ini hanya perlu membaca berkasnya sendiri dan menghubungi jaringan.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/ubuntu/lelanginstagram
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=lelanginsta
+
+[Install]
+WantedBy=multi-user.target
