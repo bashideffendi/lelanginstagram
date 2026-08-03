@@ -602,29 +602,62 @@ tbody tr.r-snipe td { background: var(--warn-soft); }
 .pcard-item.mendesak { border-left-color: var(--amber); background: var(--warn-soft); }
 .pcard-item.lewat { border-left-color: var(--line-2); opacity: .72; }
 
-.pcard-item header { display: flex; align-items: flex-start; gap: 14px; }
+.pcard-item header { display: flex; align-items: flex-start; gap: 16px; }
 .pjudul { min-width: 0; flex: 1 1 auto; }
 .pjudul h3 {
   font-size: 16px; font-weight: 700; letter-spacing: -.01em;
-  overflow-wrap: anywhere; margin-bottom: 2px;
+  overflow-wrap: anywhere; margin-bottom: 2px; line-height: 1.3;
 }
 .pjudul p { font-size: 12.5px; }
+.pkanan { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
 .psisa {
   font-family: var(--mono); font-size: 13px; font-weight: 600;
-  color: var(--ink-soft); white-space: nowrap; flex: none;
+  color: var(--ink-soft); white-space: nowrap;
 }
 .psisa.mendesak { color: var(--amber); }
 .psisa.lewat { color: var(--muted); font-weight: 400; }
 
+/*
+ * Tiap keterangan satu baris utuh dengan label selebar tetap. Sebelumnya
+ * kolomnya melar mengikuti isi, sehingga nilai panjang terputus ke baris
+ * berikutnya dan barisnya jadi bertingkat tak beraturan.
+ */
 .pinfo {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
-  gap: 2px 20px; margin: 12px 0 14px; font-size: 13.5px;
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 5px 28px; margin: 14px 0 16px; font-size: 13.5px;
 }
-.pinfo .pl {
-  display: inline-block; width: 86px;
+.pit { display: grid; grid-template-columns: 92px 1fr; gap: 10px; align-items: baseline; }
+.pit .pl {
+  font-family: var(--mono); font-size: 9.5px; font-weight: 500;
+  letter-spacing: .1em; text-transform: uppercase; color: var(--muted);
+  padding-top: 2px;
+}
+.pit .pv { min-width: 0; overflow-wrap: anywhere; }
+
+/* ---- sunting keterangan ---- */
+.pcard-item.sunting { border-left-color: var(--primary); background: var(--surface-2); }
+.pform {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 12px 20px; margin: 16px 0 12px;
+}
+.pform label { display: grid; gap: 5px; }
+.pform label > span {
   font-family: var(--mono); font-size: 9.5px; font-weight: 500;
   letter-spacing: .1em; text-transform: uppercase; color: var(--muted);
 }
+.pform input, .pform select { width: 100%; font-size: 14px; }
+.pform input.mn { font-family: var(--mono); }
+.pform-note { font-size: 12.5px; color: var(--muted); margin-bottom: 12px; min-height: 16px; }
+.pform-note.bad { color: var(--danger); }
+
+.fine-1 { margin-top: 26px; border-top: 1px solid var(--line); }
+.fine-1 summary {
+  cursor: pointer; padding: 14px 0; font-size: 13.5px; font-weight: 600;
+  color: var(--ink-soft); list-style: none;
+}
+.fine-1 summary::-webkit-details-marker { display: none; }
+.fine-1 summary::before { content: "+"; color: var(--primary); font-weight: 700; margin-right: 9px; }
+.fine-1[open] summary::before { content: "–"; }
 
 .paksi { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
 .psel { font-size: 12.5px; padding: 6px 8px; }

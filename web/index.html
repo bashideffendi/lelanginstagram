@@ -283,7 +283,7 @@
           <label class="pakun-l" for="pakun">Akun Instagram-mu</label>
           <input type="text" id="pakun" placeholder="tanpa @" autocomplete="off">
           <span class="fill"></span>
-          <button id="pics" class="btn sm">Kirim semua ke kalender</button>
+          <button id="pics" class="btn sm">Unduh untuk kalender</button>
           <button id="pekspor" class="btn sm quiet">Ekspor</button>
           <button id="pimpor" class="btn sm quiet">Impor</button>
           <input type="file" id="pimporfile" accept=".json,application/json" class="hidden">
@@ -291,6 +291,28 @@
 
         <div id="plist"></div>
         <section id="priwayat"></section>
+
+        <details class="fine-1">
+          <summary>Bagaimana pengingat kalendernya bekerja</summary>
+          <div class="fine-body">
+            <p>
+              Tombol di atas <b>mengunduh satu berkas</b> berisi jadwal lelangmu, bukan
+              menyambung langsung ke akun Google-mu. Buka berkas itu di ponsel, lalu
+              aplikasi kalender bawaanmu &mdash; Google Calendar di Android, Calendar di
+              iPhone &mdash; menawarkan memasukkannya.
+            </p>
+            <p>
+              Setelah masuk, tiap lelang jadi acara dengan <b>dua alarm: 30 menit dan
+              5 menit sebelum tutup</b>. Notifikasinya keluar dari kalender ponselmu,
+              jadi tetap berbunyi walau browser tertutup dan situs ini tidak dibuka.
+            </p>
+            <p>
+              <b>Yang perlu diingat:</b> ini pemasangan sekali jalan, bukan sinkronisasi.
+              Kalau nanti kamu mengubah jam tutup di sini, acara yang sudah masuk kalender
+              tidak ikut berubah &mdash; unduh lagi dan pasang ulang.
+            </p>
+          </div>
+        </details>
 
         <p class="foot-note">
           Daftar ini tersimpan di browser ini saja &mdash; tidak ada server yang
