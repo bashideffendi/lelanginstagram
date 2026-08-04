@@ -441,6 +441,14 @@ function showError(msg) {
  * di alamat sekaligus membuat tombol maju-mundur peramban bekerja seperti
  * yang orang harapkan, dan halaman pantauan bisa ditandai (bookmark).
  */
+const VIEW_SAH = new Set(['cek', 'pantau']);
+
+/** Halaman yang diminta alamat. Nama asing diabaikan — alamat bisa dari mana saja. */
+function dariAlamat() {
+  const n = location.hash.replace(/^#/, '');
+  return VIEW_SAH.has(n) ? n : 'cek';
+}
+
 function pilihView(nama, { tulisAlamat = true } = {}) {
   state.view = nama;
   if (tulisAlamat) {
@@ -1227,16 +1235,7 @@ function wire() {
     b.onclick = () => pilihView(b.dataset.view);
   });
 
-  // Halaman dipulihkan dari alamat, jadi memuat ulang tidak melempar balik ke
-  // Cek pemenang. Nama yang tidak dikenal diabaikan, bukan menampilkan layar
-  // kosong — alamat bisa datang dari mana saja.
-  const VIEW_SAH = new Set(['cek', 'pantau']);
-  const dariAlamat = () => {
-    const n = location.hash.replace(/^#/, '');
-    return VIEW_SAH.has(n) ? n : 'cek';
-  };
   window.addEventListener('hashchange', () => pilihView(dariAlamat(), { tulisAlamat: false }));
-  pilihView(dariAlamat(), { tulisAlamat: false });
 
   document.addEventListener('click', (e) => {
     const more = e.target.closest('.more');
@@ -1376,3 +1375,15 @@ wireHandoff();
 initTake();
 initPantauan();
 tzNote();
+
+/*
+ * Pemulihan halaman dari alamat dilakukan PALING AKHIR.
+ *
+ * pilihView('pantau') memanggil PantauUI.render(), dan render butuh mesin yang
+ * baru dititipkan oleh initPantauan(). Sebelumnya baris ini ada di tengah
+ * penyiapan: memuat ulang di #pantau membuat render dipanggil sebelum
+ * mesinnya ada, penyiapannya berhenti di situ, dan sisanya — termasuk
+ * initPantauan itu sendiri — tidak pernah jalan. Hasilnya halaman putih,
+ * persis di satu-satunya keadaan yang perbaikan alamat ini mau tolong.
+ */
+pilihView(dariAlamat(), { tulisAlamat: false });
