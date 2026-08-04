@@ -837,6 +837,25 @@ tbody tr.r-snipe td { background: var(--warn-soft); }
 }
 .pform input, .pform select { width: 100%; font-size: 14px; }
 .pform input.mn { font-family: var(--mono); }
+.pform label > small { font-size: 11.5px; color: var(--faint); line-height: 1.4; }
+/* Ikon kalender bawaan peramban jadi jelas bisa diklik. */
+.pform input[type="date"] { cursor: pointer; }
+.pform input[type="date"]::-webkit-calendar-picker-indicator { cursor: pointer; opacity: .65; }
+.pform input[type="date"]:hover::-webkit-calendar-picker-indicator { opacity: 1; }
+
+/* Setelan dilipat: dipakai sekali seumur pemakaian, tidak perlu baris tetap. */
+.pset { margin: 18px 0 4px; border: 1px solid var(--line); border-radius: var(--r); }
+.pset summary {
+  cursor: pointer; padding: 11px 16px; font-size: 13.5px; font-weight: 600;
+  color: var(--ink-soft); list-style: none;
+}
+.pset summary::-webkit-details-marker { display: none; }
+.pset summary::before { content: "+"; color: var(--primary); font-weight: 700; margin-right: 9px; }
+.pset[open] summary::before { content: "–"; }
+.pset[open] summary { border-bottom: 1px solid var(--line); }
+.pset .pbar { padding: 14px 16px; margin-bottom: 0; border-bottom: 0; }
+.pset .pgcal-akun, .pset .pgcal-note { padding: 0 16px; margin-top: 0; }
+.pset[open] .pgcal-akun:not(:empty) { margin-bottom: 10px; }
 .pform-note { font-size: 12.5px; color: var(--muted); margin-bottom: 12px; min-height: 16px; }
 .pform-note.bad { color: var(--danger); }
 /* Dari mana isian ini datang — tebakan caption, atau ketikanmu sendiri. */

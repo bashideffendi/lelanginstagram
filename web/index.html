@@ -262,74 +262,77 @@
 
       <!-- ================================================== pantauan -->
       <section id="pantau" class="hidden">
-        <div class="ptop">
-          <p class="label">Jangan sampai kelewatan</p>
-          <h2>Pantauan lelang</h2>
-          <p class="lead">
-            Tempel link lelang yang kamu incar. Jam tutupnya dibaca sendiri dari
-            caption postingan, lalu bisa dikirim ke kalender ponselmu lengkap dengan
-            alarm &mdash; sehingga tetap berbunyi walau browser tertutup.
-          </p>
-        </div>
-
-        <div class="take padd">
-          <input type="url" id="paddlink" spellcheck="false"
-                 placeholder="Tempel link lelang yang mau dipantau">
-          <button id="paddgo" class="btn solid">Tambah</button>
-        </div>
-        <p class="take-stat" id="paddstat"></p>
-
-        <div id="psesi"></div>
-
+        <!-- Gerbang: isi halaman ini hanya muncul setelah masuk. -->
         <div class="pmasuk" id="pmasuk"></div>
 
-        <div class="pbar">
-          <label class="pakun-l" for="pakun">Akun Instagram-mu</label>
-          <input type="text" id="pakun" placeholder="tanpa @" autocomplete="off">
-          <span class="fill"></span>
-          <button id="pgcal" class="btn sm solid">Hubungkan Google Calendar</button>
-          <button id="pics" class="btn sm quiet">Unduh berkas</button>
-          <button id="pekspor" class="btn sm quiet">Ekspor</button>
-          <button id="pimpor" class="btn sm quiet">Impor</button>
-          <input type="file" id="pimporfile" accept=".json,application/json" class="hidden">
-        </div>
-        <p class="pgcal-akun" id="pgcalakun"></p>
-        <p class="pgcal-note" id="pgcalnote"></p>
+        <div id="pisi" class="hidden">
+          <div class="take padd">
+            <input type="url" id="paddlink" spellcheck="false"
+                   placeholder="Tempel link lelang yang mau dipantau">
+            <button id="paddgo" class="btn solid">Tambah</button>
+          </div>
+          <p class="take-stat" id="paddstat"></p>
+
+          <div id="psesi"></div>
+
+          <!--
+            Setelan dilipat. Enam kendali yang dipakai sekali seumur pemakaian
+            tidak pantas menempati baris tetap di atas daftar lelang — yang
+            justru dibaca tiap hari.
+          -->
+          <details class="pset" id="pset">
+            <summary>Setelan &amp; kalender</summary>
+            <div class="pbar">
+              <label class="pakun-l" for="pakun">Akun Instagram-mu</label>
+              <input type="text" id="pakun" placeholder="tanpa @" autocomplete="off">
+              <span class="fill"></span>
+              <button id="pgcal" class="btn sm solid">Hubungkan Google Calendar</button>
+              <button id="pics" class="btn sm quiet">Unduh berkas</button>
+              <button id="pekspor" class="btn sm quiet">Ekspor</button>
+              <button id="pimpor" class="btn sm quiet">Impor</button>
+              <input type="file" id="pimporfile" accept=".json,application/json" class="hidden">
+            </div>
+            <p class="pgcal-akun" id="pgcalakun"></p>
+            <p class="pgcal-note" id="pgcalnote"></p>
+          </details>
 
         <div class="ptab" id="ptab">
           <button data-ptab="jalan" class="on">Berjalan <span class="pip" id="c-jalan"></span></button>
           <button data-ptab="selesai">Riwayat <span class="pip" id="c-selesai"></span></button>
         </div>
 
-        <div id="plist"></div>
-        <section id="priwayat" class="hidden"></section>
+          <div id="plist"></div>
+          <section id="priwayat" class="hidden"></section>
 
-        <details class="fine-1">
-          <summary>Bagaimana pengingat kalendernya bekerja</summary>
-          <div class="fine-body">
-            <p>
-              Tombol di atas <b>mengunduh satu berkas</b> berisi jadwal lelangmu, bukan
-              menyambung langsung ke akun Google-mu. Buka berkas itu di ponsel, lalu
-              aplikasi kalender bawaanmu &mdash; Google Calendar di Android, Calendar di
-              iPhone &mdash; menawarkan memasukkannya.
-            </p>
-            <p>
-              Setelah masuk, tiap lelang jadi acara dengan <b>dua alarm: 30 menit dan
-              5 menit sebelum tutup</b>. Notifikasinya keluar dari kalender ponselmu,
-              jadi tetap berbunyi walau browser tertutup dan situs ini tidak dibuka.
-            </p>
-            <p>
-              <b>Yang perlu diingat:</b> ini pemasangan sekali jalan, bukan sinkronisasi.
-              Kalau nanti kamu mengubah jam tutup di sini, acara yang sudah masuk kalender
-              tidak ikut berubah &mdash; unduh lagi dan pasang ulang.
-            </p>
-          </div>
-        </details>
+          <details class="fine-1">
+            <summary>Bagaimana pengingatnya bekerja</summary>
+            <div class="fine-body">
+              <p>
+                <b>Hubungkan Google Calendar</b> menyambung langsung ke kalendermu:
+                tiap perubahan di sini ikut sendiri, tanpa perlu menekan apa pun lagi.
+                Tombol <b>Unduh berkas</b> adalah cara lain yang tidak lewat akun Google
+                &mdash; tapi hasilnya salinan sekali jadi, jadi perubahan jam tutup
+                tidak ikut dan harus dipasang ulang.
+              </p>
+              <p>
+                Tiap lelang dapat alarm <b>5 dan 3 menit sebelum tutup</b>. Kalau
+                lelangnya memakai sniper zone, ada satu alarm lagi <b>3 menit sebelum
+                zona itu dibuka</b> &mdash; di situlah tenggat yang sebenarnya, karena
+                yang belum pernah menawar sebelum zona dimulai tidak boleh ikut lagi.
+              </p>
+              <p>
+                Notifikasinya keluar dari kalender ponselmu, jadi tetap berbunyi walau
+                browser tertutup dan situs ini tidak dibuka.
+              </p>
+            </div>
+          </details>
 
-        <p class="foot-note">
-          Daftar ini tersimpan di browser ini saja &mdash; tidak ada server yang
-          menyimpannya. Pakai <b>Ekspor</b> untuk memindahkannya ke perangkat lain.
-        </p>
+          <p class="foot-note">
+            Daftar ini tersimpan di browser ini <b>dan</b> di servermu sendiri, jadi
+            laptop dan ponsel melihat isi yang sama. <b>Ekspor</b> membuat salinannya
+            sebagai berkas.
+          </p>
+        </div>
       </section>
 
 </div>

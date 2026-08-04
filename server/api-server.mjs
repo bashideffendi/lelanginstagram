@@ -204,18 +204,44 @@ const HEADER_IG = {
 
 const hits = new Map();
 
-function terbatas(ip) {
+/**
+ * @param ember pemisah hitungan. Penarikan dan percobaan masuk punya jatah
+ *              sendiri-sendiri; menyatukannya berarti penarikan yang wajar
+ *              bisa menghabiskan jatah yang seharusnya menjaga kata sandi.
+ */
+function terbatas(ip, ember = 'tarik', batas = RATE_MAX) {
   const now = Date.now();
-  const list = (hits.get(ip) || []).filter((t) => now - t < RATE_WINDOW_MS);
+  const kunci = ember + '|' + ip;
+  const list = (hits.get(kunci) || []).filter((t) => now - t < RATE_WINDOW_MS);
   list.push(now);
-  hits.set(ip, list);
-  if (hits.size > 5000) hits.clear();
-  return list.length > RATE_MAX;
+  hits.set(kunci, list);
+
+  // Dulu seluruh peta dikosongkan saat penuh, dan itu justru menghapus
+  // hitungan semua orang sekaligus — cukup membanjiri dari banyak alamat
+  // untuk menyetel ulang batas siapa pun. Sekarang yang dibuang hanya yang
+  // sudah kedaluwarsa.
+  if (hits.size > 5000) {
+    for (const [k, v] of hits) {
+      if (!v.length || now - v[v.length - 1] >= RATE_WINDOW_MS) hits.delete(k);
+    }
+  }
+  return list.length > batas;
 }
 
+/**
+ * Alamat pemanggil, diambil dari ujung KANAN X-Forwarded-For.
+ *
+ * Apache menambahkan alamat asli di belakang isi yang sudah ada, jadi nilai
+ * paling kiri justru yang dikirim pemanggil sendiri — bisa dikarang. Memakai
+ * yang paling kiri berarti pembatas lajunya bisa dilewati cukup dengan
+ * mengirim header palsu, dan itu membuatnya tidak membatasi apa pun.
+ *
+ * Di belakang tepat satu proxy, yang paling kanan selalu yang ditambahkan
+ * proxy itu sendiri, dan itulah satu-satunya yang tidak bisa dikarang.
+ */
 function ipKlien(req) {
-  const fwd = req.headers['x-forwarded-for'];
-  return String(fwd || '').split(',')[0].trim() || req.socket.remoteAddress || 'tanpa-ip';
+  const fwd = String(req.headers['x-forwarded-for'] || '').split(',');
+  return fwd[fwd.length - 1].trim() || req.socket.remoteAddress || 'tanpa-ip';
 }
 
 function cookieHeader() {
@@ -409,8 +435,10 @@ const server = http.createServer(async (req, res) => {
   if (url.pathname === '/akun/masuk' && req.method === 'POST') {
     try {
       const b = await bacaBadan(req);
-      // Pembatas laju yang sama dipakai supaya sandi tidak bisa ditebak beruntun.
-      if (terbatas('masuk:' + ipKlien(req))) {
+      // Jatah tersendiri dan jauh lebih sempit daripada penarikan: menebak
+      // sandi butuh ribuan percobaan, jadi sepuluh per sepuluh menit sudah
+      // menutup jalan itu tanpa pernah mengganggu pemakaian yang wajar.
+      if (terbatas(ipKlien(req), 'masuk', 10)) {
         return kirim(res, 429, { error: 'terlalu_sering', message: 'Terlalu banyak percobaan. Tunggu beberapa menit.' }, asal);
       }
       if (!sandiCocok(b.sandi)) {

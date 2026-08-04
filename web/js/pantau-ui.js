@@ -12,7 +12,7 @@ import * as A from './akun.js';
 import { analyze, parseBid, fmtRupiah, tebakOpenBid } from './analysis.js';
 import { keadaanSesiServer, segarkanSesiViaExtension } from './ext.js';
 import {
-  fmtDateTime, fmtTime, fmtDate, fmtHari, fmtDuration, wallTimeToEpoch,
+  fmtDateTime, fmtTime, fmtDate, fmtHari, fmtIsoDate, fmtDuration, wallTimeToEpoch,
   parseClock, fmtClock, applyMask
 } from './time.js';
 
@@ -79,8 +79,13 @@ function keEpoch(tgl, jam, tz) {
 
   const isiTgl = String(tgl).trim();
   if (isiTgl) {
+    // Bentuk kalender bawaan peramban lebih dulu; bentuk ketikan lama tetap
+    // diterima supaya catatan yang sudah ada tidak mendadak ditolak.
+    const iso = isiTgl.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (iso) return { epoch: wallTimeToEpoch(+iso[1], +iso[2], +iso[3], j.h, j.mi, j.sec, tz) };
+
     const t = isiTgl.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
-    if (!t) return { galat: 'Tanggal harus berbentuk 03/08/2026, atau dikosongkan saja.' };
+    if (!t) return { galat: 'Tanggalnya belum terbaca. Pilih dari kalender, atau kosongkan saja.' };
     return { epoch: wallTimeToEpoch(+t[3], +t[2], +t[1], j.h, j.mi, j.sec, tz) };
   }
 
@@ -149,6 +154,10 @@ export function initPantau(d) {
     if (c) e.target.value = fmtClock(c.h, c.mi, c.sec);
   });
 
+  // Isi halaman menyusul tanda masuk. Tanpa ini, daftar lelang beserta seluruh
+  // kendalinya terpampang lebih dulu lalu baru ditanya siapa kamu.
+  gerbang();
+
   $('ptab').addEventListener('click', (e) => {
     const t = e.target.closest('[data-ptab]');
     if (!t) return;
@@ -176,6 +185,19 @@ export function initPantau(d) {
       .then(() => { tandaiGoogle(); sinkronSekarang({ diam: true }); })
       .catch(() => { /* belum diizinkan; tombolnya menunggu */ });
   }
+}
+
+/**
+ * Buka atau kunci isi halaman pantauan.
+ *
+ * Dipanggil tiap kali keadaan masuk berubah. Dulu seluruh isinya terpampang
+ * tanpa syarat dan login hanya menentukan ikut-tidaknya ke perangkat lain;
+ * sekarang daftar lelang, jam tutup, dan tawaranmu tidak terlihat sebelum
+ * kamu masuk.
+ */
+function gerbang() {
+  const isi = $('pisi');
+  if (isi) isi.classList.toggle('hidden', !A.sudahMasuk());
 }
 
 function stat(teks, kelas = '') {
@@ -316,6 +338,9 @@ let keadaanAkun = { ada: false, terpasang: false };
 
 function gambarMasuk(pesan = '', kelas = '') {
   const kotak = $('pmasuk');
+  // Satu tempat saja yang menyalakan-memadamkan isi halaman, dan tempatnya di
+  // sini — tiap perubahan keadaan masuk pasti lewat sini.
+  gerbang();
 
   if (!keadaanAkun.ada) {
     kotak.innerHTML = '';
@@ -751,7 +776,7 @@ async function tanganiAksi(e) {
       })());
       if (tutup) {
         set('jam', fmtTime(tutup.epoch, deps.tz()));
-        set('tgl', fmtDate(tutup.epoch, deps.tz()));
+        set('tgl', fmtIsoDate(tutup.epoch, deps.tz()));
       }
       const n = kartu2.querySelector('#pformnote');
       if (n) {
@@ -1093,7 +1118,7 @@ function kartu(it, tz) {
  */
 function formUbah(it, tz) {
   const jam = it.closeAt != null ? fmtTime(it.closeAt, tz) : '';
-  const tgl = it.closeAt != null ? fmtDate(it.closeAt, tz) : '';
+  const tgl = it.closeAt != null ? fmtIsoDate(it.closeAt, tz) : '';
   const rp = (v) => (v != null ? 'Rp' + fmtRupiah(v) : '');
 
   const sniper = [0, 3, 5, 10, 15, 30, 60].map((m) =>
@@ -1122,10 +1147,12 @@ function formUbah(it, tz) {
         <input data-f="title" value="${esc(it.title || '')}" placeholder="nama barang"></label>
 
       <label><span>Jam tutup</span>
-        <input data-f="jam" value="${esc(jam)}" placeholder="ketik 2030" class="mn"></label>
+        <input data-f="jam" value="${esc(jam)}" placeholder="ketik 2030" class="mn">
+        <small>Titik dua muncul sendiri. Sampai detik.</small></label>
 
       <label><span>Tanggal tutup</span>
-        <input data-f="tgl" value="${esc(tgl)}" placeholder="kosong = otomatis" class="mn"></label>
+        <input type="date" data-f="tgl" value="${esc(tgl)}" class="mn">
+        <small>Kosongkan kalau lelangnya tutup dalam 24 jam ke depan.</small></label>
 
       <label><span>Harga pembukaan</span>
         <input data-f="openBid" value="${esc(rp(it.openBid))}" placeholder="750rb atau 750000"></label>

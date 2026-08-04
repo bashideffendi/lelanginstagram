@@ -163,6 +163,19 @@ export function fmtHari(epochSec, tz) {
   return HARI[w] || w;
 }
 
+/**
+ * "2026-08-04" dalam zona waktu terpilih — bentuk yang dimengerti
+ * `<input type="date">`, satu-satunya bentuk yang diterimanya.
+ */
+export function fmtIsoDate(epochSec, tz) {
+  const p = Object.fromEntries(
+    dtf(tz, { year: 'numeric', month: '2-digit', day: '2-digit' })
+      .formatToParts(new Date(epochSec * 1000))
+      .map((x) => [x.type, x.value])
+  );
+  return `${p.year}-${p.month}-${p.day}`;
+}
+
 export function fmtIsoUtc(epochSec) {
   return new Date(epochSec * 1000).toISOString().replace('.000Z', 'Z');
 }
