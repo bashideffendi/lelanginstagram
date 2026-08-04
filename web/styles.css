@@ -596,6 +596,12 @@ tbody tr.r-snipe td { background: var(--warn-soft); }
  */
 .pgcal-note { font-size: 12.5px; color: var(--muted); margin: 12px 0 4px; }
 .pgcal-note:empty { display: none; }
+.pgcal-akun {
+  font-family: var(--mono); font-size: 12px; color: var(--primary-700);
+  margin: 12px 0 0;
+}
+.pgcal-akun:empty { display: none; }
+.pgcal-akun + .pgcal-note { margin-top: 4px; }
 .pgcal-note.bad { color: var(--danger); }
 
 .pmasuk:not(:empty) {
@@ -739,11 +745,26 @@ tbody tr.r-snipe td { background: var(--warn-soft); }
  * kartunya harus dibaca kata per kata, bukan disapu sekilas.
  */
 .pk-angka {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
-  gap: 14px 20px; margin: 16px 0 12px;
-  padding: 14px 16px; border-radius: var(--r-sm);
+  margin: 16px 0 14px; border-radius: var(--r-sm);
   background: var(--surface); border: 1px solid var(--c-line);
 }
+.pk-baris {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
+  gap: 14px 20px; padding: 14px 16px;
+}
+/* Aturan lelang: sama berlabelnya, tapi lebih kecil — ini keterangan yang
+   menentukan cara ikut, bukan angka yang berubah tiap menit. */
+.pk-rinci {
+  border-top: 1px solid var(--line);
+  grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
+  gap: 12px 20px; padding: 11px 16px;
+  background: var(--surface-2); border-radius: 0 0 var(--r-sm) var(--r-sm);
+}
+.pk-r b {
+  display: block; font-family: var(--mono); font-size: 14px; font-weight: 600;
+  font-variant-numeric: tabular-nums; color: var(--ink); overflow-wrap: anywhere;
+}
+.pk-r b.kosong { color: var(--line-2); font-weight: 400; }
 .pk-a { min-width: 0; line-height: 1.25; }
 .pk-l {
   display: block; font-family: var(--mono); font-size: 9.5px; font-weight: 500;
@@ -852,9 +873,11 @@ tbody tr.r-snipe td { background: var(--warn-soft); }
   .pk-barang { font-size: 12.5px; }
   /* Dua kolom, bukan satu: empat angka bertumpuk membuat kartunya sepanjang
      layar dan harus digulir untuk dibaca utuh. */
-  .pk-angka { grid-template-columns: 1fr 1fr; gap: 12px 14px; padding: 12px 13px; }
+  .pk-baris { grid-template-columns: 1fr 1fr; gap: 12px 14px; padding: 12px 13px; }
+  .pk-rinci { padding: 10px 13px; }
   .pk-a b { font-size: 18px; }
   .pk-a b.redup { font-size: 15px; }
+  .pk-r b { font-size: 13.5px; }
   .paksi .btn, .paksi .psel, .paksi .pharga { flex: 1 1 calc(50% - 4px); }
   .pbar { gap: 8px; }
   #pakun { flex: 1 1 auto; width: auto; }

@@ -106,6 +106,7 @@ export function putuskan() {
   }
   token = null;
   tokenSampai = 0;
+  akunTersambung._nilai = null;
 }
 
 async function panggil(jalur, opsi = {}) {
@@ -129,6 +130,30 @@ async function panggil(jalur, opsi = {}) {
     throw e;
   }
   return j;
+}
+
+/**
+ * Alamat akun Google yang sedang tersambung.
+ *
+ * Tanpa ini, satu-satunya cara mengetahui acaranya dititipkan ke akun yang
+ * mana adalah membuka acaranya dan melihat apakah Google menolak — jawaban
+ * yang baru datang setelah kejadian, di perangkat yang salah, dalam bentuk
+ * "a supported calendar is not available in this account".
+ *
+ * Diambil dari daftar acara, bukan dari data akun: cakupan izin yang diminta
+ * cuma acara kalender, dan alamatnya kebetulan memang nama kalender utama.
+ * Jadi tidak perlu meminta izin tambahan hanya untuk menampilkan ini.
+ */
+export async function akunTersambung() {
+  if (akunTersambung._nilai) return akunTersambung._nilai;
+  try {
+    const j = await panggil('/calendars/primary/events?maxResults=1&fields=summary');
+    const nama = j?.summary || '';
+    if (nama.includes('@')) akunTersambung._nilai = nama;
+    return akunTersambung._nilai || null;
+  } catch {
+    return null;                 // bukan kegagalan yang perlu mengganggu
+  }
 }
 
 /** Susunan acara kalender dari satu catatan pantauan. */

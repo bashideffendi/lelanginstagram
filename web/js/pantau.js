@@ -136,6 +136,31 @@ export function bersihkanJudulTebakan() {
   return dibuang;
 }
 
+/**
+ * Betulkan harga pembukaan dan kelipatan yang terlanjur tersimpan telanjang.
+ *
+ * Aturan "50 berarti Rp50.000" diperbaiki di penebaknya, tapi penebak hanya
+ * berjalan saat penarikan berikutnya. Lelang yang sudah dipantau tetap
+ * memajang "buka Rp100" sampai kebetulan diperiksa lagi — dan justru kartu
+ * itulah yang dilihat tiap hari. Nilai yang kamu isi sendiri tidak disentuh.
+ */
+export function perbaikiAngkaTelanjang() {
+  const daftar = baca();
+  let diperbaiki = 0;
+
+  for (const it of daftar) {
+    const manual = it.manual || [];
+    for (const f of ['openBid', 'increment']) {
+      if (manual.includes(f)) continue;
+      const v = it[f];
+      if (typeof v === 'number' && v > 0 && v < 1000) { it[f] = v * 1000; diperbaiki++; }
+    }
+  }
+
+  if (diperbaiki) tulis(daftar);
+  return diperbaiki;
+}
+
 export function tebakKelipatan(caption, parseBid) {
   if (!caption) return null;
   const nilai = '((?:rp\\.?\\s*)?[\\d.,]+\\s*(?:jt|juta|rb|ribu|k)?)';

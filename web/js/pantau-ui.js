@@ -159,6 +159,7 @@ export function initPantau(d) {
   // Nama barang tidak lagi ditebak; yang terlanjur tersimpan ikut dibuang,
   // supaya tidak ada kartu yang masih memajang tebakan lama.
   P.bersihkanJudulTebakan();
+  P.perbaikiAngkaTelanjang();
 
   A.keadaan().then((k) => {
     keadaanAkun = k;
@@ -287,6 +288,18 @@ function tandaiGoogle(pesan, kelas = '', { html = false } = {}) {
   b.textContent = G.terhubung() ? 'Putuskan Google Calendar' : 'Hubungkan Google Calendar';
   b.classList.toggle('quiet', G.terhubung());
   n.className = 'pgcal-note ' + kelas;
+
+  // Akunnya disebut terus-menerus, bukan hanya saat ada masalah. Kalau baru
+  // ketahuan setelah acaranya tidak muncul di HP, ketahuannya sudah telat.
+  if (G.terhubung()) {
+    G.akunTersambung().then((akun) => {
+      const l = $('pgcalakun');
+      if (l) l.textContent = akun ? 'Tersambung sebagai ' + akun : '';
+    });
+  } else {
+    const l = $('pgcalakun');
+    if (l) l.textContent = '';
+  }
   const isi = pesan || (G.terhubung()
     ? 'Tersambung. Perubahan di sini langsung ikut di kalendermu.'
     : '');
@@ -814,14 +827,26 @@ function kartu(it, tz) {
     ${a.s ? `<span class="pk-s ${a.kelas || ''}">${a.s}</span>` : ''}
   </div>`).join('');
 
-  // Sisanya benar-benar keterangan tambahan: enak diketahui, tidak menentukan.
-  const meta = [];
-  if (it.openBid != null) {
-    meta.push(`buka Rp${fmtRupiah(it.openBid)}` +
-      (it.increment != null ? ` &middot; naik Rp${fmtRupiah(it.increment)}` : ''));
-  }
-  if (it.sniperMin) meta.push(`sniper zone ${it.sniperMin} menit terakhir`);
-  if (it.peserta) meta.push(`${it.peserta} peserta`);
+  /*
+   * Aturan lelangnya berlabel, dan selalu tampil walau isinya belum diketahui.
+   *
+   * Sebelumnya keempatnya digabung jadi satu baris abu-abu yang isinya
+   * berubah-ubah — satu kartu berbunyi "4 peserta", kartu di bawahnya "buka
+   * Rp100 - naik Rp100 - 7 peserta". Yang hilang tidak kelihatan hilang; yang
+   * ada pun harus dieja untuk tahu angka mana milik apa. Kolom kosong yang
+   * bertanda "—" jauh lebih berguna: kelihatan bahwa ada yang perlu diisi,
+   * dan tombol Ubah ada tepat di bawahnya.
+   */
+  const rinci = [
+    { l: 'Buka', v: it.openBid != null ? 'Rp' + fmtRupiah(it.openBid) : null },
+    { l: 'Kelipatan', v: it.increment != null ? 'Rp' + fmtRupiah(it.increment) : null },
+    { l: 'Sniper zone', v: it.sniperMin ? it.sniperMin + ' menit' : (it.sniperMin === 0 ? 'tidak ada' : null) },
+    { l: 'Peserta', v: it.peserta ? String(it.peserta) : null }
+  ];
+  const selRinci = rinci.map((r) => `<div class="pk-r">
+    <span class="pk-l">${r.l}</span>
+    <b${r.v == null ? ' class="kosong"' : ''}>${r.v ?? '&mdash;'}</b>
+  </div>`).join('');
 
   const status = Object.entries(P.STATUS).map(([k, v]) =>
     `<option value="${k}"${it.status === k ? ' selected' : ''}>${v}</option>`).join('');
@@ -840,9 +865,10 @@ function kartu(it, tz) {
         ? 'dicek ' + fmtTime(it.lastCheckedAt, tz) : ''}</span>
     </div>
 
-    <div class="pk-angka">${selAngka}</div>
-
-    ${meta.length ? `<p class="pk-meta">${meta.join('  &middot;  ')}</p>` : ''}
+    <div class="pk-angka">
+      <div class="pk-baris">${selAngka}</div>
+      <div class="pk-baris pk-rinci">${selRinci}</div>
+    </div>
 
     ${nada === 'lewat' ? `<div class="pk-vonis">
       <span>${it.memimpin
