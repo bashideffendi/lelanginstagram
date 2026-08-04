@@ -24,8 +24,14 @@ export const API_BASE = 'https://lelanginsta-api.tempuscollective.com';
  *
  * Bisa dicoba lebih dulu tanpa mengubah berkas ini:
  *   localStorage.setItem('lelanginsta_gcal_id', 'ISI-CLIENT-ID')
+ *
+ * Nilai ini memang publik — Client ID aplikasi browser terbaca dari kode
+ * halaman situs mana pun yang memakainya, dan alurnya tidak memakai client
+ * secret sama sekali. Yang menjaganya adalah daftar Authorized JavaScript
+ * origins di Google Cloud Console: selama di situ hanya ada alamat situs ini,
+ * Client ID yang disalin orang tidak bisa dipakai dari domain lain.
  */
-export const CLIENT_ID_GOOGLE = '';
+export const CLIENT_ID_GOOGLE = '227848554525-i71euvksie2p83q2mhejv64b6c0m5hm0.apps.googleusercontent.com';
 
 /** Untuk mencoba server lain tanpa mengubah berkas ini: */
 export function apiBase() {

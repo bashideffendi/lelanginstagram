@@ -69,15 +69,24 @@ Salin itu. **Client secret tidak dipakai** — abaikan saja.
 
 ## 5. Pasang di Lelang Insta
 
-Kirimkan Client ID itu, nanti dipasang ke `web/config.js`.
+**Sudah terpasang** di `web/config.js`, jadi semua perangkat langsung dapat —
+tidak ada yang perlu ditempel di HP maupun di laptop lain.
 
-Mau mencoba sendiri lebih dulu tanpa menunggu? Buka
-<https://lelanginsta.tempuscollective.com>, tekan `F12`, pilih tab **Console**,
-tempel ini lalu muat ulang halamannya:
+Client ID memang publik: aplikasi browser tidak memakai client secret, dan
+Client ID-nya terbaca dari kode halaman situs mana pun yang memakainya. Yang
+menjaganya adalah daftar **Authorized JavaScript origins** di langkah 4 —
+selama di situ hanya ada alamat situs ini, Client ID yang disalin orang tidak
+bisa dipakai dari domain lain.
+
+Kalau suatu saat perlu menguji Client ID lain tanpa mengubah berkasnya, buka
+`F12` → tab **Console**, lalu:
 
 ```js
-localStorage.setItem('lelanginsta_gcal_id', 'TEMPEL-CLIENT-ID-DI-SINI')
+localStorage.setItem('lelanginsta_gcal_id', 'CLIENT-ID-LAIN')   // nilai ini menang
+localStorage.removeItem('lelanginsta_gcal_id')                  // kembali ke config.js
 ```
+
+Yang ini hanya berlaku di browser itu saja, tidak ikut ke perangkat lain.
 
 ## 6. Hubungkan
 
