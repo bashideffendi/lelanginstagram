@@ -595,6 +595,18 @@ function mundur(detik) {
  * dan yang masih berhari-hari lagi terlihat setara. Urutan pemeriksaannya
  * disusun dari yang paling menuntut tindakan.
  */
+/** Nama keadaan, dicetak di label berwarna pekat di kepala kartu. */
+const TANDA = {
+  jalan: 'berjalan',
+  mendesak: 'hampir tutup',
+  tersalip: 'tersalip',
+  memimpin: 'kamu memimpin',
+  lewat: 'sudah tutup',
+  menang: 'menang',
+  kalah: 'kalah',
+  batal: 'batal'
+};
+
 export function nadaKartu(it) {
   if (it.status === 'menang') return 'menang';
   if (it.status === 'kalah') return 'kalah';
@@ -638,6 +650,7 @@ function kartu(it, tz) {
   return `<article class="pcard-item ${nada}" data-id="${esc(it.id)}">
     <div class="pk-atas">
       <div class="pk-judul">
+        <span class="pk-tanda">${TANDA[nada] || nada}</span>
         <h3>${esc(it.title || it.id)}</h3>
         <p>${url
           ? `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">` +
@@ -645,9 +658,9 @@ function kartu(it, tz) {
           : `<span class="dim">${it.owner ? '@' + esc(it.owner) : 'penjual tidak diketahui'}</span>`}</p>
       </div>
       ${aktif && detik != null
-        ? `<div class="pk-mundur ${nada}"><span class="jam">${mundur(detik)}</span>` +
+        ? `<div class="pk-mundur"><span class="jam">${mundur(detik)}</span>` +
           `<span class="ket">${detik > 0 ? 'lagi' : 'sudah tutup'}</span></div>`
-        : `<span class="tag ${it.status === 'menang' ? 'new' : 'same'}">${P.STATUS[it.status]}</span>`}
+        : ''}
     </div>
 
     <div class="pk-harga">
@@ -655,7 +668,6 @@ function kartu(it, tz) {
         ? `<b>Rp${fmtRupiah(it.topBid)}</b><span class="ket">tertinggi` +
           `${it.topUser ? ' &middot; @' + esc(it.topUser) : ''}</span>`
         : '<b class="dim">belum dicek</b>'}
-      ${it.memimpin ? '<span class="tag win">kamu memimpin</span>' : ''}
       ${it.myBid != null && !it.memimpin
         ? `<span class="tag same">tawaranmu Rp${fmtRupiah(it.myBid)}</span>` : ''}
       <span class="fill"></span>
@@ -779,12 +791,15 @@ export function mulaiDetak(aktif) {
       const kotak = el.querySelector('.pk-mundur .jam');
       if (!kotak) continue;                       // kartu sedang disunting
 
-      // Warnanya ikut berubah sendiri saat lelang masuk jam genting, tanpa
-      // menunggu penarikan berikutnya.
+      // Warna dan labelnya ikut berubah sendiri saat lelang masuk jam genting,
+      // tanpa menunggu penarikan berikutnya.
       const nada = nadaKartu(it);
       kotak.textContent = mundur(it.closeAt - now);
-      el.querySelector('.pk-mundur').className = 'pk-mundur ' + nada;
-      el.className = 'pcard-item ' + nada;
+      if (el.className !== 'pcard-item ' + nada) {
+        el.className = 'pcard-item ' + nada;
+        const tanda = el.querySelector('.pk-tanda');
+        if (tanda) tanda.textContent = TANDA[nada] || nada;
+      }
     }
   }, 1000);
 

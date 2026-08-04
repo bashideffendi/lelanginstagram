@@ -642,39 +642,58 @@ tbody tr.r-snipe td { background: var(--warn-soft); }
  *
  * Kartu yang semuanya berwarna sama membuat mata tidak punya pegangan: yang
  * tinggal lima menit dan yang masih tiga hari terlihat setara, jadi seluruh
- * daftar harus dibaca satu per satu. Tiap keadaan diberi satu warna dan
- * dipakai konsisten di garis tepi, latar, dan angka hitung mundurnya.
+ * daftar harus dibaca satu per satu.
+ *
+ * Tiap keadaan memasang empat warna sekaligus. Anak-anaknya tinggal membaca
+ * variabelnya, jadi menambah keadaan baru cukup satu baris dan tidak mungkin
+ * warnanya bertabrakan setengah-setengah.
+ *
+ *   --c       menyala; hanya untuk bidang tanpa teks (garis tepi kiri)
+ *   --c-ink   versi yang cukup gelap untuk dibaca; label, angka, tautan
+ *   --c-bg    latar kartu
+ *   --c-line  garis tepi sisanya
+ *
+ * Warna yang menyala sekaligus dipakai sebagai teks hampir selalu tidak
+ * terbaca — jingga dan hijau pekat dengan huruf putih cuma sekitar 3:1.
+ * Karena itu dipisah: yang menyala di batangnya, yang terbaca di hurufnya.
  */
 .pcard-item {
-  background: var(--surface); border: 1px solid var(--line);
-  border-left: 4px solid var(--line-2);
-  border-radius: var(--r); padding: 16px 18px; box-shadow: var(--shadow-sm);
+  --c: #8A9099; --c-ink: #5F666F; --c-bg: var(--surface); --c-line: var(--line);
+  background: var(--c-bg); border: 1px solid var(--c-line);
+  border-left: 6px solid var(--c);
+  border-radius: var(--r); padding: 15px 18px 16px; box-shadow: var(--shadow-sm);
 }
 
-/* Berjalan, masih lama — biru tenang, tidak menuntut apa-apa. */
-.pcard-item.jalan { border-left-color: var(--info); background: var(--info-soft); }
+/* Berjalan, masih lama — biru; tidak menuntut apa-apa. */
+.pcard-item.jalan { --c: #1E7BF5; --c-ink: #10529F; --c-bg: #DBE9FC; --c-line: #A6C9F6; }
 
 /* Tawaranmu sudah dilewati orang. Ada yang harus kamu putuskan. */
-.pcard-item.tersalip { border-left-color: var(--rose); background: var(--rose-soft); }
-.pk-mundur.tersalip .jam { color: var(--rose); }
+.pcard-item.tersalip { --c: #F5254F; --c-ink: #AF1332; --c-bg: #FCDCE4; --c-line: #F4A9BC; }
 
 /* Kurang dari sejam lagi — inilah yang membuat orang kalah karena lupa. */
-.pcard-item.mendesak { border-left-color: var(--amber); background: var(--warn-soft); }
-.pk-mundur.mendesak .jam { color: var(--amber); }
+.pcard-item.mendesak { --c: #FB8B0C; --c-ink: #9A4C00; --c-bg: #FDE8CB; --c-line: #F5C589; }
 
 /* Kamu yang tertinggi sekarang. */
-.pcard-item.memimpin { border-left-color: var(--primary); background: var(--primary-soft); }
-.pk-mundur.memimpin .jam { color: var(--primary-700); }
+.pcard-item.memimpin { --c: #08BB6A; --c-ink: #05713F; --c-bg: #D3F1E1; --c-line: #92DDB8; }
 
-/* Jamnya lewat tapi belum ditandai hasilnya. */
-.pcard-item.lewat { border-left-color: var(--line-2); background: var(--surface-2); opacity: .78; }
-.pk-mundur.lewat .jam { color: var(--muted); font-weight: 400; }
+/* Jamnya lewat tapi hasilnya belum ditandai. */
+.pcard-item.lewat { --c: #8A9099; --c-ink: #545B64; --c-bg: #E8EBEF; --c-line: #CBD1D8; }
 
 /* ---- sudah selesai, di tab Riwayat ---- */
-.pcard-item.menang { border-left-color: var(--primary); background: var(--primary-soft); }
-.pcard-item.kalah { border-left-color: var(--line-2); background: var(--surface-2); }
-.pcard-item.batal { border-left-color: var(--line-2); background: var(--surface-2); opacity: .7; }
+.pcard-item.menang { --c: #08BB6A; --c-ink: #05713F; --c-bg: #D3F1E1; --c-line: #92DDB8; }
+.pcard-item.kalah { --c: #F5254F; --c-ink: #AF1332; --c-bg: #FADFE5; --c-line: #EFB4C2; }
+/* Dibatalkan penjual. Diredupkan lewat warna, bukan opacity — opacity
+ * menipiskan seluruh teks di atasnya sekaligus, dan kontrasnya jadi bohong. */
+.pcard-item.batal { --c: #A6ACB5; --c-ink: #545B64; --c-bg: #EDEFF2; --c-line: var(--line-2); }
 .pcard-item.kalah .pk-harga b, .pcard-item.batal .pk-harga b { color: var(--muted); }
+
+/* Label keadaan: satu-satunya bidang berwarna pekat, jadi terbaca sekilas. */
+.pk-tanda {
+  display: inline-block; background: var(--c-ink); color: #fff;
+  font-family: var(--mono); font-size: 9.5px; font-weight: 600;
+  letter-spacing: .09em; text-transform: uppercase;
+  padding: 3px 8px; border-radius: 4px; margin-bottom: 7px;
+}
 
 /*
  * Kartu dibaca dari dua hal saja: berapa lama lagi, dan berapa harganya
@@ -688,12 +707,12 @@ tbody tr.r-snipe td { background: var(--warn-soft); }
   line-height: 1.35; overflow-wrap: anywhere; margin-bottom: 3px;
 }
 .pk-judul p { font-size: 12.5px; }
-.pk-judul a { color: var(--primary); }
+.pk-judul a { color: var(--c-ink); text-decoration: underline; text-underline-offset: 2px; }
 
 .pk-mundur { flex: none; text-align: right; line-height: 1.1; }
 .pk-mundur .jam {
-  display: block; font-family: var(--mono); font-size: 21px; font-weight: 600;
-  letter-spacing: -.02em; font-variant-numeric: tabular-nums; color: var(--ink);
+  display: block; font-family: var(--mono); font-size: 23px; font-weight: 700;
+  letter-spacing: -.025em; font-variant-numeric: tabular-nums; color: var(--c-ink);
 }
 .pk-mundur .ket { font-size: 10.5px; color: var(--muted); }
 
