@@ -80,8 +80,21 @@ export function saveKey(k) {
 }
 
 async function callServer(path, key) {
+  // Tanda masuk ikut dikirim kalau ada. Bukan untuk membuka pintu — titik
+  // akhir ini memang terbuka — melainkan supaya server mengenali pemiliknya
+  // dan memberi jatah penarikan yang cukup untuk beberapa lelang sekaligus di
+  // menit-menit terakhir. Tanpa ini, pemiliknya kena batas yang disusun untuk
+  // orang asing.
+  let masuk = '';
+  try { masuk = localStorage.getItem('lelanginsta_sesi') || ''; } catch { /* mode privat */ }
+
   // Kosong = fungsi di alamat yang sama; terisi = server sendiri, misalnya VPS.
-  const r = await fetch(apiBase() + path, { headers: key ? { 'x-ketok-key': key } : {} });
+  const r = await fetch(apiBase() + path, {
+    headers: {
+      ...(key ? { 'x-ketok-key': key } : {}),
+      ...(masuk ? { 'x-lelang-token': masuk } : {})
+    }
+  });
   let body = {};
   try { body = await r.json(); } catch { /* bukan JSON */ }
   return { ok: r.ok, status: r.status, body };

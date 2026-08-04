@@ -1387,8 +1387,19 @@ const BATAS_CEK_AKHIR = 3;
 
 let sedangCek = false;
 
+/**
+ * Sampai kapan berhenti menarik sesudah server bilang terlalu sering.
+ *
+ * Tanpa ini, jawaban 429 hanya ditelan diam-diam dan permintaan berikutnya
+ * berangkat dua puluh detik kemudian — menambah beban pada batas yang justru
+ * sedang mengeluh. Mundur dua menit dulu mengembalikan jatahnya, dan dua menit
+ * masih jauh lebih rapat daripada apa pun yang perlu diketahui manusia.
+ */
+let tundaSampai = 0;
+
 async function perbaruiYangJatuhTempo() {
   if (sedangCek || document.hidden) return;
+  if (Date.now() < tundaSampai) return;
   if (deps.tampilPantau && !deps.tampilPantau()) return;
   // Menggambar ulang di tengah penyuntingan menghapus ketikan yang belum
   // disimpan. Pemeriksaannya bisa menunggu; ketikan yang hilang tidak.
@@ -1418,7 +1429,12 @@ async function perbaruiYangJatuhTempo() {
     if (menutup) baru.cekAkhir = true;
     P.simpan(baru);
     render();
-  } catch {
+  } catch (err) {
+    if (err?.httpStatus === 429) {
+      tundaSampai = Date.now() + 120000;
+      tandaiSegar(it.id, 'menunggu jatah…');
+      return;
+    }
     // Gagal sesekali itu wajar — dicoba lagi pada putaran berikutnya. Tapi
     // lelang yang sudah tutup tidak akan berubah lagi, jadi percobaannya
     // dibatasi: postingan yang dihapus penjual kalau tidak akan ditarik terus

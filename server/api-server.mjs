@@ -180,6 +180,13 @@ const RATE_WINDOW_MS = 10 * 60 * 1000;
 const RATE_MAX = Number(process.env.RATE_MAX || 20);
 
 /**
+ * Jatah untuk yang sudah masuk. Cukup untuk enam lelang berbarengan di menit
+ * paling genting, dan tetap jauh di bawah kecepatan yang membuat Instagram
+ * mulai membatasi akun servernya.
+ */
+const RATE_MAX_MASUK = Number(process.env.RATE_MAX_MASUK || 90);
+
+/**
  * Instagram mengikat sesi pada identitas peramban yang membuatnya, dan
  * menolak yang lain dengan "useragent mismatch" — bukan dengan pengalihan
  * ke login. Diuji langsung: semua identitas peramban ditolak, identitas
@@ -664,10 +671,25 @@ const server = http.createServer(async (req, res) => {
     return kirim(res, 400, { error: 'url_kosong', message: 'Parameter url wajib diisi.' }, asal);
   }
 
-  if (terbatas(ipKlien(req))) {
+  /*
+   * Yang sudah masuk dapat jatah jauh lebih longgar.
+   *
+   * Batas 20 per 10 menit disusun waktu titik akhir ini terbuka untuk umum dan
+   * tidak ada cara mengenali siapa pemanggilnya. Sejak pantauan memeriksa
+   * sendiri, angka itu justru menghukum pemiliknya: di sepuluh menit terakhir
+   * satu lelang diperiksa tiap 45 detik — tiga belas penarikan — jadi dua
+   * lelang yang tutup di malam yang sama sudah melewatinya. Dan melewatinya
+   * berarti gagal menarik tepat di jendela sniper, satu-satunya menit yang
+   * benar-benar menentukan.
+   *
+   * Sekarang ada login, jadi pemiliknya bisa dikenali. Yang anonim tetap 20.
+   */
+  const pemilik = sesiSah(tokenDari(req));
+  const batas = pemilik ? RATE_MAX_MASUK : RATE_MAX;
+  if (terbatas(ipKlien(req), pemilik ? 'tarik-pemilik' : 'tarik', batas)) {
     return kirim(res, 429, {
       error: 'terlalu_sering',
-      message: `Terlalu banyak permintaan. Batasnya ${RATE_MAX} penarikan per 10 menit.`
+      message: `Terlalu banyak permintaan. Batasnya ${batas} penarikan per 10 menit.`
     }, asal);
   }
 
