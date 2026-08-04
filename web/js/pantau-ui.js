@@ -19,7 +19,22 @@ const esc = (s) =>
 
 let deps = null;
 let detak = null;
+let pemburu = null;
 let sedangDiubah = null;      // id lelang yang sedang disunting
+
+/**
+ * Hasil penarikan terakhir per lelang, hanya selama tab terbuka.
+ *
+ * Dipakai supaya tombol analisis membuka hasilnya seketika tanpa menarik
+ * ulang. Sengaja tidak ikut disimpan: isinya bisa ratusan komentar, dan
+ * membengkakkan simpanan browser maupun kiriman ke server.
+ */
+const dumpTerakhir = new Map();
+
+function simpanDump(id, dump) {
+  dumpTerakhir.set(id, dump);
+  if (dumpTerakhir.size > 12) dumpTerakhir.delete(dumpTerakhir.keys().next().value);
+}
 
 /** "03/08/2026" + "20:30:00" -> epoch, dalam zona waktu yang sedang dipakai. */
 function keEpoch(tgl, jam, tz) {
@@ -353,6 +368,7 @@ async function tanganiAksi(e) {
       t.textContent = 'Mengecek…';
       try {
         const dump = await deps.tarik(item.url);
+        simpanDump(id, dump);
         P.simpan(dariDump(dump));
         render();
       } catch (err) {
@@ -430,7 +446,10 @@ async function tanganiAksi(e) {
       stat('Berkas kalender diunduh. Buka berkasnya di ponsel untuk memasang pengingatnya.', 'ready');
       break;
     case 'buka':
-      deps.bukaAnalisis(item.url);
+      // Kalau hasil tarikannya masih ada, langsung dipakai — tidak perlu
+      // menempel ulang link maupun menunggu penarikan kedua.
+      if (dumpTerakhir.has(id)) deps.bukaAnalisis(null, dumpTerakhir.get(id), item);
+      else deps.bukaAnalisis(item.url, null, item);
       break;
     case 'hapus':
       if (confirm(`Hapus "${item.title || item.id}" dari pantauan?`)) {
@@ -513,9 +532,16 @@ export function render() {
   $('priwayat').innerHTML = riwayat(tz);
 }
 
-function isi(label, nilai, sub) {
-  return `<div class="pit"><span class="pl">${label}</span>` +
-    `<span class="pv">${nilai}${sub ? ` <span class="dim">${sub}</span>` : ''}</span></div>`;
+/** Hitung mundur ringkas: berdetik saat mepet, berjam saat masih lama. */
+function mundur(detik) {
+  if (detik <= 0) return 'tutup';
+  const j = Math.floor(detik / 3600);
+  const m = Math.floor((detik % 3600) / 60);
+  const d = detik % 60;
+  const p = (n) => String(n).padStart(2, '0');
+  if (detik < 3600) return `${m}:${p(d)}`;
+  if (detik < 86400) return `${j}:${p(m)}:${p(d)}`;
+  return `${Math.floor(detik / 86400)} hari ${j % 24} jam`;
 }
 
 function kartu(it, tz) {
@@ -525,54 +551,65 @@ function kartu(it, tz) {
   const aktif = it.status === 'aktif';
   const nada = !aktif ? '' : sisa?.lewat ? 'lewat' : sisa?.mendesak ? 'mendesak' : '';
 
-  const baris = [];
-  baris.push(isi('Tutup',
-    it.closeAt != null
-      ? `<b>${fmtTime(it.closeAt, tz)}</b>`
-      : '<span class="dim">belum diisi</span>',
-    it.closeAt != null ? fmtDate(it.closeAt, tz) : ''));
+  const detik = it.closeAt != null ? it.closeAt - Math.floor(Date.now() / 1000) : null;
+  const url = it.url || (it.shortcode ? 'https://www.instagram.com/p/' + it.shortcode + '/' : null);
 
-  baris.push(isi('Pembukaan',
-    it.openBid != null ? 'Rp' + fmtRupiah(it.openBid) : '<span class="dim">—</span>',
-    it.increment != null ? 'kelipatan Rp' + fmtRupiah(it.increment) : ''));
-
-  if (it.topBid != null) {
-    baris.push(isi('Tertinggi', 'Rp' + fmtRupiah(it.topBid), '@' + esc(it.topUser || '?')));
+  // Satu angka besar saja: harga tertinggi sekarang. Sisanya keterangan kecil
+  // dalam satu baris — daftar berlabel yang dulu membuat tiap kartu terbaca
+  // seperti formulir.
+  const meta = [];
+  if (it.closeAt != null) meta.push(`tutup ${fmtTime(it.closeAt, tz)} &middot; ${fmtDate(it.closeAt, tz)}`);
+  if (it.openBid != null) {
+    meta.push(`buka Rp${fmtRupiah(it.openBid)}` +
+      (it.increment != null ? ` &middot; naik Rp${fmtRupiah(it.increment)}` : ''));
   }
-  if (it.myBid != null) baris.push(isi('Tawaranku', 'Rp' + fmtRupiah(it.myBid)));
-  if (it.sniperMin) baris.push(isi('Sniper zone', it.sniperMin + ' menit terakhir'));
-  if (it.lastCheckedAt) {
-    baris.push(isi('Dicek', `<span class="dim">${fmtDateTime(it.lastCheckedAt, tz)}</span>`));
-  }
+  if (it.sniperMin) meta.push(`sniper ${it.sniperMin} mnt`);
+  if (it.peserta) meta.push(`${it.peserta} peserta`);
 
   const status = Object.entries(P.STATUS).map(([k, v]) =>
     `<option value="${k}"${it.status === k ? ' selected' : ''}>${v}</option>`).join('');
 
   return `<article class="pcard-item ${nada}" data-id="${esc(it.id)}">
-    <header>
-      <div class="pjudul">
+    <div class="pk-atas">
+      <div class="pk-judul">
         <h3>${esc(it.title || it.id)}</h3>
-        <p class="dim">${it.owner ? '@' + esc(it.owner) : 'penjual tidak diketahui'}</p>
+        <p>${url
+          ? `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">` +
+            `${it.owner ? '@' + esc(it.owner) : 'buka di Instagram'} &#8599;</a>`
+          : `<span class="dim">${it.owner ? '@' + esc(it.owner) : 'penjual tidak diketahui'}</span>`}</p>
       </div>
-      <div class="pkanan">
-        ${aktif && sisa ? `<div class="psisa ${nada}">${esc(sisa.teks)}</div>` : ''}
-        ${it.memimpin ? '<span class="tag win">memimpin</span>' : ''}
-      </div>
-    </header>
+      ${aktif && detik != null
+        ? `<div class="pk-mundur ${nada}"><span class="jam">${mundur(detik)}</span>` +
+          `<span class="ket">${detik > 0 ? 'lagi' : 'sudah tutup'}</span></div>`
+        : `<span class="tag ${it.status === 'menang' ? 'new' : 'same'}">${P.STATUS[it.status]}</span>`}
+    </div>
 
-    <div class="pinfo">${baris.join('')}</div>
+    <div class="pk-harga">
+      ${it.topBid != null
+        ? `<b>Rp${fmtRupiah(it.topBid)}</b><span class="ket">tertinggi` +
+          `${it.topUser ? ' &middot; @' + esc(it.topUser) : ''}</span>`
+        : '<b class="dim">belum dicek</b>'}
+      ${it.memimpin ? '<span class="tag win">kamu memimpin</span>' : ''}
+      ${it.myBid != null && !it.memimpin
+        ? `<span class="tag same">tawaranmu Rp${fmtRupiah(it.myBid)}</span>` : ''}
+      <span class="fill"></span>
+      <span class="pk-segar" data-segar>${it.lastCheckedAt
+        ? 'dicek ' + fmtTime(it.lastCheckedAt, tz) : ''}</span>
+    </div>
+
+    ${meta.length ? `<p class="pk-meta">${meta.join('  &middot;  ')}</p>` : ''}
 
     <div class="paksi">
-      <button class="btn sm" data-aksi="cek">Cek posisi</button>
-      <button class="btn sm" data-aksi="ubah">Ubah</button>
-      <button class="btn sm" data-aksi="ics">Ingatkan</button>
-      <button class="btn sm" data-aksi="buka">Analisis</button>
+      <button class="btn sm" data-aksi="buka">Lihat urutan tawaran</button>
+      <button class="btn sm quiet" data-aksi="cek">Cek sekarang</button>
+      <button class="btn sm quiet" data-aksi="ubah">Ubah</button>
       <select class="psel" data-ubah="status">${status}</select>
       ${it.status === 'menang' || it.status === 'kalah'
         ? `<input class="pharga" data-ubah="final" placeholder="harga akhir"
              value="${it.finalPrice != null ? 'Rp' + fmtRupiah(it.finalPrice) : ''}">`
         : ''}
       <span class="fill"></span>
+      <button class="btn sm quiet" data-aksi="ics" title="Unduh berkas kalender">Kalender</button>
       <button class="btn sm quiet" data-aksi="hapus">Hapus</button>
     </div>
   </article>`;
@@ -596,8 +633,8 @@ function formUbah(it, tz) {
     `${m ? m + ' menit terakhir' : 'Tidak ada'}</option>`).join('');
 
   return `<article class="pcard-item sunting" data-id="${esc(it.id)}">
-    <header><div class="pjudul"><h3>Ubah keterangan lelang</h3>
-      <p class="dim">Isian di bawah ditebak dari caption. Perbaiki yang salah.</p></div></header>
+    <div class="pk-atas"><div class="pk-judul"><h3>Ubah keterangan lelang</h3>
+      <p class="dim">Isian di bawah ditebak dari caption. Perbaiki yang salah.</p></div></div>
 
     <div class="pform">
       <label><span>Barang</span>
@@ -664,19 +701,80 @@ function chip(n, k, cls = '') {
 /** Hitung mundur diperbarui tiap detik, tapi hanya saat halamannya terlihat. */
 export function mulaiDetak(aktif) {
   clearInterval(detak);
+  clearInterval(pemburu);
   if (!aktif) return;
+
   detak = setInterval(() => {
-    const tz = deps.tz();
+    const now = Math.floor(Date.now() / 1000);
     for (const el of document.querySelectorAll('#plist [data-id]')) {
       const it = P.ambil(el.dataset.id);
       if (!it || it.status !== 'aktif' || it.closeAt == null) continue;
+
       const s = sisaWaktu(it.closeAt);
-      const box = el.querySelector('.psisa');
-      if (box) {
-        box.textContent = s.teks;
-        box.className = 'psisa ' + (s.lewat ? 'lewat' : s.mendesak ? 'mendesak' : '');
-        el.className = 'pcard-item ' + (s.lewat ? 'lewat' : s.mendesak ? 'mendesak' : '');
-      }
+      const kotak = el.querySelector('.pk-mundur .jam');
+      if (!kotak) continue;
+      kotak.textContent = mundur(it.closeAt - now);
+      el.querySelector('.pk-mundur').className =
+        'pk-mundur ' + (s.lewat ? 'lewat' : s.mendesak ? 'mendesak' : '');
+      el.className = 'pcard-item ' + (s.lewat ? 'lewat' : s.mendesak ? 'mendesak' : '');
     }
   }, 1000);
+
+  // Posisi diperbarui sendiri. Alat ini ada supaya kamu tidak perlu ingat;
+  // menuntut klik "Cek posisi" mengembalikan beban yang mau dihilangkan.
+  pemburu = setInterval(perbaruiYangJatuhTempo, 20000);
+  perbaruiYangJatuhTempo();
+}
+
+/**
+ * Seberapa sering satu lelang perlu diperiksa.
+ *
+ * Makin dekat penutupan makin sering, karena di situlah harga berubah cepat.
+ * Yang masih berhari-hari lagi cukup sesekali — server punya batas laju, dan
+ * memboroskannya pada lelang yang belum bergerak berarti lelang yang genting
+ * kehabisan jatah.
+ */
+function jarakCek(detikTersisa) {
+  if (detikTersisa <= 0) return null;
+  if (detikTersisa < 600) return 45;
+  if (detikTersisa < 3600) return 120;
+  if (detikTersisa < 6 * 3600) return 600;
+  return 1800;
+}
+
+let sedangCek = false;
+
+async function perbaruiYangJatuhTempo() {
+  if (sedangCek || document.hidden) return;
+  if (deps.tampilPantau && !deps.tampilPantau()) return;
+
+  const now = Math.floor(Date.now() / 1000);
+  const antre = P.semua().filter((it) => {
+    if (it.status !== 'aktif' || !it.url || it.closeAt == null) return false;
+    const jarak = jarakCek(it.closeAt - now);
+    if (jarak == null) return false;
+    return now - (it.lastCheckedAt || 0) >= jarak;
+  });
+  if (!antre.length) return;
+
+  // Satu per satu, bukan sekaligus: penarikan serempak paling cepat memicu
+  // pembatasan dari Instagram.
+  sedangCek = true;
+  try {
+    const it = antre.sort((a, b) => a.closeAt - b.closeAt)[0];
+    tandaiSegar(it.id, 'memeriksa…');
+    const dump = await deps.tarik(it.url);
+    simpanDump(it.id, dump);
+    P.simpan(dariDump(dump));
+    render();
+  } catch {
+    // Gagal sesekali itu wajar — dicoba lagi pada putaran berikutnya.
+  } finally {
+    sedangCek = false;
+  }
+}
+
+function tandaiSegar(id, teks) {
+  const el = document.querySelector(`#plist [data-id="${CSS.escape(id)}"] [data-segar]`);
+  if (el) el.textContent = teks;
 }

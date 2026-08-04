@@ -623,37 +623,42 @@ tbody tr.r-snipe td { background: var(--warn-soft); }
 .pcard-item.mendesak { border-left-color: var(--amber); background: var(--warn-soft); }
 .pcard-item.lewat { border-left-color: var(--line-2); opacity: .72; }
 
-.pcard-item header { display: flex; align-items: flex-start; gap: 16px; }
-.pjudul { min-width: 0; flex: 1 1 auto; }
-.pjudul h3 {
-  font-size: 16px; font-weight: 700; letter-spacing: -.01em;
-  overflow-wrap: anywhere; margin-bottom: 2px; line-height: 1.3;
-}
-.pjudul p { font-size: 12.5px; }
-.pkanan { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
-.psisa {
-  font-family: var(--mono); font-size: 13px; font-weight: 600;
-  color: var(--ink-soft); white-space: nowrap;
-}
-.psisa.mendesak { color: var(--amber); }
-.psisa.lewat { color: var(--muted); font-weight: 400; }
-
 /*
- * Tiap keterangan satu baris utuh dengan label selebar tetap. Sebelumnya
- * kolomnya melar mengikuti isi, sehingga nilai panjang terputus ke baris
- * berikutnya dan barisnya jadi bertingkat tak beraturan.
+ * Kartu dibaca dari dua hal saja: berapa lama lagi, dan berapa harganya
+ * sekarang. Sisanya keterangan kecil satu baris. Daftar berlabel yang dulu
+ * membuat tiap kartu terbaca seperti formulir sudah dibuang.
  */
-.pinfo {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 5px 28px; margin: 14px 0 16px; font-size: 13.5px;
+.pk-atas { display: flex; align-items: flex-start; gap: 18px; }
+.pk-judul { min-width: 0; flex: 1 1 auto; }
+.pk-judul h3 {
+  font-size: 15.5px; font-weight: 700; letter-spacing: -.012em;
+  line-height: 1.35; overflow-wrap: anywhere; margin-bottom: 3px;
 }
-.pit { display: grid; grid-template-columns: 92px 1fr; gap: 10px; align-items: baseline; }
-.pit .pl {
-  font-family: var(--mono); font-size: 9.5px; font-weight: 500;
-  letter-spacing: .1em; text-transform: uppercase; color: var(--muted);
-  padding-top: 2px;
+.pk-judul p { font-size: 12.5px; }
+.pk-judul a { color: var(--primary); }
+
+.pk-mundur { flex: none; text-align: right; line-height: 1.1; }
+.pk-mundur .jam {
+  display: block; font-family: var(--mono); font-size: 21px; font-weight: 600;
+  letter-spacing: -.02em; font-variant-numeric: tabular-nums; color: var(--ink);
 }
-.pit .pv { min-width: 0; overflow-wrap: anywhere; }
+.pk-mundur .ket { font-size: 10.5px; color: var(--muted); }
+.pk-mundur.mendesak .jam { color: var(--amber); }
+.pk-mundur.lewat .jam { color: var(--muted); font-weight: 400; }
+
+.pk-harga {
+  display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
+  margin: 14px 0 8px;
+}
+.pk-harga b {
+  font-family: var(--mono); font-size: 22px; font-weight: 600;
+  letter-spacing: -.02em; font-variant-numeric: tabular-nums;
+}
+.pk-harga b.dim { font-size: 15px; font-weight: 400; font-family: var(--sans); }
+.pk-harga .ket { font-size: 12.5px; color: var(--muted); }
+.pk-segar { font-size: 11px; color: var(--faint); font-family: var(--mono); }
+
+.pk-meta { font-size: 12.5px; color: var(--muted); margin-bottom: 14px; }
 
 /* ---- sunting keterangan ---- */
 .pcard-item.sunting { border-left-color: var(--primary); background: var(--surface-2); }
@@ -694,8 +699,10 @@ tbody tr.r-snipe td { background: var(--warn-soft); }
   .mainnav { margin-left: 0; width: 100%; }
   .mainnav button { flex: 1 1 auto; justify-content: center; }
   .ptop { padding-top: 22px; }
-  .pcard-item header { flex-direction: column; gap: 6px; }
-  .pinfo { grid-template-columns: 1fr; }
+  .pk-atas { gap: 12px; }
+  .pk-judul h3 { font-size: 15px; }
+  .pk-mundur .jam { font-size: 18px; }
+  .pk-harga b { font-size: 19px; }
   .paksi .btn, .paksi .psel, .paksi .pharga { flex: 1 1 calc(50% - 4px); }
   .pbar { gap: 8px; }
   #pakun { flex: 1 1 auto; width: auto; }

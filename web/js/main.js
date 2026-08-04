@@ -1404,9 +1404,32 @@ function initPantauan() {
 
     hitungTutup: (caption, comments) => guessCutoff(caption, comments, state.tz),
 
-    bukaAnalisis: (url) => {
+    tampilPantau: () => state.view === 'pantau',
+
+    /**
+     * Buka halaman analisis. Kalau hasil tarikannya sudah ada, dipakai
+     * langsung — tidak masuk akal menembak Instagram lagi untuk data yang
+     * baru saja diambil, apalagi ada batas laju.
+     */
+    bukaAnalisis: (url, dump, item) => {
       pilihView('cek');
-      $('iglink').value = url;
+      if (dump) {
+        state.isDemo = false;
+        activate([parseDump(dump, 'dari pantauan')]);
+        // Jam tutup dan sniper zone yang sudah kamu tetapkan di pantauan
+        // ikut terbawa, bukan ditebak ulang dari caption.
+        if (item?.closeAt != null) {
+          state.cutoff = item.closeAt;
+          state.guessedCutoff = false;
+        }
+        if (item?.sniperMin) {
+          state.sniperMin = item.sniperMin;
+          $('sniper').value = String(item.sniperMin);
+        }
+        render();
+        return;
+      }
+      $('iglink').value = url || '';
       runTake();
     }
   });
