@@ -356,7 +356,15 @@ async function sinkronSekarang({ diam = true } = {}) {
       ? ' Tutup ' + [...new Set(dikalender.map((x) => fmtDate(x.closeAt, deps.tz())))]
         .slice(0, 3).join(', ') + '.'
       : '';
-    const tautan = h.tautan || dikalender.find((x) => x.gcalLink)?.gcalLink;
+    // Tautannya dipaksa membuka sebagai akun yang menyimpan acaranya. Tanpa
+    // itu, HP yang sedang aktif di akun Google lain menjawab "a supported
+    // calendar is not available in this account" — kalimat yang tidak
+    // menyebut akun mana pun, jadi tidak menuntun ke mana-mana.
+    const akun = await G.akunTersambung().catch(() => null);
+    let tautan = h.tautan || dikalender.find((x) => x.gcalLink)?.gcalLink;
+    if (tautan && akun) {
+      tautan += (tautan.includes('?') ? '&' : '?') + 'authuser=' + encodeURIComponent(akun);
+    }
     const buka = tautan
       ? ` <a href="${esc(tautan)}" target="_blank" rel="noopener noreferrer">Buka acaranya &#8599;</a>`
       : '';
@@ -453,6 +461,45 @@ function dariDump(dump) {
   };
 }
 
+/**
+ * Tawaran tertinggi tiap peserta, disimpan bersama catatan lelang.
+ *
+ * Tanpa ini, posisimu hanya bisa dihitung saat penarikan. Kalau akun
+ * Instagram-mu baru diisi sesudahnya, tiap kartu tetap berkata "belum
+ * menawar" sampai lelangnya kebetulan diperiksa lagi — walau namamu terpampang
+ * sebagai penawar tertinggi di kartu yang sama.
+ *
+ * Dipangkas 60 teratas: cukup untuk mengenali posisimu di lelang mana pun yang
+ * masuk akal diikuti, dan tidak membengkakkan kiriman ke server.
+ */
+function petaTawaran(rows) {
+  const peta = new Map();
+  for (const r of rows) {
+    if (r.bid == null || r.isOwner || r.isAnnouncement) continue;
+    const u = String(r.username || '').toLowerCase();
+    if (!u) continue;
+    if (!peta.has(u) || peta.get(u) < r.bid) peta.set(u, r.bid);
+  }
+  return Object.fromEntries(
+    [...peta.entries()].sort((a, b) => b[1] - a[1]).slice(0, 60));
+}
+
+/** Posisimu di satu lelang, dihitung dari akun yang sedang dipakai sekarang. */
+function posisiku(it) {
+  const aku = P.akunku().trim().toLowerCase();
+  if (!aku) return { myBid: null, memimpin: false, tanpaAkun: true };
+
+  const memimpin = String(it.topUser || '').toLowerCase() === aku;
+  const peta = it.tawaranPer;
+  if (peta && typeof peta === 'object') {
+    const v = peta[aku];
+    return { myBid: typeof v === 'number' ? v : null, memimpin };
+  }
+  // Catatan lama tanpa peta tawaran: kalau namamu yang tertinggi, nilainya
+  // sudah pasti — itu angka yang sama.
+  return { myBid: memimpin ? (it.topBid ?? null) : (it.myBid ?? null), memimpin };
+}
+
 function posisiDari(hasil) {
   const w = hasil.summary.winner;
   const aku = P.akunku().toLowerCase();
@@ -461,6 +508,7 @@ function posisiDari(hasil) {
     .sort((a, b) => b.bid - a.bid)[0];
 
   return {
+    tawaranPer: petaTawaran(hasil.rows),
     lastCheckedAt: Math.floor(Date.now() / 1000),
     topBid: w ? w.bid : null,
     topUser: w ? w.username : null,
@@ -764,11 +812,14 @@ export function nadaKartu(it) {
 
   const sisa = it.closeAt != null ? sisaWaktu(it.closeAt) : null;
   if (sisa?.lewat) return 'lewat';
+  // Dihitung sekarang, bukan diambil dari yang tersimpan: kalau akun
+  // Instagram-mu baru diisi, warnanya harus ikut berubah saat itu juga.
+  const p = posisiku(it);
   // Tersalip lebih mendesak daripada sekadar mepet waktu: ada yang harus
   // kamu putuskan, bukan sekadar ditunggu.
-  if (it.myBid != null && !it.memimpin) return 'tersalip';
+  if (p.myBid != null && !p.memimpin) return 'tersalip';
   if (sisa?.mendesak) return 'mendesak';
-  if (it.memimpin) return 'memimpin';
+  if (p.memimpin) return 'memimpin';
   return 'jalan';
 }
 
@@ -801,11 +852,12 @@ function kartu(it, tz) {
   // Selalu tampil, walau kamu belum menawar. Kolom yang muncul-hilang membuat
   // dua kartu bersusunan berbeda, dan "belum menawar" itu sendiri keterangan
   // yang berguna — bukan alasan menghilangkan barisnya.
-  angka.push(it.myBid != null
-    ? { l: 'Tawaranmu', v: 'Rp' + fmtRupiah(it.myBid),
-        s: it.memimpin ? 'memimpin' : 'kalah', kelas: it.memimpin ? 'baik' : 'buruk' }
+  const aku = posisiku(it);
+  angka.push(aku.myBid != null
+    ? { l: 'Tawaranmu', v: 'Rp' + fmtRupiah(aku.myBid),
+        s: aku.memimpin ? 'memimpin' : 'kalah', kelas: aku.memimpin ? 'baik' : 'buruk' }
     : { l: 'Tawaranmu', v: '&mdash;',
-        s: P.akunku() ? 'belum menawar' : 'akunmu belum diisi', nihil: true });
+        s: aku.tanpaAkun ? 'akunmu belum diisi' : 'belum menawar', nihil: true });
 
   if (it.closeAt != null) {
     angka.push({
@@ -876,10 +928,10 @@ function kartu(it, tz) {
     </div>
 
     ${nada === 'lewat' ? `<div class="pk-vonis">
-      <span>${it.memimpin
+      <span>${aku.memimpin
         ? 'Kamu yang tertinggi saat lelang ditutup.'
-        : (it.myBid != null
-          ? `Tawaran tertinggimu Rp${fmtRupiah(it.myBid)}, kalah dari Rp${fmtRupiah(it.topBid)}.`
+        : (aku.myBid != null
+          ? `Tawaran tertinggimu Rp${fmtRupiah(aku.myBid)}, kalah dari Rp${fmtRupiah(it.topBid)}.`
           : 'Bagaimana hasilnya?')}</span>
       <button class="btn sm solid" data-aksi="menang">Menang</button>
       <button class="btn sm" data-aksi="kalah">Kalah</button>
