@@ -264,8 +264,14 @@ function gambarSesiGagal(kotak, s, tambahan) {
     `${tambahan ? ' ' + esc(tambahan) : ''}</span>` +
     (deps.punyaExtension?.()
       ? '<span>Pastikan browser ini masih login Instagram dengan akun khusus, lalu muat ulang halaman ini.</span>'
-      : '<span>Paling gampang: pasang <b>extension Lelang Insta</b> di browser ini — sesudah itu ' +
-        'sesinya disegarkan sendiri tiap halaman ini dibuka, tanpa menyentuh cookie sama sekali.</span>') +
+      : s.lewatExtension
+        // Sudah pernah disegarkan dari suatu browser: sebut jalan yang sudah
+        // terbukti, jangan menyuruh memasang extension di HP.
+        ? '<span>Buka halaman ini sekali di <b>browser yang ada extension Lelang Insta</b> — ' +
+          'sesinya akan disegarkan sendiri di sana, lalu perangkat ini ikut hidup lagi.</span>'
+        : '<span>Paling gampang: pasang <b>extension Lelang Insta</b> di sebuah browser di ' +
+          'laptop — sesudah itu sesinya disegarkan sendiri tiap halaman ini dibuka di sana, ' +
+          'tanpa menyentuh cookie sama sekali.</span>') +
     '</div>';
 }
 

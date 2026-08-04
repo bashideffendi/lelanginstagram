@@ -253,7 +253,18 @@ function cookieTerkirim() {
  */
 const DENYUT_MS = 4 * 3600 * 1000;
 
-let sesiIg = { keadaan: 'belum', dicek: null, hidupTerakhir: null, akun: null, pesan: '' };
+const F_TANDA = path.join(DATA_DIR, 'sesi-ig.json');
+
+let sesiIg = {
+  keadaan: 'belum', dicek: null, hidupTerakhir: null, akun: null, pesan: '',
+  // Bertahan melewati restart: fakta bahwa ada browser yang sanggup
+  // menyegarkan sendiri tidak berubah karena layanan dinyalakan ulang.
+  lewatExtension: !!bacaJson(F_TANDA, {}).lewatExtension
+};
+
+function simpanTanda() {
+  tulisJson(F_TANDA, { lewatExtension: !!sesiIg.lewatExtension });
+}
 
 async function periksaSesiIg() {
   const cookie = cookieHeader();
@@ -304,6 +315,7 @@ function keadaanSesi() {
     dicek: sesiIg.dicek,
     hidupTerakhir: sesiIg.hidupTerakhir,
     akun: sesiIg.akun || null,
+    lewatExtension: !!sesiIg.lewatExtension,
     cookie: cookieTerkirim()
   };
 }
@@ -443,6 +455,10 @@ const server = http.createServer(async (req, res) => {
 
       simpanCookieIg(b);
       const s = await periksaSesiIg();
+      // Dicatat supaya perangkat lain tahu ada browser yang bisa menyegarkan
+      // sendiri, dan peringatannya bisa menyuruh membuka browser itu alih-alih
+      // menyuruh memasang extension di HP — tempat extension tidak bisa dipasang.
+      if (s.keadaan === 'hidup') { sesiIg.lewatExtension = true; simpanTanda(); }
       console.log(`[lelanginsta] sesi IG disegarkan dari extension → ${s.keadaan}`);
 
       return kirim(res, 200, {
