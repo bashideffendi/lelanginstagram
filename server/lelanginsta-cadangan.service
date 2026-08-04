@@ -7,12 +7,17 @@ Type=oneshot
 User=ubuntu
 ExecStart=/bin/bash /home/ubuntu/lelanginstagram/server/cadangan.sh
 
-# Hanya perlu membaca data dan menulis ke folder cadangan.
+# Hanya perlu membaca data dan menulis cadangan.
+#
+# Jalur yang diizinkan adalah folder repo, bukan folder cadangannya sendiri:
+# systemd menyiapkan namespace SEBELUM skripnya jalan, jadi menunjuk folder
+# yang belum ada membuat layanan gagal menyala sama sekali — dan folder itu
+# baru dibuat oleh skrip yang tidak pernah sempat jalan.
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=read-only
-ReadWritePaths=/home/ubuntu/lelanginstagram/cadangan
+ReadWritePaths=/home/ubuntu/lelanginstagram
 
 StandardOutput=journal
 StandardError=journal
