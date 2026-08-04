@@ -1,0 +1,19 @@
+[Unit]
+Description=Cadangan harian data pantauan Lelang Insta
+Documentation=https://github.com/bashideffendi/lelanginstagram
+
+[Service]
+Type=oneshot
+User=ubuntu
+ExecStart=/bin/bash /home/ubuntu/lelanginstagram/server/cadangan.sh
+
+# Hanya perlu membaca data dan menulis ke folder cadangan.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/ubuntu/lelanginstagram/cadangan
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=lelanginsta-cadangan

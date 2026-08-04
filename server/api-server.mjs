@@ -530,6 +530,33 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
+  /*
+   * Cabut semua sesi, dari mana pun mereka dibuat.
+   *
+   * Sesi berlaku setahun dan disimpan di server, jadi ponsel yang hilang tetap
+   * bisa membuka pantauanmu sampai setahun ke depan. Sebelumnya satu-satunya
+   * cara mencabutnya adalah menghapus berkas sesi lewat SSH — cara yang tidak
+   * ada gunanya bagi orang yang sedang panik kehilangan ponsel.
+   *
+   * Yang memanggil ikut dicabut lalu diberi sesi baru, bukan dikecualikan:
+   * mengecualikan berarti perangkat ini harus dipercaya sudah benar, padahal
+   * justru dari perangkat inilah keputusan "ada yang tidak beres" diambil.
+   */
+  if (url.pathname === '/akun/cabut-semua' && req.method === 'POST') {
+    if (!sesiSah(tokenDari(req))) {
+      return kirim(res, 401, { error: 'belum_masuk', message: 'Perlu masuk dulu.' }, asal);
+    }
+    const jumlah = sesi.size;
+    sesi.clear();
+    const baru = buatSesi();
+    console.log(`[lelanginsta] semua sesi dicabut (${jumlah}), satu sesi baru dibuat`);
+    return kirim(res, 200, {
+      dicabut: jumlah,
+      token: baru,
+      message: `${jumlah} sesi dicabut. Perangkat lain harus masuk lagi.`
+    }, asal);
+  }
+
   if (url.pathname === '/akun/keluar' && req.method === 'POST') {
     // Keluar harus benar-benar mencabut tandanya di server, bukan sekadar
     // melupakannya di browser — kalau tidak, token yang tercecer tetap sah.

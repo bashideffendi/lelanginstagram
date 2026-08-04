@@ -366,14 +366,29 @@ function gambarMasuk(pesan = '', kelas = '') {
   if (A.sudahMasuk()) {
     kotak.innerHTML =
       '<div class="pm-in"><span class="pm-ok">Tersambung ke servermu</span>' +
-      '<span class="pm-sub">Daftar ini ikut ke perangkat lain yang kamu masuki dengan sandi yang sama.</span>' +
+      '<span class="pm-sub">Daftar ini sama di semua perangkat yang kamu masuki.</span>' +
       '<span class="fill"></span>' +
+      '<button class="btn sm quiet" id="pmcabut" ' +
+      'title="Untuk kalau ponselmu hilang">Keluarkan semua perangkat</button>' +
       '<button class="btn sm quiet" id="pmkeluar">Keluar</button></div>' +
-      (pesan ? `<p class="pm-note ${kelas}">${pesan}</p>` : '');
+      (pesan ? `<p class="pm-note ${esc(kelas)}">${esc(pesan)}</p>` : '');
+
     $('pmkeluar').onclick = async () => {
       $('pmkeluar').disabled = true;
       await A.keluar();
       gambarMasuk('Keluar. Daftarnya tetap ada di browser ini.');
+    };
+
+    $('pmcabut').onclick = async () => {
+      if (!confirm('Keluarkan semua perangkat?\n\nSemua ponsel dan browser lain harus ' +
+        'masuk lagi. Browser ini tetap masuk. Daftar lelangnya tidak terhapus.')) return;
+      $('pmcabut').disabled = true;
+      try {
+        const h = await A.cabutSemua();
+        gambarMasuk(h.message);
+      } catch (e) {
+        gambarMasuk('Gagal: ' + e.message, 'bad');
+      }
     };
     return;
   }

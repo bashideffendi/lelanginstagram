@@ -1,0 +1,16 @@
+[Unit]
+Description=Jalankan cadangan Lelang Insta tiap hari
+
+[Timer]
+# 03:15 waktu server. Jauh dari jam lelang, yang hampir selalu malam.
+OnCalendar=*-*-* 03:15:00
+
+# Kalau server sedang mati pada jam itu, jalankan begitu menyala lagi —
+# cadangan yang terlewat diam-diam adalah cadangan yang tidak ada.
+Persistent=true
+
+# Sebar acak semenit supaya tidak bertabrakan dengan tugas terjadwal lain.
+RandomizedDelaySec=60
+
+[Install]
+WantedBy=timers.target

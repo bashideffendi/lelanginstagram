@@ -100,6 +100,18 @@ export async function keluar() {
   simpanToken('');
 }
 
+/**
+ * Cabut semua sesi di semua perangkat, lalu pakai yang baru di sini.
+ *
+ * Untuk keadaan yang tidak enak: ponsel hilang, atau ada perangkat yang tidak
+ * kamu kenali masih bisa membuka pantauanmu.
+ */
+export async function cabutSemua() {
+  const j = await panggil('/akun/cabut-semua', { method: 'POST' });
+  simpanToken(j.token);
+  return j;
+}
+
 export async function ambilDariServer() {
   return panggil('/pantau');
 }
