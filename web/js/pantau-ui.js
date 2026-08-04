@@ -795,15 +795,17 @@ function kartu(it, tz) {
 
   angka.push(it.topBid != null
     ? { l: 'Tertinggi sekarang', v: 'Rp' + fmtRupiah(it.topBid),
-        s: it.topUser ? '@' + esc(it.topUser) : '', kuat: true }
-    : { l: 'Tertinggi sekarang', v: '—', s: 'belum dicek', redup: true });
+        s: it.topUser ? '@' + esc(it.topUser) : '' }
+    : { l: 'Tertinggi sekarang', v: '&mdash;', s: 'belum dicek', nihil: true });
 
-  if (it.myBid != null) {
-    angka.push({
-      l: 'Tawaranmu', v: 'Rp' + fmtRupiah(it.myBid),
-      s: it.memimpin ? 'memimpin' : 'kalah', kelas: it.memimpin ? 'baik' : 'buruk'
-    });
-  }
+  // Selalu tampil, walau kamu belum menawar. Kolom yang muncul-hilang membuat
+  // dua kartu bersusunan berbeda, dan "belum menawar" itu sendiri keterangan
+  // yang berguna — bukan alasan menghilangkan barisnya.
+  angka.push(it.myBid != null
+    ? { l: 'Tawaranmu', v: 'Rp' + fmtRupiah(it.myBid),
+        s: it.memimpin ? 'memimpin' : 'kalah', kelas: it.memimpin ? 'baik' : 'buruk' }
+    : { l: 'Tawaranmu', v: '&mdash;',
+        s: P.akunku() ? 'belum menawar' : 'akunmu belum diisi', nihil: true });
 
   if (it.closeAt != null) {
     angka.push({
@@ -823,7 +825,7 @@ function kartu(it, tz) {
 
   const selAngka = angka.map((a) => `<div class="pk-a${a.mundur ? ' pk-mundur' : ''}">
     <span class="pk-l">${a.l}</span>
-    <b class="${a.mundur ? 'jam ' : ''}${a.kelas || ''}${a.redup ? ' redup' : ''}">${a.v}</b>
+    <b class="${a.mundur ? 'jam ' : ''}${a.kelas || ''}${a.nihil ? ' pk-nihil' : ''}">${a.v}</b>
     ${a.s ? `<span class="pk-s ${a.kelas || ''}">${a.s}</span>` : ''}
   </div>`).join('');
 
@@ -843,9 +845,12 @@ function kartu(it, tz) {
     { l: 'Sniper zone', v: it.sniperMin ? it.sniperMin + ' menit' : (it.sniperMin === 0 ? 'tidak ada' : null) },
     { l: 'Peserta', v: it.peserta ? String(it.peserta) : null }
   ];
+  // Kelasnya diberi awalan pk-. "kosong" tanpa awalan sudah dipakai kotak
+  // "belum ada lelang" — bergaris putus-putus dan berpadding 40px — dan
+  // dipungut diam-diam oleh apa pun yang kebetulan memakai nama itu.
   const selRinci = rinci.map((r) => `<div class="pk-r">
     <span class="pk-l">${r.l}</span>
-    <b${r.v == null ? ' class="kosong"' : ''}>${r.v ?? '&mdash;'}</b>
+    <b${r.v == null ? ' class="pk-nihil"' : ''}>${r.v ?? '&mdash;'}</b>
   </div>`).join('');
 
   const status = Object.entries(P.STATUS).map(([k, v]) =>

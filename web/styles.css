@@ -764,7 +764,7 @@ tbody tr.r-snipe td { background: var(--warn-soft); }
   display: block; font-family: var(--mono); font-size: 14px; font-weight: 600;
   font-variant-numeric: tabular-nums; color: var(--ink); overflow-wrap: anywhere;
 }
-.pk-r b.kosong { color: var(--line-2); font-weight: 400; }
+.pk-r b.pk-nihil, .pk-a b.pk-nihil { color: var(--line-2); font-weight: 400; }
 .pk-a { min-width: 0; line-height: 1.25; }
 .pk-l {
   display: block; font-family: var(--mono); font-size: 9.5px; font-weight: 500;
@@ -776,7 +776,6 @@ tbody tr.r-snipe td { background: var(--warn-soft); }
   letter-spacing: -.025em; font-variant-numeric: tabular-nums; color: var(--ink);
   overflow-wrap: anywhere;
 }
-.pk-a b.redup { font-size: 17px; font-weight: 400; color: var(--muted); }
 .pk-a b.baik { color: var(--primary-700); }
 .pk-a b.buruk { color: var(--danger); }
 .pk-s { display: block; font-size: 12px; color: var(--muted); margin-top: 2px; }
@@ -876,7 +875,6 @@ tbody tr.r-snipe td { background: var(--warn-soft); }
   .pk-baris { grid-template-columns: 1fr 1fr; gap: 12px 14px; padding: 12px 13px; }
   .pk-rinci { padding: 10px 13px; }
   .pk-a b { font-size: 18px; }
-  .pk-a b.redup { font-size: 15px; }
   .pk-r b { font-size: 13.5px; }
   .paksi .btn, .paksi .psel, .paksi .pharga { flex: 1 1 calc(50% - 4px); }
   .pbar { gap: 8px; }
