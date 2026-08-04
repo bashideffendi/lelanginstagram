@@ -57,7 +57,9 @@ MAX_PAGES=60
 Write-Host ''
 Write-Host 'Mengirim ke server...' -NoNewline
 
-$perintah = "cat > $ENVF && chmod 600 $ENVF && sudo systemctl restart lelanginsta-api && sleep 3 && systemctl is-active lelanginsta-api"
+# Jeda 6 detik, bukan 3: pemeriksa sesi berjalan sekali saat layanan menyala,
+# dan hasilnya baru siap dibaca sesudah Instagram menjawab.
+$perintah = "cat > $ENVF && chmod 600 $ENVF && sudo systemctl restart lelanginsta-api && sleep 6 && systemctl is-active lelanginsta-api"
 $hasil = $isi | ssh -i $KUNCI -o BatchMode=yes -o StrictHostKeyChecking=accept-new $VPS $perintah 2>&1
 
 if ($hasil -match 'active') {
@@ -70,16 +72,24 @@ if ($hasil -match 'active') {
 
 Write-Host ''
 Write-Host 'Menguji apakah Instagram menerima sesinya...' -NoNewline
-$uji = ssh -i $KUNCI -o BatchMode=yes $VPS "curl -s -m 45 'localhost:8791/api/comments?url=https://www.instagram.com/p/C9xKtOkAbCd/'" 2>&1
+
+# Dulu diuji dengan menarik satu postingan contoh, dan contohnya sudah tidak
+# ada — jadi jawabannya selalu "mungkin berhasil, mungkin tidak". Sekarang
+# server punya pemeriksa sesi sendiri yang menjawab tegas.
+$uji = ssh -i $KUNCI -o BatchMode=yes $VPS "curl -s -m 45 'localhost:8791/sehat'" 2>&1
 
 Write-Host ''
-if ($uji -match '"comments"') {
-  Write-Host 'BERHASIL — sesinya diterima dan komentar bisa ditarik.' -ForegroundColor Green
-} elseif ($uji -match 'menolak sesi') {
-  Write-Host 'DITOLAK — cookie-nya sudah kedaluwarsa. Ambil ulang yang baru, lalu jalankan berkas ini lagi.' -ForegroundColor Red
-} elseif ($uji -match 'tidak ditemukan|404') {
-  Write-Host 'Sesinya kemungkinan diterima; postingan contoh yang dipakai menguji memang tidak ada.' -ForegroundColor Yellow
-  Write-Host 'Coba langsung dari halaman Lelang Insta dengan link lelang sungguhan.'
+if ($uji -match '"keadaan"\s*:\s*"hidup"') {
+  Write-Host 'BERHASIL — Instagram menerima sesinya.' -ForegroundColor Green
+} elseif ($uji -match '"keadaan"\s*:\s*"ditolak"') {
+  Write-Host 'DITOLAK — cookie itu sudah kedaluwarsa juga.' -ForegroundColor Red
+  Write-Host 'Pastikan kamu menyalinnya dari browser yang MASIH login, bukan dari catatan lama.'
+  Write-Host 'Buka instagram.com dulu dan pastikan halamannya terbuka tanpa diminta login.'
+} elseif ($uji -match '"keadaan"\s*:\s*"kosong"') {
+  Write-Host 'Cookie tidak terbaca di server. Coba jalankan berkas ini sekali lagi.' -ForegroundColor Red
+} elseif ($uji -match '"keadaan"\s*:\s*"tak_tentu"') {
+  Write-Host 'Server tidak bisa menghubungi Instagram saat ini — bukan berarti cookie-nya salah.' -ForegroundColor Yellow
+  Write-Host 'Tunggu sebentar, lalu buka halaman Pantauan untuk melihat keadaannya.'
 } else {
   Write-Host 'Jawaban server:' -ForegroundColor Yellow
   Write-Host ($uji.ToString().Substring(0, [Math]::Min(400, $uji.ToString().Length)))
