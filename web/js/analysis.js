@@ -236,13 +236,28 @@ export function fmtRupiah(v) {
  * Cari harga pembukaan yang tertulis di caption atau aturan lelang.
  * Bentuk yang lazim: "OB : 750K", "Open Bid 750rb", "OB Rp750.000".
  */
+/**
+ * Harga pembukaan dari caption atau komentar aturan.
+ *
+ * Ikut melaporkan apakah angkanya kuat — bersatuan atau ber-Rp — karena itu
+ * menentukan boleh tidaknya dipakai sebagai acuan kalibrasi skala. "OB 750K"
+ * acuan terbaik yang bisa didapat; "OB 100" bukan acuan sama sekali, itu
+ * justru angka telanjang yang perlu dikalibrasi juga.
+ *
+ * Dulu semuanya dianggap kuat, dan akibatnya berantai: angka telanjang 100
+ * masuk ke kumpulan acuan, median acuan jadi 100, kalibrasi menyimpulkan skala
+ * 1, lalu seluruh tawaran di lelang itu terbaca ratusan rupiah. Kartunya
+ * memajang "buka Rp100" — dan itu persis gejalanya.
+ */
 export function cariOpenBid(teks) {
   if (!teks) return null;
   const re = /\b(?:ob|open\s*bid|opening\s*bid)\b\s*[:=.]?\s*((?:rp\.?\s*)?[\d.,]+\s*(?:jt|juta|jeti|mio|rb|ribu|k)?)/gi;
   let m;
   while ((m = re.exec(String(teks))) !== null) {
     const nilai = parseBid(m[1]);
-    if (nilai.value != null) return nilai.value;
+    if (nilai.value != null) {
+      return { value: nilai.value, kuat: /(jt|juta|jeti|mio|rb|ribu|k|rp)/i.test(m[1]) };
+    }
   }
   return null;
 }
@@ -340,16 +355,18 @@ export function analyze(comments, opts = {}) {
   }
 
   // Harga pembukaan: dari caption, atau dari komentar aturan lelang.
-  const openBid = cariOpenBid(captionText) ||
+  const ob = cariOpenBid(captionText) ||
     cariOpenBid(rows.filter((r) => r.isAnnouncement || r.isOwner).map((r) => r.text).join('\n'));
 
   // Komentar "OB" tanpa angka berarti menawar di harga pembukaan itu.
-  if (openBid != null) {
+  if (ob) {
     for (const r of rows) {
       if (r.bidRaw == null && !r.isAnnouncement && menawarDiPembukaan(r.text)) {
-        r.bidRaw = openBid;
-        r.bidStrong = true;                 // nilainya dari angka bersatuan di aturan
-        r.bidConfidence = 'high';
+        r.bidRaw = ob.value;
+        // Sekuat sumbernya, tidak lebih. Kalau aturannya menulis "OB 100"
+        // tanpa satuan, tawaran ini pun angka telanjang dan ikut dikalibrasi.
+        r.bidStrong = ob.kuat;
+        r.bidConfidence = ob.kuat ? 'high' : 'medium';
         r.bidMatched = 'OB';
         r.isOpenBid = true;
       }
@@ -368,6 +385,10 @@ export function analyze(comments, opts = {}) {
     r.bid = r.bidRaw == null ? null : (r.bidStrong ? r.bidRaw : r.bidRaw * skala);
     r.bidScaled = r.bidRaw != null && !r.bidStrong && skala !== 1;
   }
+
+  // Harga pembukaan ikut dikalibrasi kalau angkanya telanjang, supaya tidak
+  // jadi satu-satunya nilai di layar yang memakai skala berbeda dari sisanya.
+  const openBid = ob ? (ob.kuat ? ob.value : ob.value * skala) : null;
 
   // --- Sniper zone menentukan tawaran mana yang tidak berhak, jadi dihitung
   // sebelum pemenang dipilih. Ia tidak menggeser waktu tutup.

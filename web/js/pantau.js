@@ -95,29 +95,80 @@ export function setAkunku(nama) {
 // ---------------------------------------------------------------- turunan
 
 /** Judul barang: baris pertama caption yang bukan aturan atau tempelan. */
+/**
+ * Baris pembuka caption lelang sering bukan nama barang, melainkan tata tertib
+ * — "Mohon dibaca keterangan", "Happy bidding", "No PHP". Baris begitu lolos
+ * saringan lama karena bentuknya wajar: cukup panjang, berhuruf, tidak diawali
+ * kata "lelang". Hasilnya judul kartu berisi imbauan penjual, bukan barangnya.
+ */
+const BUANG_AWAL = new RegExp('^(' + [
+  'lelang', 'open\\s*bid', 'ob\\b', 'bid\\b', 'closed?', 'close', 'rules?', 'note',
+  'hati2', 'rek\\b', 'no\\s', 'mohon', 'harap', 'silahkan', 'silakan', 'wajib',
+  'baca', 'dibaca', 'perhatikan', 'ingat', 'catatan', 'syarat', 'ketentuan',
+  'aturan', 'happy', 'selamat', 'terima\\s*kasih', 'thanks?', 'serius', 'jangan',
+  'dm\\b', 'chat', 'wa\\b', 'hubungi', 'info\\b', 'kondisi', 'deskripsi',
+  'keterangan', 'yang\\s', 'siapa', 'pemenang', 'minat', 'fast', 'cod\\b',
+  'ongkir', 'garansi', 'sold', 'start'
+].join('|') + ')', 'i');
+
+/** Penanda tata tertib yang bisa muncul di tengah baris, bukan cuma di awal. */
+const BUANG_ISI = /(dibaca|read\s*caption|happy\s*bidding|no\s*php|no\s*cancel|serius\s*bid|ketentuan|terima\s*kasih)/i;
+
 export function tebakJudul(caption) {
   if (!caption) return null;
-  const buang = /^(lelang|open\s*bid|ob\b|bid\b|closed?|close|rules?|note|hati2|rek\b|no cod)/i;
+
+  const calon = [];
   for (const baris of String(caption).split(/\r?\n/)) {
     const b = baris.replace(/[^\p{L}\p{N}\s.,'()+-]/gu, '').trim();
     if (b.length < 6 || b.length > 90) continue;
-    if (buang.test(b)) continue;
-    if (!/[\p{L}]/u.test(b)) continue;
-    return b;
+    if (!/\p{L}/u.test(b)) continue;
+    if (BUANG_AWAL.test(b) || BUANG_ISI.test(b)) continue;
+    calon.push(b);
   }
+
+  // Nama barang hampir selalu membawa kode model — "SRPD 55", "43-5170".
+  // Kalau ada baris berkode, itu jauh lebih meyakinkan daripada sekadar baris
+  // pertama yang kebetulan lolos saringan.
+  const berkode = calon.find((b) => /\p{L}[\p{L}\s]*[-\s]?\d{2,}/u.test(b));
+  if (berkode) return berkode;
+  if (calon.length) return calon[0];
+
   // Tidak ada baris yang meyakinkan; pakai baris pertama apa adanya.
   const awal = String(caption).split(/\r?\n/).find((x) => x.trim());
   return awal ? awal.trim().slice(0, 90) : null;
 }
 
 /** Kelipatan minimum, biasanya ditulis "+50K" atau "Minimal Bid : 50rb". */
+/*
+ * Kata "bid" saja pernah ikut jadi kata kunci di sini, dan itu keliru: caption
+ * hampir selalu menyebut "Open bid 750rb" sebelum menyebut kelipatannya, jadi
+ * yang terbaca justru harga pembukaan. Kartunya lalu memajang "naik Rp750.000"
+ * — salah besar, tapi bentuknya wajar sehingga tidak kentara.
+ *
+ * Sekarang hanya kata yang benar-benar menunjuk kenaikan yang dipakai. Tidak
+ * menebak lebih baik daripada menebak angka yang salah, karena kolomnya toh
+ * bisa diisi sendiri.
+ */
 export function tebakKelipatan(caption, parseBid) {
   if (!caption) return null;
-  const re = /(?:kelipatan|minimal\s*bid|min\s*bid|bid)\s*[:=]?\s*\+?\s*((?:rp\.?\s*)?[\d.,]+\s*(?:jt|juta|rb|ribu|k)?)/gi;
+  const nilai = '((?:rp\\.?\\s*)?[\\d.,]+\\s*(?:jt|juta|rb|ribu|k)?)';
+  const re = new RegExp(
+    '(?:kelipatan|minimal\\s*bid|min\\.?\\s*bid|increment|naik(?:an)?)\\s*[:=]?\\s*\\+?\\s*' + nilai +
+    '|(?:^|[\\s(])\\+\\s*' + nilai,
+    'gi');
+
   let m;
   while ((m = re.exec(caption)) !== null) {
-    const v = parseBid(m[1]);
-    if (v.value != null) return v.value;
+    const v = parseBid(m[1] ?? m[2]);
+    if (v.value == null) continue;
+    const teks = m[1] ?? m[2];
+
+    // "kelipatan 50" maksudnya Rp50.000, bukan Rp50. Aturan yang sama sudah
+    // dipakai untuk tawaran di komentar; tanpa ini, kartunya memajang
+    // "naik Rp50" — angka yang tidak pernah ada di lelang mana pun, dan
+    // salahnya tidak kentara karena bentuknya tetap masuk akal.
+    const telanjang = !/(jt|juta|rb|ribu|k|\.|,)/i.test(teks);
+    return telanjang && v.value < 1000 ? v.value * 1000 : v.value;
   }
   return null;
 }
