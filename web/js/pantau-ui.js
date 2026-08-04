@@ -21,6 +21,9 @@ let deps = null;
 let detak = null;
 let pemburu = null;
 let sedangDiubah = null;      // id lelang yang sedang disunting
+let subTab = 'jalan';         // 'jalan' | 'selesai'
+
+const SELESAI = new Set(['menang', 'kalah', 'batal']);
 
 /**
  * Hasil penarikan terakhir per lelang, hanya selama tab terbuka.
@@ -91,6 +94,14 @@ export function initPantau(d) {
   // Satu penangan untuk seluruh daftar; barisnya digambar ulang terus-menerus.
   $('plist').addEventListener('click', tanganiAksi);
   $('plist').addEventListener('change', tanganiUbah);
+
+  $('ptab').addEventListener('click', (e) => {
+    const t = e.target.closest('[data-ptab]');
+    if (!t) return;
+    subTab = t.dataset.ptab;
+    sedangDiubah = null;
+    render();
+  });
 
   A.keadaan().then((k) => {
     keadaanAkun = k;
@@ -466,16 +477,30 @@ async function tanganiAksi(e) {
 
 function tanganiUbah(e) {
   const el = e.target;
+
+  // Hanya kendali di kartu ringkas yang menyimpan seketika. Kolom di dalam
+  // form sunting punya tombol Simpan sendiri; menggambar ulang di sini
+  // menghapus yang baru diketik begitu pindah kolom — persis seperti kolomnya
+  // tidak bisa diisi.
+  const jenis = el.dataset.ubah;
+  if (!jenis) return;
+
   const id = el.closest('[data-id]')?.dataset.id;
   const item = P.ambil(id);
   if (!item) return;
 
-  if (el.dataset.ubah === 'status') {
+  if (jenis === 'status') {
     P.simpan({ ...item, status: el.value });
-  } else if (el.dataset.ubah === 'final') {
+    // Kartunya pindah tab, jadi terlihat seperti menghilang. Sebut ke mana.
+    const keSelesai = SELESAI.has(el.value);
+    if (keSelesai !== (subTab === 'selesai')) {
+      stat(`"${esc(item.title || item.id)}" dipindahkan ke tab ` +
+        `<b>${keSelesai ? 'Riwayat' : 'Berjalan'}</b>.`, 'ready');
+    }
+  } else if (jenis === 'final') {
     const v = parseBid(el.value);
     P.simpan({ ...item, finalPrice: v.value });
-  } else if (el.dataset.ubah === 'sniper') {
+  } else if (jenis === 'sniper') {
     P.simpan({ ...item, sniperMin: +el.value || 0 });
   }
   render();
@@ -517,19 +542,38 @@ export function render() {
     }, 700);
   }
   sidikTerakhir = s;
-  $('c-pantau').textContent = daftar.filter((x) => x.status === 'aktif').length || '';
 
-  if (!daftar.length) {
-    $('plist').innerHTML =
-      '<p class="kosong">Belum ada lelang dipantau. Tempel link lelang di atas, ' +
-      'dan jam tutupnya akan dibaca sendiri dari caption postingannya.</p>';
-    $('priwayat').innerHTML = '';
-    return;
+  const jalan = daftar.filter((x) => !SELESAI.has(x.status));
+  const selesai = daftar.filter((x) => SELESAI.has(x.status));
+
+  $('c-pantau').textContent = jalan.length || '';
+  $('c-jalan').textContent = jalan.length || '';
+  $('c-selesai').textContent = selesai.length || '';
+  for (const b of $('ptab').querySelectorAll('[data-ptab]')) {
+    b.classList.toggle('on', b.dataset.ptab === subTab);
   }
 
   const tz = deps.tz();
-  $('plist').innerHTML = daftar.map((it) => kartu(it, tz)).join('');
-  $('priwayat').innerHTML = riwayat(tz);
+  const riwayatTampil = subTab === 'selesai';
+  $('priwayat').classList.toggle('hidden', !riwayatTampil);
+
+  // Yang paling dekat tutup naik ke atas; yang belum punya jam tutup ke bawah.
+  // Di riwayat urutannya terbalik — yang paling baru selesai yang dicari.
+  const tampil = riwayatTampil
+    ? selesai.slice().sort((a, b) => (b.closeAt ?? 0) - (a.closeAt ?? 0))
+    : jalan.slice().sort((a, b) => (a.closeAt ?? Infinity) - (b.closeAt ?? Infinity));
+
+  if (!tampil.length) {
+    $('plist').innerHTML = `<p class="kosong">${riwayatTampil
+      ? 'Belum ada lelang yang ditandai selesai. Tandai <b>menang</b> atau <b>kalah</b> ' +
+        'di kartu lelang, dan lelangnya pindah ke sini.'
+      : 'Belum ada lelang dipantau. Tempel link lelang di atas, dan jam tutupnya ' +
+        'akan dibaca sendiri dari caption postingannya.'}</p>`;
+  } else {
+    $('plist').innerHTML = tampil.map((it) => kartu(it, tz)).join('');
+  }
+
+  $('priwayat').innerHTML = riwayatTampil ? riwayat(tz) : '';
 }
 
 /** Hitung mundur ringkas: berdetik saat mepet, berjam saat masih lama. */
@@ -544,12 +588,34 @@ function mundur(detik) {
   return `${Math.floor(detik / 86400)} hari ${j % 24} jam`;
 }
 
+/**
+ * Warna kartu menandai keadaan, bukan menghias.
+ *
+ * Semua kartu berwarna sama membuat mata tidak punya pegangan: yang genting
+ * dan yang masih berhari-hari lagi terlihat setara. Urutan pemeriksaannya
+ * disusun dari yang paling menuntut tindakan.
+ */
+export function nadaKartu(it) {
+  if (it.status === 'menang') return 'menang';
+  if (it.status === 'kalah') return 'kalah';
+  if (it.status === 'batal') return 'batal';
+
+  const sisa = it.closeAt != null ? sisaWaktu(it.closeAt) : null;
+  if (sisa?.lewat) return 'lewat';
+  // Tersalip lebih mendesak daripada sekadar mepet waktu: ada yang harus
+  // kamu putuskan, bukan sekadar ditunggu.
+  if (it.myBid != null && !it.memimpin) return 'tersalip';
+  if (sisa?.mendesak) return 'mendesak';
+  if (it.memimpin) return 'memimpin';
+  return 'jalan';
+}
+
 function kartu(it, tz) {
   if (sedangDiubah === it.id) return formUbah(it, tz);
 
   const sisa = it.closeAt != null ? sisaWaktu(it.closeAt) : null;
   const aktif = it.status === 'aktif';
-  const nada = !aktif ? '' : sisa?.lewat ? 'lewat' : sisa?.mendesak ? 'mendesak' : '';
+  const nada = nadaKartu(it);
 
   const detik = it.closeAt != null ? it.closeAt - Math.floor(Date.now() / 1000) : null;
   const url = it.url || (it.shortcode ? 'https://www.instagram.com/p/' + it.shortcode + '/' : null);
@@ -601,7 +667,7 @@ function kartu(it, tz) {
 
     <div class="paksi">
       <button class="btn sm" data-aksi="buka">Lihat urutan tawaran</button>
-      <button class="btn sm quiet" data-aksi="cek">Cek sekarang</button>
+      ${aktif ? '<button class="btn sm quiet" data-aksi="cek">Cek sekarang</button>' : ''}
       <button class="btn sm quiet" data-aksi="ubah">Ubah</button>
       <select class="psel" data-ubah="status">${status}</select>
       ${it.status === 'menang' || it.status === 'kalah'
@@ -609,7 +675,7 @@ function kartu(it, tz) {
              value="${it.finalPrice != null ? 'Rp' + fmtRupiah(it.finalPrice) : ''}">`
         : ''}
       <span class="fill"></span>
-      <button class="btn sm quiet" data-aksi="ics" title="Unduh berkas kalender">Kalender</button>
+      ${aktif ? '<button class="btn sm quiet" data-aksi="ics" title="Unduh berkas kalender">Kalender</button>' : ''}
       <button class="btn sm quiet" data-aksi="hapus">Hapus</button>
     </div>
   </article>`;
@@ -710,13 +776,15 @@ export function mulaiDetak(aktif) {
       const it = P.ambil(el.dataset.id);
       if (!it || it.status !== 'aktif' || it.closeAt == null) continue;
 
-      const s = sisaWaktu(it.closeAt);
       const kotak = el.querySelector('.pk-mundur .jam');
-      if (!kotak) continue;
+      if (!kotak) continue;                       // kartu sedang disunting
+
+      // Warnanya ikut berubah sendiri saat lelang masuk jam genting, tanpa
+      // menunggu penarikan berikutnya.
+      const nada = nadaKartu(it);
       kotak.textContent = mundur(it.closeAt - now);
-      el.querySelector('.pk-mundur').className =
-        'pk-mundur ' + (s.lewat ? 'lewat' : s.mendesak ? 'mendesak' : '');
-      el.className = 'pcard-item ' + (s.lewat ? 'lewat' : s.mendesak ? 'mendesak' : '');
+      el.querySelector('.pk-mundur').className = 'pk-mundur ' + nada;
+      el.className = 'pcard-item ' + nada;
     }
   }, 1000);
 
@@ -747,6 +815,9 @@ let sedangCek = false;
 async function perbaruiYangJatuhTempo() {
   if (sedangCek || document.hidden) return;
   if (deps.tampilPantau && !deps.tampilPantau()) return;
+  // Menggambar ulang di tengah penyuntingan menghapus ketikan yang belum
+  // disimpan. Pemeriksaannya bisa menunggu; ketikan yang hilang tidak.
+  if (sedangDiubah) return;
 
   const now = Math.floor(Date.now() / 1000);
   const antre = P.semua().filter((it) => {

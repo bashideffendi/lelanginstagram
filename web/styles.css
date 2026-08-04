@@ -15,6 +15,9 @@
   --danger: #C0432F; --danger-soft: rgba(192, 67, 47, .08);
   --ok: #23985A; --ok-soft: rgba(35, 152, 90, .10);
   --warn: #C5891B; --warn-soft: rgba(197, 137, 27, .10);
+  /* Warna keadaan kartu pantauan — dipakai untuk menandai, bukan menghias. */
+  --info: #2563A8; --info-soft: rgba(37, 99, 168, .09);
+  --rose: #B5314A; --rose-soft: rgba(181, 49, 74, .09);
   --mark: #DCE0E6;
   --shadow-sm: 0 1px 1px rgba(0, 0, 0, .02);
   --shadow: 0 1px 2px rgba(0, 0, 0, .05);
@@ -614,14 +617,64 @@ tbody tr.r-snipe td { background: var(--warn-soft); }
   border: 1px dashed var(--line-2); border-radius: var(--r); background: var(--surface-2);
 }
 
+/* ---- sub-tab: yang berjalan, dan yang sudah selesai ---- */
+.ptab { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin: 26px 0 16px; }
+.ptab button {
+  background: none; border: 0; border-bottom: 2px solid transparent;
+  padding: 9px 2px; margin-right: 20px; cursor: pointer;
+  font-family: var(--sans); font-size: 13.5px; font-weight: 600;
+  color: var(--muted); display: inline-flex; align-items: center; gap: 7px;
+}
+.ptab button:hover { color: var(--ink); }
+.ptab button.on { color: var(--ink); border-bottom-color: var(--primary); }
+.ptab .pip {
+  font-family: var(--mono); font-size: 10.5px; font-weight: 500;
+  background: var(--surface-2); border: 1px solid var(--line);
+  border-radius: 20px; padding: 1px 7px; color: var(--muted);
+}
+.ptab button.on .pip {
+  background: var(--primary-soft); border-color: rgba(14, 138, 95, .22); color: var(--primary);
+}
+.ptab .pip:empty { display: none; }
+
+/*
+ * Warna kartu = keadaan lelangnya.
+ *
+ * Kartu yang semuanya berwarna sama membuat mata tidak punya pegangan: yang
+ * tinggal lima menit dan yang masih tiga hari terlihat setara, jadi seluruh
+ * daftar harus dibaca satu per satu. Tiap keadaan diberi satu warna dan
+ * dipakai konsisten di garis tepi, latar, dan angka hitung mundurnya.
+ */
 .pcard-item {
   background: var(--surface); border: 1px solid var(--line);
-  border-left: 3px solid var(--line-2);
+  border-left: 4px solid var(--line-2);
   border-radius: var(--r); padding: 16px 18px; box-shadow: var(--shadow-sm);
 }
+
+/* Berjalan, masih lama — biru tenang, tidak menuntut apa-apa. */
+.pcard-item.jalan { border-left-color: var(--info); background: var(--info-soft); }
+
+/* Tawaranmu sudah dilewati orang. Ada yang harus kamu putuskan. */
+.pcard-item.tersalip { border-left-color: var(--rose); background: var(--rose-soft); }
+.pk-mundur.tersalip .jam { color: var(--rose); }
+
 /* Kurang dari sejam lagi — inilah yang membuat orang kalah karena lupa. */
 .pcard-item.mendesak { border-left-color: var(--amber); background: var(--warn-soft); }
-.pcard-item.lewat { border-left-color: var(--line-2); opacity: .72; }
+.pk-mundur.mendesak .jam { color: var(--amber); }
+
+/* Kamu yang tertinggi sekarang. */
+.pcard-item.memimpin { border-left-color: var(--primary); background: var(--primary-soft); }
+.pk-mundur.memimpin .jam { color: var(--primary-700); }
+
+/* Jamnya lewat tapi belum ditandai hasilnya. */
+.pcard-item.lewat { border-left-color: var(--line-2); background: var(--surface-2); opacity: .78; }
+.pk-mundur.lewat .jam { color: var(--muted); font-weight: 400; }
+
+/* ---- sudah selesai, di tab Riwayat ---- */
+.pcard-item.menang { border-left-color: var(--primary); background: var(--primary-soft); }
+.pcard-item.kalah { border-left-color: var(--line-2); background: var(--surface-2); }
+.pcard-item.batal { border-left-color: var(--line-2); background: var(--surface-2); opacity: .7; }
+.pcard-item.kalah .pk-harga b, .pcard-item.batal .pk-harga b { color: var(--muted); }
 
 /*
  * Kartu dibaca dari dua hal saja: berapa lama lagi, dan berapa harganya
@@ -643,8 +696,6 @@ tbody tr.r-snipe td { background: var(--warn-soft); }
   letter-spacing: -.02em; font-variant-numeric: tabular-nums; color: var(--ink);
 }
 .pk-mundur .ket { font-size: 10.5px; color: var(--muted); }
-.pk-mundur.mendesak .jam { color: var(--amber); }
-.pk-mundur.lewat .jam { color: var(--muted); font-weight: 400; }
 
 .pk-harga {
   display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
