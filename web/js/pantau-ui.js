@@ -195,13 +195,48 @@ function stat(teks, kelas = '') {
  * empat jam dan hasilnya dipajang di sini, jadi kamu sempat mengurusnya saat
  * tidak sedang mengejar apa pun.
  */
+/**
+ * Setor ulang sesi tiap beberapa hari, walau yang di server masih hidup.
+ *
+ * Instagram memutar sessionid untuk browser yang aktif dipakai. Kalau server
+ * cuma disegarkan saat sesinya sudah mati, selalu ada jendela di antaranya —
+ * sesi di server mati lebih dulu, penarikan dari HP gagal, dan baru ketahuan
+ * dari peringatan. Menyetorkan yang terbaru secara berkala membuat sesi di
+ * server mengikuti sesi di browser ini, jadi jendela itu tidak pernah terbuka.
+ *
+ * Diam sepenuhnya: tidak ada yang perlu dilihat kalau tidak ada yang salah.
+ */
+const JARAK_SETOR = 3 * 24 * 3600 * 1000;
+const KUNCI_SETOR = 'lelanginsta_setor_sesi';
+
+async function segarkanBerkala() {
+  if (!deps.punyaExtension?.() || !A.sudahMasuk()) return;
+
+  let terakhir = 0;
+  try { terakhir = Number(localStorage.getItem(KUNCI_SETOR) || 0); } catch { /* mode privat */ }
+  if (Date.now() - terakhir < JARAK_SETOR) return;
+
+  try {
+    await segarkanSesiViaExtension(A.token());
+    try { localStorage.setItem(KUNCI_SETOR, String(Date.now())); } catch { /* diabaikan */ }
+  } catch {
+    // Gagal saat sesinya masih hidup bukan masalah: dicoba lagi lain kali.
+  }
+}
+
 async function periksaSesi() {
   const kotak = $('psesi');
   if (!kotak) return;
 
   const s = await keadaanSesiServer();
-  if (!s || s.keadaan === 'hidup' || s.keadaan === 'belum' || s.keadaan === 'tak_tentu') {
+  if (!s || s.keadaan === 'belum' || s.keadaan === 'tak_tentu') {
     kotak.innerHTML = '';
+    return;
+  }
+
+  if (s.keadaan === 'hidup') {
+    kotak.innerHTML = '';
+    segarkanBerkala();
     return;
   }
 
