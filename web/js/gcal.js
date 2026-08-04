@@ -189,7 +189,7 @@ function acara(it, tz) {
  * sisa acara lama.
  */
 export async function sinkron(items, tz, { simpan }) {
-  const hasil = { dibuat: 0, diperbarui: 0, dihapus: 0, gagal: [] };
+  const hasil = { dibuat: 0, diperbarui: 0, dihapus: 0, gagal: [], tautan: null };
 
   for (const it of items) {
     const perlu = it.status === 'aktif' && it.closeAt != null;
@@ -197,18 +197,24 @@ export async function sinkron(items, tz, { simpan }) {
     try {
       if (perlu) {
         if (it.gcalId) {
-          await panggil(`/calendars/primary/events/${encodeURIComponent(it.gcalId)}`, {
+          const j = await panggil(`/calendars/primary/events/${encodeURIComponent(it.gcalId)}`, {
             method: 'PATCH',
             body: JSON.stringify(acara(it, tz))
           });
+          if (j.htmlLink && j.htmlLink !== it.gcalLink) simpan({ ...it, gcalLink: j.htmlLink });
           hasil.diperbarui++;
+          hasil.tautan = hasil.tautan || j.htmlLink || null;
         } else {
           const j = await panggil('/calendars/primary/events', {
             method: 'POST',
             body: JSON.stringify(acara(it, tz))
           });
-          simpan({ ...it, gcalId: j.id });
+          // Tautannya ikut disimpan. "1 ditambahkan" tidak membuktikan apa-apa
+          // kalau acaranya tidak ketemu di kalender; tautan ini membuka acara
+          // itu persis, di akun mana pun dia sebenarnya dibuat.
+          simpan({ ...it, gcalId: j.id, gcalLink: j.htmlLink || null });
           hasil.dibuat++;
+          hasil.tautan = hasil.tautan || j.htmlLink || null;
         }
       } else if (it.gcalId) {
         await panggil(`/calendars/primary/events/${encodeURIComponent(it.gcalId)}`, { method: 'DELETE' });

@@ -249,6 +249,16 @@ export function fmtRupiah(v) {
  * 1, lalu seluruh tawaran di lelang itu terbaca ratusan rupiah. Kartunya
  * memajang "buka Rp100" — dan itu persis gejalanya.
  */
+/**
+ * Harga pembukaan siap pakai dari caption saja, tanpa komentar sebagai acuan.
+ * Angka telanjang di bawah seribu berarti ribuan — "OB 100" itu Rp100.000.
+ */
+export function tebakOpenBid(teks) {
+  const ob = cariOpenBid(teks);
+  if (!ob) return null;
+  return ob.kuat || ob.value >= 1000 ? ob.value : ob.value * 1000;
+}
+
 export function cariOpenBid(teks) {
   if (!teks) return null;
   const re = /\b(?:ob|open\s*bid|opening\s*bid)\b\s*[:=.]?\s*((?:rp\.?\s*)?[\d.,]+\s*(?:jt|juta|jeti|mio|rb|ribu|k)?)/gi;
@@ -388,7 +398,12 @@ export function analyze(comments, opts = {}) {
 
   // Harga pembukaan ikut dikalibrasi kalau angkanya telanjang, supaya tidak
   // jadi satu-satunya nilai di layar yang memakai skala berbeda dari sisanya.
-  const openBid = ob ? (ob.kuat ? ob.value : ob.value * skala) : null;
+  // Kalau kalibrasinya tidak punya bahan — misalnya semua tawaran di komentar
+  // bersatuan sementara aturannya menulis "OB 100" — aturan telanjangnya tetap
+  // berlaku sendiri. Tidak ada lelang jam tangan seharga seratus rupiah.
+  const openBid = ob
+    ? (ob.kuat ? ob.value : ob.value * (skala !== 1 ? skala : (ob.value < 1000 ? 1000 : 1)))
+    : null;
 
   // --- Sniper zone menentukan tawaran mana yang tidak berhak, jadi dihitung
   // sebelum pemenang dipilih. Ia tidak menggeser waktu tutup.

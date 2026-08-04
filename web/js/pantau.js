@@ -94,99 +94,48 @@ export function setAkunku(nama) {
 
 // ---------------------------------------------------------------- turunan
 
-/** Judul barang: baris pertama caption yang bukan aturan atau tempelan. */
-/**
- * Baris pembuka caption lelang sering bukan nama barang, melainkan tata tertib
- * — "Mohon dibaca keterangan", "Happy bidding", "No PHP". Baris begitu lolos
- * saringan lama karena bentuknya wajar: cukup panjang, berhuruf, tidak diawali
- * kata "lelang". Hasilnya judul kartu berisi imbauan penjual, bukan barangnya.
+/*
+ * Nama barang sengaja TIDAK ditebak.
+ *
+ * Tiap penjual menulis caption dengan gaya sendiri, dan tidak ada pola yang
+ * bertahan di antara mereka. Penebak lamanya sudah dua kali salah dengan cara
+ * yang berbeda: sekali mengambil tata tertib ("Mohon dibaca keterangan sebelum
+ * bid"), sekali mengambil spesifikasi ("Lingkar pergelangan +- 15 cm"). Tiap
+ * perbaikan cuma memindahkan salahnya ke bentuk baru.
+ *
+ * Kolomnya dibiarkan kosong dan bisa diisi sendiri. Kartu tetap terbaca tanpa
+ * itu, karena yang memimpin kartu adalah nama penjual — data pasti dari
+ * Instagram. Kosong lebih jujur daripada salah: kolom kosong terlihat sebagai
+ * sesuatu yang perlu diisi, kalimat salah terlihat sebagai sesuatu yang sudah
+ * benar.
+ *
+ * Harga pembukaan dan kelipatan tetap ditebak. Keduanya ditulis dengan kata
+ * kunci yang seragam antar penjual — "OB", "kelipatan" — jadi tebakannya
+ * berpijak pada pola nyata, bukan pada tata letak caption.
  */
-const BUANG_AWAL = new RegExp('^(' + [
-  'lelang', 'open\\s*bid', 'ob\\b', 'bid\\b', 'closed?', 'close', 'rules?', 'note',
-  'hati2', 'rek\\b', 'no\\s', 'mohon', 'harap', 'silahkan', 'silakan', 'wajib',
-  'baca', 'dibaca', 'perhatikan', 'ingat', 'catatan', 'syarat', 'ketentuan',
-  'aturan', 'happy', 'selamat', 'terima\\s*kasih', 'thanks?', 'serius', 'jangan',
-  'dm\\b', 'chat', 'wa\\b', 'hubungi', 'info\\b', 'kondisi', 'deskripsi',
-  'keterangan', 'yang\\s', 'siapa', 'pemenang', 'minat', 'fast', 'cod\\b',
-  'ongkir', 'garansi', 'sold', 'start'
-].join('|') + ')', 'i');
-
-/** Penanda tata tertib yang bisa muncul di tengah baris, bukan cuma di awal. */
-const BUANG_ISI = /(dibaca|read\s*caption|happy\s*bidding|no\s*php|no\s*cancel|serius\s*bid|ketentuan|terima\s*kasih)/i;
-
-/** Apakah baris ini tata tertib penjual, bukan nama barang? */
-export function judulBoilerplate(teks) {
-  const b = String(teks || '').trim();
-  if (!b) return false;
-  return BUANG_AWAL.test(b) || BUANG_ISI.test(b);
-}
 
 /**
- * Betulkan judul yang terlanjur tersimpan dari tebakan lama.
+ * Buang judul yang terlanjur tersimpan dari tebakan lama.
  *
- * Judul ditebak sekali saat lelang ditambahkan, lalu disimpan. Memperbaiki
- * penebaknya saja tidak menyentuh yang sudah ada — lelang yang sudah dipantau
- * tetap memajang "Mohon dibaca keterangan sebelum bid" sampai penarikan
- * berikutnya kebetulan berjalan. Captionnya ikut tersimpan, jadi tebakannya
- * bisa diulang di tempat tanpa menyentuh Instagram sama sekali.
- *
- * Judul yang kamu ketik sendiri tidak diutak-atik, walau bentuknya kebetulan
- * mirip tata tertib.
+ * Membiarkannya berarti sebagian kartu memajang tebakan dan sebagian tidak,
+ * tanpa cara membedakan mana yang mana. Judul yang kamu ketik sendiri tidak
+ * disentuh.
  */
-export function perbaikiJudul() {
-  const daftar = baca();          // apa adanya, tanpa urutan tampilan
-  let diperbaiki = 0;
+export function bersihkanJudulTebakan() {
+  const daftar = baca();
+  let dibuang = 0;
 
   for (const it of daftar) {
-    if ((it.manual || []).includes('title') || !it.caption) continue;
-    if (!judulBoilerplate(it.title)) continue;
-
-    const baru = tebakJudul(it.caption);
-    if (baru && baru !== it.title && !judulBoilerplate(baru)) {
-      it.title = baru;
-      diperbaiki++;
-    }
+    if ((it.manual || []).includes('title')) continue;
+    if (it.title == null) continue;
+    it.title = null;
+    dibuang++;
   }
 
-  if (diperbaiki) tulis(daftar);
-  return diperbaiki;
+  if (dibuang) tulis(daftar);
+  return dibuang;
 }
 
-export function tebakJudul(caption) {
-  if (!caption) return null;
-
-  const calon = [];
-  for (const baris of String(caption).split(/\r?\n/)) {
-    const b = baris.replace(/[^\p{L}\p{N}\s.,'()+-]/gu, '').trim();
-    if (b.length < 6 || b.length > 90) continue;
-    if (!/\p{L}/u.test(b)) continue;
-    if (BUANG_AWAL.test(b) || BUANG_ISI.test(b)) continue;
-    calon.push(b);
-  }
-
-  // Nama barang hampir selalu membawa kode model — "SRPD 55", "43-5170".
-  // Kalau ada baris berkode, itu jauh lebih meyakinkan daripada sekadar baris
-  // pertama yang kebetulan lolos saringan.
-  const berkode = calon.find((b) => /\p{L}[\p{L}\s]*[-\s]?\d{2,}/u.test(b));
-  if (berkode) return berkode;
-  if (calon.length) return calon[0];
-
-  // Tidak ada baris yang meyakinkan; pakai baris pertama apa adanya.
-  const awal = String(caption).split(/\r?\n/).find((x) => x.trim());
-  return awal ? awal.trim().slice(0, 90) : null;
-}
-
-/** Kelipatan minimum, biasanya ditulis "+50K" atau "Minimal Bid : 50rb". */
-/*
- * Kata "bid" saja pernah ikut jadi kata kunci di sini, dan itu keliru: caption
- * hampir selalu menyebut "Open bid 750rb" sebelum menyebut kelipatannya, jadi
- * yang terbaca justru harga pembukaan. Kartunya lalu memajang "naik Rp750.000"
- * — salah besar, tapi bentuknya wajar sehingga tidak kentara.
- *
- * Sekarang hanya kata yang benar-benar menunjuk kenaikan yang dipakai. Tidak
- * menebak lebih baik daripada menebak angka yang salah, karena kolomnya toh
- * bisa diisi sendiri.
- */
 export function tebakKelipatan(caption, parseBid) {
   if (!caption) return null;
   const nilai = '((?:rp\\.?\\s*)?[\\d.,]+\\s*(?:jt|juta|rb|ribu|k)?)';
@@ -271,8 +220,8 @@ export function pengingat(it) {
 
 /**
  * Berkas kalender berisi satu acara per lelang, masing-masing dengan alarmnya.
- * Acaranya sengaja berdurasi nol menit dan diberi nama jelas, supaya di
- * tampilan kalender langsung terbaca lelang mana yang akan tutup.
+ * Acaranya diberi nama jelas supaya di tampilan kalender langsung terbaca
+ * lelang mana yang akan tutup.
  */
 export function buatIcs(items, { alarmMenit = null } = {}) {
   const now = stampUtc(Math.floor(Date.now() / 1000));

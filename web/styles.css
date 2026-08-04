@@ -830,10 +830,10 @@ tbody tr.r-snipe td { background: var(--warn-soft); }
  * Susunannya dibedakan lewat huruf dan garis tepi, bukan lewat latar: satu
  * tindakan utama berhuruf tebal bergaris warna keadaan, sisanya netral.
  */
-.paksi .btn, .paksi .psel, .paksi .pharga {
+.paksi .btn:not(.solid), .paksi .psel, .paksi .pharga {
   background: var(--surface); border-color: var(--c-line);
 }
-.paksi .btn:hover { background: var(--surface-2); border-color: var(--c-ink); }
+.paksi .btn:not(.solid):hover { background: var(--surface-2); border-color: var(--c-ink); }
 .paksi .btn.utama { color: var(--c-ink); border-color: var(--c); font-weight: 700; }
 .paksi .btn.utama:hover { background: var(--c-bg); }
 

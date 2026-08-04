@@ -9,7 +9,7 @@
 import * as P from './pantau.js';
 import * as G from './gcal.js';
 import * as A from './akun.js';
-import { analyze, parseBid, fmtRupiah } from './analysis.js';
+import { analyze, parseBid, fmtRupiah, tebakOpenBid } from './analysis.js';
 import {
   fmtDateTime, fmtTime, fmtDate, fmtHari, fmtDuration, wallTimeToEpoch,
   parseClock, fmtClock, applyMask
@@ -156,9 +156,9 @@ export function initPantau(d) {
     render();
   });
 
-  // Judul yang terlanjur tersimpan dari tebakan lama dibetulkan di tempat,
-  // dari caption yang ikut tersimpan — tanpa menunggu penarikan berikutnya.
-  P.perbaikiJudul();
+  // Nama barang tidak lagi ditebak; yang terlanjur tersimpan ikut dibuang,
+  // supaya tidak ada kartu yang masih memajang tebakan lama.
+  P.bersihkanJudulTebakan();
 
   A.keadaan().then((k) => {
     keadaanAkun = k;
@@ -274,7 +274,7 @@ async function samakanServer({ pertamaKali = false } = {}) {
 
 // ---------------------------------------------------------------- kalender
 
-function tandaiGoogle(pesan, kelas = '') {
+function tandaiGoogle(pesan, kelas = '', { html = false } = {}) {
   const b = $('pgcal');
   const n = $('pgcalnote');
   if (!G.siap()) {
@@ -287,9 +287,13 @@ function tandaiGoogle(pesan, kelas = '') {
   b.textContent = G.terhubung() ? 'Putuskan Google Calendar' : 'Hubungkan Google Calendar';
   b.classList.toggle('quiet', G.terhubung());
   n.className = 'pgcal-note ' + kelas;
-  n.textContent = pesan || (G.terhubung()
+  const isi = pesan || (G.terhubung()
     ? 'Tersambung. Perubahan di sini langsung ikut di kalendermu.'
     : '');
+  // textContent secara bawaan: pesan galat dari Google bisa memuat apa saja,
+  // dan hanya pesan yang kita susun sendiri yang boleh mengandung tautan.
+  if (html) n.innerHTML = isi;
+  else n.textContent = isi;
 }
 
 async function hubungGoogle() {
@@ -330,22 +334,28 @@ async function sinkronSekarang({ diam = true } = {}) {
     if (h.diperbarui) bagian.push(`${h.diperbarui} diperbarui`);
     if (h.dihapus) bagian.push(`${h.dihapus} dihapus`);
 
-    // Disebut tanggalnya, bukan cuma jumlahnya. "1 ditambahkan" tidak memberi
-    // tahu harus membuka kalender di hari yang mana — dan lelang yang tutup
-    // pekan depan tidak akan terlihat di tampilan hari ini.
+    // Disebut tanggalnya dan diberi tautan, bukan cuma jumlahnya.
+    // "1 ditambahkan" tidak membuktikan apa-apa kalau acaranya tidak ketemu:
+    // bisa jadi tanggalnya di luar tampilan, bisa jadi akunnya lain. Tautan
+    // ini membuka acaranya persis, di akun mana pun dia dibuat.
     const dikalender = daftar.filter((x) => x.status === 'aktif' && x.closeAt != null && x.gcalId);
     const kapan = dikalender.length
-      ? ' Cari di ' + [...new Set(dikalender.map((x) => fmtDate(x.closeAt, deps.tz())))]
+      ? ' Tutup ' + [...new Set(dikalender.map((x) => fmtDate(x.closeAt, deps.tz())))]
         .slice(0, 3).join(', ') + '.'
+      : '';
+    const tautan = h.tautan || dikalender.find((x) => x.gcalLink)?.gcalLink;
+    const buka = tautan
+      ? ` <a href="${esc(tautan)}" target="_blank" rel="noopener noreferrer">Buka acaranya &#8599;</a>`
       : '';
 
     tandaiGoogle(
       h.gagal.length
         ? `${h.gagal.length} gagal disinkronkan: ${h.gagal[0].pesan}`
         : (bagian.length
-          ? 'Kalender disamakan — ' + bagian.join(', ') + '.' + kapan
-          : 'Kalender sudah sama.' + kapan),
-      h.gagal.length ? 'bad' : ''
+          ? 'Kalender disamakan — ' + bagian.join(', ') + '.' + kapan + buka
+          : 'Kalender sudah sama.' + kapan + buka),
+      h.gagal.length ? 'bad' : '',
+      { html: true }
     );
     if (!diam) render();
   } catch (e) {
@@ -416,7 +426,7 @@ function dariDump(dump) {
     shortcode: src.shortcode || null,
     owner: src.owner_username || null,
     caption,
-    title: pakai('title', P.tebakJudul(caption)),
+    title: manual.has('title') ? (lama.title ?? null) : null,
     openBid: pakai('openBid', hasil.summary.openBid ?? null),
     increment: pakai('increment', P.tebakKelipatan(caption, parseBid)),
     closeAt: manual.has('closeAt')
@@ -542,15 +552,23 @@ async function tanganiAksi(e) {
       const tutup = deps.hitungTutup(item.caption, []);
       const kartu2 = t.closest('[data-id]');
       const set = (f, v) => { const e = kartu2.querySelector(`[data-f="${f}"]`); if (e) e.value = v; };
-      set('title', P.tebakJudul(item.caption) || '');
-      set('openBid', '');
-      set('increment', '');
+      // Nama barang tidak ikut ditebak ulang — tidak ada penebaknya lagi.
+      const ob = tebakOpenBid(item.caption);
+      set('openBid', ob != null ? 'Rp' + fmtRupiah(ob) : '');
+      set('increment', (() => {
+        const k = P.tebakKelipatan(item.caption, parseBid);
+        return k != null ? 'Rp' + fmtRupiah(k) : '';
+      })());
       if (tutup) {
         set('jam', fmtTime(tutup.epoch, deps.tz()));
         set('tgl', fmtDate(tutup.epoch, deps.tz()));
       }
       const n = kartu2.querySelector('#pformnote');
-      if (n) { n.textContent = 'Ditebak ulang dari caption. Periksa sebelum menyimpan.'; n.className = 'pform-note'; }
+      if (n) {
+        n.textContent = 'Jam tutup, harga pembukaan, dan kelipatan ditebak ulang dari caption. ' +
+          'Nama barang tidak ditebak — isi sendiri kalau perlu.';
+        n.className = 'pform-note';
+      }
       break;
     }
 
