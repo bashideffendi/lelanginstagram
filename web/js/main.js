@@ -1306,6 +1306,11 @@ function initPantauan() {
 
     hitungTutup: (caption, comments) => guessCutoff(caption, comments, state.tz),
 
+    // Penanda extension dipasang lewat atribut oleh bridge.js sebelum ping
+    // dijawab, jadi bisa ditanya seketika tanpa menunggu.
+    punyaExtension: () => !!extVersion ||
+      document.documentElement.hasAttribute('data-ketok-ext'),
+
     tampilPantau: () => state.view === 'pantau',
 
     /**

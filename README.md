@@ -66,6 +66,26 @@ Belum lewat Chrome Web Store, jadi pasangnya manual — sekali saja:
 Setelah itu kotak di halaman utama akan berubah jadi "Extension terpasang", dan
 kamu tinggal menempel link postingan lalu menekan **Ambil komentar**.
 
+**Extension juga menyegarkan sesi Instagram di server** (izin `cookies`, sejak
+v1.1.0). Sesi Instagram mati sendiri tiap beberapa minggu, dan sebelumnya
+satu-satunya cara menghidupkannya adalah membuka DevTools, menyalin tiga
+cookie, lalu menjalankan `server/isi-cookie.ps1` — pekerjaan yang tidak masuk
+akal dituntut dari alat yang gunanya justru mengurangi kerepotan.
+
+Sekarang, saat halaman **Pantauan** dibuka dan servernya melaporkan sesinya
+ditolak, extension membaca cookie dari sesi Instagram di browser ini dan
+mengirimkannya ke servermu sendiri. Diam-diam, tanpa satu klik pun. Syaratnya
+dua: browser ini masih login Instagram dengan akun khusus, dan kamu sudah masuk
+di Lelang Insta (endpoint `/sesi-ig` menolak tanpa itu — kalau tidak, siapa pun
+yang tahu alamat servermu bisa menanamkan sesi Instagram milik siapa pun).
+
+Nilai cookienya berjalan dari extension langsung ke servermu, tidak melewati
+halaman web, tidak pernah masuk log, dan tidak pernah dikembalikan lewat
+jawaban apa pun. Yang dilaporkan cuma diterima atau tidak oleh Instagram.
+
+Karena izinnya bertambah, extension yang sudah terpasang perlu **Reload** sekali
+di `chrome://extensions` dan izinnya diterima lagi.
+
 Kalau menambah alamat baru tempat web app di-hosting, daftarkan di
 `content_scripts.matches` pada `extension/manifest.json` — bridge hanya
 disuntikkan ke alamat yang terdaftar di sana.

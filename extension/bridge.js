@@ -22,7 +22,7 @@
       return;
     }
 
-    if (d.action !== 'extract') return;
+    if (d.action !== 'extract' && d.action !== 'segarkanSesi') return;
 
     var port;
     try {
@@ -47,7 +47,9 @@
       });
     });
 
-    port.postMessage({ action: 'extract', url: d.url, includeRaw: d.includeRaw });
+    port.postMessage(d.action === 'segarkanSesi'
+      ? { action: 'segarkanSesi', api: d.api, token: d.token }
+      : { action: 'extract', url: d.url, includeRaw: d.includeRaw });
   });
 
   // Penanda supaya halaman tahu extension ada bahkan sebelum ping dijawab.

@@ -614,6 +614,16 @@ tbody tr.r-snipe td { background: var(--warn-soft); }
 .psesi-bad span { font-size: 13px; color: var(--ink-soft); line-height: 1.5; }
 .psesi-bad code { background: var(--surface); }
 
+.psesi-kerja, .psesi-ok {
+  margin: 20px 0 4px; padding: 12px 18px; border-radius: var(--r);
+  font-size: 13.5px; border: 1px solid var(--line);
+  background: var(--surface-2); color: var(--ink-soft);
+}
+.psesi-ok {
+  border-color: rgba(14, 138, 95, .28); background: var(--primary-soft); color: var(--primary-700);
+  font-weight: 600;
+}
+
 .pmasuk:not(:empty) {
   margin: 22px 0 4px; padding: 14px 18px;
   border: 1px solid var(--line); border-left: 3px solid var(--primary);

@@ -10,7 +10,7 @@ import * as P from './pantau.js';
 import * as G from './gcal.js';
 import * as A from './akun.js';
 import { analyze, parseBid, fmtRupiah, tebakOpenBid } from './analysis.js';
-import { keadaanSesiServer } from './ext.js';
+import { keadaanSesiServer, segarkanSesiViaExtension } from './ext.js';
 import {
   fmtDateTime, fmtTime, fmtDate, fmtHari, fmtDuration, wallTimeToEpoch,
   parseClock, fmtClock, applyMask
@@ -205,15 +205,49 @@ async function periksaSesi() {
     return;
   }
 
+  /*
+   * Kalau extension terpasang dan kamu sudah masuk, ini diperbaiki sendiri —
+   * tanpa diberitahu, tanpa diklik.
+   *
+   * Cookie yang dibutuhkan server sudah ada di browser ini, di sesi Instagram
+   * yang sedang kamu pakai. Menuntutmu membuka DevTools, menyalin tiga nilai,
+   * lalu menjalankan skrip untuk memindahkan sesuatu yang sudah ada di
+   * genggaman adalah kerepotan yang diciptakan sendiri oleh alat ini.
+   */
+  if (deps.punyaExtension?.() && A.sudahMasuk()) {
+    kotak.innerHTML = '<div class="psesi-kerja">Sesi Instagram server kedaluwarsa — menyegarkan sendiri&hellip;</div>';
+    try {
+      const h = await segarkanSesiViaExtension(A.token());
+      if (h.keadaan === 'hidup') {
+        kotak.innerHTML = '<div class="psesi-ok">Sesi Instagram server disegarkan sendiri dari browser ini. ' +
+          'Tidak ada yang perlu kamu lakukan.</div>';
+        setTimeout(() => { if ($('psesi')) $('psesi').innerHTML = ''; }, 8000);
+        return;
+      }
+      // Gagal juga: berarti browser ini pun tidak lagi login Instagram.
+      return gambarSesiGagal(kotak, s, h.pesan || 'Instagram menolak sesi dari browser ini juga.');
+    } catch (e) {
+      return gambarSesiGagal(kotak, s, e.message);
+    }
+  }
+
+  gambarSesiGagal(kotak, s, null);
+}
+
+function gambarSesiGagal(kotak, s, tambahan) {
   const sejak = s.hidupTerakhir
     ? ` Terakhir masih diterima ${fmtDateTime(Math.floor(s.hidupTerakhir / 1000), deps.tz())}.`
     : '';
 
   kotak.innerHTML =
     '<div class="psesi-bad"><b>Sesi Instagram di server sudah tidak diterima.</b>' +
-    `<span>Penarikan lelang akan gagal sampai cookie-nya diambil ulang.${esc(sejak)}</span>` +
-    '<span>Jalankan <code>server\\isi-cookie.ps1</code> di laptop — klik kanan, ' +
-    '<b>Run with PowerShell</b>, lalu tempel tiga cookie dari akun khusus.</span></div>';
+    `<span>Penarikan lelang akan gagal sampai sesinya disegarkan.${esc(sejak)}` +
+    `${tambahan ? ' ' + esc(tambahan) : ''}</span>` +
+    (deps.punyaExtension?.()
+      ? '<span>Pastikan browser ini masih login Instagram dengan akun khusus, lalu muat ulang halaman ini.</span>'
+      : '<span>Paling gampang: pasang <b>extension Lelang Insta</b> di browser ini — sesudah itu ' +
+        'sesinya disegarkan sendiri tiap halaman ini dibuka, tanpa menyentuh cookie sama sekali.</span>') +
+    '</div>';
 }
 
 // ---------------------------------------------------------------- masuk

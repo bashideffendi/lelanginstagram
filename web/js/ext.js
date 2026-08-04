@@ -127,6 +127,40 @@ export async function keadaanSesiServer() {
   }
 }
 
+/**
+ * Minta extension menyegarkan sesi Instagram di server.
+ *
+ * Cookie-nya dibaca oleh extension dari browser ini — halaman tidak bisa
+ * membacanya sendiri karena `sessionid` bertanda HttpOnly, dan itu memang
+ * disengaja Instagram. Halaman cuma menyebutkan alamat server dan tanda
+ * masuknya; nilai cookienya berjalan dari extension langsung ke server,
+ * tidak pernah melewati halaman ini.
+ */
+export function segarkanSesiViaExtension(token) {
+  return new Promise((resolve, reject) => {
+    const id = 'sesi-' + Math.random().toString(36).slice(2);
+    const jeda = setTimeout(() => {
+      window.removeEventListener('message', dengar);
+      reject(new Error('Extension tidak menjawab.'));
+    }, 20000);
+
+    function dengar(ev) {
+      const d = ev.data;
+      if (ev.source !== window || !d || d.ketokExt !== 'res' || d.id !== id) return;
+      if (d.kind === 'progress') return;
+      clearTimeout(jeda);
+      window.removeEventListener('message', dengar);
+      if (d.kind === 'error') reject(new Error(d.message || 'Gagal menyegarkan sesi.'));
+      else resolve({ keadaan: d.keadaan, pesan: d.pesan });
+    }
+
+    window.addEventListener('message', dengar);
+    window.postMessage({
+      ketokExt: 'req', action: 'segarkanSesi', id, api: apiBase(), token: token || ''
+    }, location.origin);
+  });
+}
+
 export async function extractViaServer(url, key) {
   const r = await callServer('/api/comments?url=' + encodeURIComponent(url), key);
   if (!r.ok) {

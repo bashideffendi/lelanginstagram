@@ -58,6 +58,44 @@ function sidikSandi(sandi, garam) {
   return crypto.scryptSync(String(sandi), garam, 32).toString('hex');
 }
 
+/**
+ * Simpan cookie Instagram yang baru ke berkas env, lalu pakai saat itu juga.
+ *
+ * Ditulis ke berkas supaya bertahan melewati restart, DAN dipasang ke
+ * process.env supaya berlaku tanpa restart — menyalakan ulang layanan hanya
+ * untuk ini akan memutus penarikan yang sedang berjalan.
+ *
+ * Baris lain di berkas dipertahankan apa adanya. Menulis ulang seluruh berkas
+ * dari daftar yang dihafal di sini berarti setelan yang ditambahkan nanti
+ * akan lenyap diam-diam pada penyegaran cookie berikutnya.
+ */
+const F_ENV = process.env.BERKAS_ENV || '/home/ubuntu/lelanginstagram/server/lelanginsta.env';
+
+function simpanCookieIg({ sessionid, ds_user_id, csrftoken }) {
+  const baru = { IG_SESSIONID: sessionid, IG_DS_USER_ID: ds_user_id, IG_CSRFTOKEN: csrftoken };
+
+  let baris = [];
+  try {
+    baris = fs.readFileSync(F_ENV, 'utf8').split(/\r?\n/);
+  } catch { /* berkas belum ada; disusun dari nol */ }
+
+  const sudah = new Set();
+  baris = baris.map((b) => {
+    const m = b.match(/^\s*([A-Z0-9_]+)\s*=/);
+    if (!m || !(m[1] in baru)) return b;
+    sudah.add(m[1]);
+    return `${m[1]}=${baru[m[1]]}`;
+  });
+  for (const k of Object.keys(baru)) if (!sudah.has(k)) baris.push(`${k}=${baru[k]}`);
+
+  const tmp = F_ENV + '.tmp';
+  fs.writeFileSync(tmp, baris.join('\n').replace(/\n+$/, '') + '\n', { mode: 0o600 });
+  fs.renameSync(tmp, F_ENV);
+  try { fs.chmodSync(F_ENV, 0o600); } catch { /* diabaikan */ }
+
+  for (const [k, v] of Object.entries(baru)) process.env[k] = v;
+}
+
 function sandiTerpasang() {
   return !!bacaJson(F_AKUN, null)?.sidik;
 }
@@ -363,6 +401,45 @@ const server = http.createServer(async (req, res) => {
     // melupakannya di browser — kalau tidak, token yang tercecer tetap sah.
     hapusSesi(tokenDari(req));
     return kirim(res, 200, { keluar: true }, asal);
+  }
+
+  // ------------------------------------------------------------ sesi Instagram
+
+  /*
+   * Terima sesi Instagram baru dari extension di browser pemilik.
+   *
+   * Terkunci di balik login Lelang Insta yang sama dengan pantauan: tanpa itu,
+   * siapa pun yang tahu alamat server ini bisa menanamkan sesi Instagram milik
+   * siapa pun ke dalamnya.
+   *
+   * Nilainya tidak pernah dicatat ke log, dan tidak pernah dikembalikan lewat
+   * jawaban apa pun — yang dilaporkan cuma diterima atau tidak oleh Instagram.
+   */
+  if (url.pathname === '/sesi-ig' && req.method === 'POST') {
+    if (!sesiSah(tokenDari(req))) {
+      return kirim(res, 401, { error: 'belum_masuk', message: 'Perlu masuk dulu di Lelang Insta.' }, asal);
+    }
+    try {
+      const b = await bacaBadan(req);
+      const kurang = ['sessionid', 'ds_user_id', 'csrftoken'].filter((k) => !b[k]);
+      if (kurang.length) {
+        return kirim(res, 400, { error: 'tidak_lengkap',
+          message: 'Belum lengkap: ' + kurang.join(', ') + '.' }, asal);
+      }
+
+      simpanCookieIg(b);
+      const s = await periksaSesiIg();
+      console.log(`[lelanginsta] sesi IG disegarkan dari extension → ${s.keadaan}`);
+
+      return kirim(res, 200, {
+        keadaan: s.keadaan,
+        message: s.keadaan === 'hidup'
+          ? 'Sesi Instagram disegarkan dan diterima.'
+          : (s.pesan || 'Sesi tersimpan, tapi Instagram belum menerimanya.')
+      }, asal);
+    } catch (e) {
+      return kirim(res, 400, { error: 'isi_salah', message: e.message }, asal);
+    }
   }
 
   // ------------------------------------------------------------ pantauan
