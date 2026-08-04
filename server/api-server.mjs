@@ -163,6 +163,18 @@ const ASAL = (process.env.ASAL_DIIZINKAN ||
   'https://lelanginsta.tempuscollective.com,https://lelanginstagram.vercel.app,http://localhost:8777')
   .split(',').map((s) => s.trim()).filter(Boolean);
 
+/**
+ * Siapa yang boleh masuk dengan akun Google.
+ *
+ * Daftar, bukan satu nilai: mengganti alamat kelak tidak boleh menuntut
+ * mengubah kode. Kosong berarti masuk lewat Google dimatikan sama sekali —
+ * lebih aman daripada bawaan yang menerima siapa saja.
+ */
+const EMAIL_DIIZINKAN = (process.env.EMAIL_DIIZINKAN || '')
+  .split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
+
+const CLIENT_ID_GOOGLE = (process.env.GOOGLE_CLIENT_ID || '').trim();
+
 const MAX_PAGES = Number(process.env.MAX_PAGES || 60);
 const RATE_WINDOW_MS = 10 * 60 * 1000;
 const RATE_MAX = Number(process.env.RATE_MAX || 20);
@@ -412,7 +424,11 @@ const server = http.createServer(async (req, res) => {
   // ------------------------------------------------------------ akun
 
   if (url.pathname === '/akun/keadaan') {
-    return kirim(res, 200, { terpasang: sandiTerpasang() }, asal);
+    return kirim(res, 200, {
+      terpasang: sandiTerpasang(),
+      google: !!(CLIENT_ID_GOOGLE && EMAIL_DIIZINKAN.length),
+      clientId: CLIENT_ID_GOOGLE || null      // publik; halaman butuh untuk memanggil Google
+    }, asal);
   }
 
   if (url.pathname === '/akun/pasang' && req.method === 'POST') {
@@ -445,6 +461,70 @@ const server = http.createServer(async (req, res) => {
         return kirim(res, 401, { error: 'sandi_salah', message: 'Kata sandi salah.' }, asal);
       }
       return kirim(res, 200, { token: buatSesi() }, asal);
+    } catch (e) {
+      return kirim(res, 400, { error: 'isi_salah', message: e.message }, asal);
+    }
+  }
+
+  /*
+   * Masuk dengan akun Google.
+   *
+   * Halaman mengirim ID token dari Google Identity Services; kesahihannya
+   * diperiksa ke Google sendiri, bukan dibaca begitu saja. Isi JWT bisa
+   * dikarang siapa pun — yang tidak bisa dikarang adalah tanda tangannya, dan
+   * memverifikasi tanda tangan RS256 beserta perputaran kuncinya jauh lebih
+   * banyak kode daripada satu permintaan ke titik akhir resmi Google. Untuk
+   * alat berpengguna satu orang, yang lebih sedikit kodenya lebih sedikit pula
+   * salahnya.
+   *
+   * Tiga hal diperiksa, dan ketiganya wajib:
+   *   aud            token itu memang untuk aplikasi ini, bukan aplikasi lain
+   *   email_verified Google sudah membuktikan alamat itu milik pemegangnya
+   *   email          ada di daftar yang diizinkan
+   *
+   * Tanpa pemeriksaan aud, siapa pun bisa memakai token yang diterbitkan untuk
+   * aplikasi lain miliknya sendiri untuk masuk ke sini.
+   */
+  if (url.pathname === '/akun/google' && req.method === 'POST') {
+    if (terbatas(ipKlien(req), 'masuk', 10)) {
+      return kirim(res, 429, { error: 'terlalu_sering', message: 'Terlalu banyak percobaan. Tunggu beberapa menit.' }, asal);
+    }
+    if (!EMAIL_DIIZINKAN.length || !CLIENT_ID_GOOGLE) {
+      return kirim(res, 503, { error: 'belum_disiapkan',
+        message: 'Masuk dengan Google belum disiapkan di server ini.' }, asal);
+    }
+
+    try {
+      const b = await bacaBadan(req);
+      if (!b.credential) {
+        return kirim(res, 400, { error: 'isi_salah', message: 'Token Google tidak ada.' }, asal);
+      }
+
+      const r = await fetch('https://oauth2.googleapis.com/tokeninfo?id_token=' +
+        encodeURIComponent(b.credential));
+      const t = await r.json().catch(() => null);
+
+      if (!r.ok || !t || t.error) {
+        return kirim(res, 401, { error: 'token_tolak', message: 'Google menolak token itu.' }, asal);
+      }
+      if (t.aud !== CLIENT_ID_GOOGLE) {
+        return kirim(res, 401, { error: 'aud_salah', message: 'Token itu bukan untuk aplikasi ini.' }, asal);
+      }
+      if (String(t.email_verified) !== 'true') {
+        return kirim(res, 401, { error: 'email_belum', message: 'Alamat email itu belum diverifikasi Google.' }, asal);
+      }
+
+      const email = String(t.email || '').toLowerCase();
+      if (!EMAIL_DIIZINKAN.includes(email)) {
+        // Alamatnya tidak disebut kembali: alat ini punya satu pemilik, dan
+        // memberi tahu penebak "bukan alamat ini" adalah keterangan gratis.
+        console.log('[lelanginsta] masuk Google ditolak — alamat tidak diizinkan');
+        return kirim(res, 403, { error: 'tidak_diizinkan',
+          message: 'Akun Google itu tidak diizinkan masuk ke sini.' }, asal);
+      }
+
+      console.log(`[lelanginsta] masuk lewat Google: ${email}`);
+      return kirim(res, 200, { token: buatSesi(), email }, asal);
     } catch (e) {
       return kirim(res, 400, { error: 'isi_salah', message: e.message }, asal);
     }

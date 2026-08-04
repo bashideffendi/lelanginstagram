@@ -342,8 +342,24 @@ function gambarMasuk(pesan = '', kelas = '') {
   // sini — tiap perubahan keadaan masuk pasti lewat sini.
   gerbang();
 
+  // Server tak terjangkau. Dulu kotaknya dikosongkan begitu saja — dan sejak
+  // isi halaman ikut dikunci, hasilnya halaman putih tanpa satu kata pun
+  // penjelasan. Layar kosong terbaca sebagai alat yang rusak; ini memberi tahu
+  // apa yang terjadi dan bahwa datamu tidak ke mana-mana.
   if (!keadaanAkun.ada) {
-    kotak.innerHTML = '';
+    kotak.innerHTML =
+      '<div class="pm-gerbang">' +
+        '<span class="pm-judul">Server pantauan tidak bisa dihubungi</span>' +
+        '<span class="pm-sub">Daftar lelangmu aman — tersimpan di servermu dan di browser ini. ' +
+        'Yang belum bisa cuma membukanya dari sini sekarang.</span>' +
+        '<button class="btn sm" id="pmcoba">Coba lagi</button>' +
+      '</div>';
+    $('pmcoba').onclick = async () => {
+      $('pmcoba').disabled = true;
+      keadaanAkun = await A.keadaan();
+      gambarMasuk();
+      if (A.sudahMasuk()) samakanServer({ pertamaKali: true });
+    };
     return;
   }
 
@@ -363,16 +379,35 @@ function gambarMasuk(pesan = '', kelas = '') {
   }
 
   const pertama = !keadaanAkun.terpasang;
+
+  /*
+   * Google didahulukan, kata sandi jadi jalan cadangan.
+   *
+   * Keduanya sama-sama gerbang berpemilik satu, tapi Google tidak menuntut
+   * mengingat apa pun dan tidak bisa ditebak beruntun. Kata sandi tetap ada
+   * dan disembunyikan di balik lipatan: kalau Google sedang bermasalah —
+   * izin dicabut, jaringan memblokir accounts.google.com — satu-satunya jalan
+   * masuk tidak boleh ikut mati bersamanya.
+   */
   kotak.innerHTML =
-    `<div class="pm-in"><span class="pm-judul">${pertama
-      ? 'Buat kata sandi supaya daftarnya ikut ke HP'
-      : 'Masuk supaya daftarnya ikut ke HP'}</span>` +
-    '<span class="fill"></span>' +
-    `<input type="password" id="pmsandi" placeholder="${pertama ? 'minimal 8 huruf' : 'kata sandi'}" autocomplete="current-password">` +
-    `<button class="btn sm solid" id="pmgo">${pertama ? 'Buat' : 'Masuk'}</button></div>` +
-    `<p class="pm-note ${kelas}">${pesan || (pertama
-      ? 'Kata sandi ini kamu tentukan sendiri sekarang, dan hanya tersimpan di servermu.'
-      : 'Kata sandi yang sama seperti di perangkatmu yang lain.')}</p>`;
+    '<div class="pm-gerbang">' +
+      '<span class="pm-judul">Pantauan lelang ini terkunci</span>' +
+      '<span class="pm-sub">Masuk dulu untuk melihat daftar lelang, jam tutup, dan posisi tawaranmu.</span>' +
+      (keadaanAkun.google
+        ? '<div id="pmgoogle" class="pm-google"></div>'
+        : '<p class="pm-note bad">Masuk dengan Google belum disiapkan di server.</p>') +
+      `<p class="pm-note ${esc(kelas)}">${pesan ? esc(pesan) : ''}</p>` +
+      '<details class="pm-lain"><summary>Masuk dengan kata sandi</summary>' +
+        '<div class="pm-in">' +
+        `<input type="password" id="pmsandi" placeholder="${pertama ? 'minimal 8 huruf' : 'kata sandi'}" autocomplete="current-password">` +
+        `<button class="btn sm" id="pmgo">${pertama ? 'Buat' : 'Masuk'}</button></div>` +
+        `<p class="pm-note">${pertama
+          ? 'Kata sandi ini kamu tentukan sendiri sekarang, dan hanya tersimpan di servermu.'
+          : 'Jalan cadangan kalau masuk lewat Google sedang tidak bisa.'}</p>` +
+      '</details>' +
+    '</div>';
+
+  if (keadaanAkun.google) pasangTombolGoogle();
 
   const jalan = async () => {
     const sandi = $('pmsandi').value;
@@ -390,6 +425,60 @@ function gambarMasuk(pesan = '', kelas = '') {
   };
   $('pmgo').onclick = jalan;
   $('pmsandi').addEventListener('keydown', (e) => { if (e.key === 'Enter') jalan(); });
+}
+
+/**
+ * Tombol "Sign in with Google" resmi.
+ *
+ * Digambar oleh Google sendiri, bukan tiruan: tombol palsu yang meminta sandi
+ * Google adalah bentuk penipuan yang paling lazim, dan alat ini tidak boleh
+ * terlihat seperti itu sedikit pun. Yang kembali ke sini cuma ID token, tidak
+ * pernah kata sandi Google-mu.
+ */
+async function pasangTombolGoogle() {
+  const wadah = $('pmgoogle');
+  if (!wadah) return;
+
+  try {
+    await muatGis();
+  } catch {
+    wadah.innerHTML = '<p class="pm-note bad">Pustaka Google tidak bisa dimuat — ' +
+      'jaringanmu mungkin memblokir accounts.google.com. Pakai kata sandi di bawah.</p>';
+    return;
+  }
+
+  window.google.accounts.id.initialize({
+    client_id: keadaanAkun.clientId,
+    callback: async (jawab) => {
+      try {
+        gambarMasuk('Memeriksa akun Google…');
+        const h = await A.masukGoogle(jawab.credential);
+        keadaanAkun = await A.keadaan();
+        gambarMasuk(`Masuk sebagai ${h.email}. Menyamakan daftar…`);
+        await samakanServer({ pertamaKali: true });
+      } catch (e) {
+        gambarMasuk(e.message, 'bad');
+      }
+    }
+  });
+  window.google.accounts.id.renderButton(wadah, {
+    theme: 'outline', size: 'large', text: 'signin_with', shape: 'pill', locale: 'id'
+  });
+}
+
+/** Pustaka Google dimuat sekali, dipakai bersama dengan sinkron kalender. */
+function muatGis() {
+  if (window.google?.accounts?.id) return Promise.resolve();
+  if (muatGis._janji) return muatGis._janji;
+  muatGis._janji = new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = 'https://accounts.google.com/gsi/client';
+    s.async = true;
+    s.onload = resolve;
+    s.onerror = () => reject(new Error('gagal memuat'));
+    document.head.appendChild(s);
+  });
+  return muatGis._janji;
 }
 
 /**
@@ -525,7 +614,10 @@ async function sinkronSekarang({ diam = true } = {}) {
 
     tandaiGoogle(
       h.gagal.length
-        ? `${h.gagal.length} gagal disinkronkan: ${h.gagal[0].pesan}`
+        // Di-escape: pesannya datang dari Google, dan baris ini ditulis
+        // sebagai HTML supaya tautan "Buka acaranya" bisa diklik. Yang boleh
+        // membawa markah hanya kalimat yang kita susun sendiri.
+        ? `${h.gagal.length} gagal disinkronkan: ${esc(h.gagal[0].pesan)}`
         : (bagian.length
           ? 'Kalender disamakan — ' + bagian.join(', ') + '.' + kapan + buka
           : 'Kalender sudah sama.' + kapan + buka),

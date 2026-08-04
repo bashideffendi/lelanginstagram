@@ -432,8 +432,23 @@ function showError(msg) {
  * lewat, dan memantau lelang yang belum tutup. Keduanya berbagi mesin penarik
  * komentar yang sama, jadi tidak ada yang disalin.
  */
-function pilihView(nama) {
+/**
+ * Halaman yang sedang dibuka ditulis ke alamat (#pantau).
+ *
+ * Tanpa ini, memuat ulang halaman Pantauan selalu melempar balik ke Cek
+ * pemenang — dan memuat ulang itu justru yang paling sering dilakukan di
+ * halaman pantauan, karena di situlah keadaan lelang diperbarui. Menaruhnya
+ * di alamat sekaligus membuat tombol maju-mundur peramban bekerja seperti
+ * yang orang harapkan, dan halaman pantauan bisa ditandai (bookmark).
+ */
+function pilihView(nama, { tulisAlamat = true } = {}) {
   state.view = nama;
+  if (tulisAlamat) {
+    const tujuan = nama === 'cek' ? ' ' : '#' + nama;
+    if (location.hash !== (nama === 'cek' ? '' : '#' + nama)) {
+      history.replaceState(null, '', tujuan);
+    }
+  }
   document.querySelectorAll('#nav-utama button').forEach((b) =>
     b.classList.toggle('on', b.dataset.view === nama));
 
@@ -1211,6 +1226,17 @@ function wire() {
   document.querySelectorAll('#nav-utama button').forEach((b) => {
     b.onclick = () => pilihView(b.dataset.view);
   });
+
+  // Halaman dipulihkan dari alamat, jadi memuat ulang tidak melempar balik ke
+  // Cek pemenang. Nama yang tidak dikenal diabaikan, bukan menampilkan layar
+  // kosong — alamat bisa datang dari mana saja.
+  const VIEW_SAH = new Set(['cek', 'pantau']);
+  const dariAlamat = () => {
+    const n = location.hash.replace(/^#/, '');
+    return VIEW_SAH.has(n) ? n : 'cek';
+  };
+  window.addEventListener('hashchange', () => pilihView(dariAlamat(), { tulisAlamat: false }));
+  pilihView(dariAlamat(), { tulisAlamat: false });
 
   document.addEventListener('click', (e) => {
     const more = e.target.closest('.more');

@@ -624,6 +624,20 @@ tbody tr.r-snipe td { background: var(--warn-soft); }
   font-weight: 600;
 }
 
+/* Gerbang masuk: satu-satunya isi halaman sebelum kamu dikenali. */
+.pm-gerbang { display: grid; gap: 4px; justify-items: start; }
+.pm-gerbang .pm-judul { font-size: 16px; font-weight: 700; letter-spacing: -.01em; }
+.pm-gerbang .pm-sub { font-size: 13.5px; color: var(--muted); margin-bottom: 12px; }
+.pm-google { min-height: 44px; }
+.pm-lain { margin-top: 14px; width: 100%; }
+.pm-lain summary {
+  cursor: pointer; font-size: 12.5px; color: var(--muted); list-style: none;
+}
+.pm-lain summary::-webkit-details-marker { display: none; }
+.pm-lain summary::before { content: "+"; margin-right: 7px; color: var(--primary); font-weight: 700; }
+.pm-lain[open] summary::before { content: "–"; }
+.pm-lain .pm-in { margin-top: 10px; }
+
 .pmasuk:not(:empty) {
   margin: 22px 0 4px; padding: 14px 18px;
   border: 1px solid var(--line); border-left: 3px solid var(--primary);
@@ -830,7 +844,16 @@ tbody tr.r-snipe td { background: var(--warn-soft); }
   display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
   gap: 12px 20px; margin: 16px 0 12px;
 }
-.pform label { display: grid; gap: 5px; }
+/*
+ * align-content: start — tanpa ini barisnya diregangkan.
+ *
+ * Tiap kolom adalah grid tersendiri, dan tingginya disamakan dengan kolom
+ * tertinggi di barisnya. Kolom yang punya keterangan kecil berisi tiga baris,
+ * yang tidak punya cuma dua — dan sisa ruangnya dibagikan ke antarbaris, jadi
+ * kotak isiannya melar dan turun. Hasilnya empat kotak yang tidak sejajar
+ * padahal semuanya sederajat.
+ */
+.pform label { display: grid; gap: 5px; align-content: start; }
 .pform label > span {
   font-family: var(--mono); font-size: 9.5px; font-weight: 500;
   letter-spacing: .1em; text-transform: uppercase; color: var(--muted);

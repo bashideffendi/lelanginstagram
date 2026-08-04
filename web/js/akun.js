@@ -54,10 +54,31 @@ async function panggil(jalur, opsi = {}) {
 export async function keadaan() {
   try {
     const j = await panggil('/akun/keadaan');
-    return { ada: true, terpasang: !!j.terpasang };
+    return {
+      ada: true,
+      terpasang: !!j.terpasang,
+      google: !!j.google,
+      clientId: j.clientId || ''
+    };
   } catch {
-    return { ada: false, terpasang: false };
+    return { ada: false, terpasang: false, google: false, clientId: '' };
   }
+}
+
+/**
+ * Masuk dengan akun Google.
+ *
+ * Yang dikirim ke server cuma ID token dari Google — bukan kata sandi, bukan
+ * apa pun yang bisa dipakai ulang di tempat lain. Server yang memeriksa
+ * kesahihannya ke Google dan mencocokkan alamatnya dengan daftar yang
+ * diizinkan; halaman ini tidak memutuskan apa-apa soal siapa yang boleh masuk.
+ */
+export async function masukGoogle(credential) {
+  const j = await panggil('/akun/google', {
+    method: 'POST', body: JSON.stringify({ credential })
+  });
+  simpanToken(j.token);
+  return j;
 }
 
 export async function pasangSandi(sandi) {
