@@ -26,6 +26,23 @@ let subTab = 'jalan';         // 'jalan' | 'selesai'
 const SELESAI = new Set(['menang', 'kalah', 'batal']);
 
 /**
+ * Lelang dianggap selesai kalau jamnya sudah lewat, walau hasilnya belum
+ * ditandai.
+ *
+ * Semula perpindahan ke Riwayat hanya dipicu penandaan menang/kalah, jadi
+ * lelang yang sudah tutup menumpuk di daftar berjalan. Itu salah arah:
+ * yang menuntut perhatian adalah yang belum tutup, dan tab Berjalan gunanya
+ * memperlihatkan itu saja.
+ *
+ * Yang jam tutupnya tidak diketahui tetap di Berjalan — menganggapnya selesai
+ * berarti menebak, dan menyembunyikan lelang yang mungkin masih hidup.
+ */
+function sudahSelesai(it, now) {
+  if (SELESAI.has(it.status)) return true;
+  return it.closeAt != null && it.closeAt <= now;
+}
+
+/**
  * Hasil penarikan terakhir per lelang, hanya selama tab terbuka.
  *
  * Dipakai supaya tombol analisis membuka hasilnya seketika tanpa menarik
@@ -452,6 +469,19 @@ async function tanganiAksi(e) {
       break;
     }
 
+    case 'menang':
+    case 'kalah': {
+      // Harga akhirnya sudah diketahui dari tarikan terakhir; mengetiknya lagi
+      // cuma kerja ulang. Yang sudah diisi sendiri tidak ditimpa.
+      P.simpan({
+        ...item,
+        status: t.dataset.aksi,
+        finalPrice: item.finalPrice ?? item.topBid ?? null
+      });
+      render();
+      break;
+    }
+
     case 'ics':
       deps.unduh(`lelang-${item.id}.ics`, P.buatIcs([item]), 'text/calendar;charset=utf-8');
       stat('Berkas kalender diunduh. Buka berkasnya di ponsel untuk memasang pengingatnya.', 'ready');
@@ -490,9 +520,10 @@ function tanganiUbah(e) {
   if (!item) return;
 
   if (jenis === 'status') {
-    P.simpan({ ...item, status: el.value });
+    const baru = { ...item, status: el.value };
+    P.simpan(baru);
     // Kartunya pindah tab, jadi terlihat seperti menghilang. Sebut ke mana.
-    const keSelesai = SELESAI.has(el.value);
+    const keSelesai = sudahSelesai(baru, Math.floor(Date.now() / 1000));
     if (keSelesai !== (subTab === 'selesai')) {
       stat(`"${esc(item.title || item.id)}" dipindahkan ke tab ` +
         `<b>${keSelesai ? 'Riwayat' : 'Berjalan'}</b>.`, 'ready');
@@ -527,6 +558,7 @@ function sidik(daftar) {
 
 let sidikTerakhir = null;
 let tundaSinkron = null;
+let jumlahSelesai = -1;       // pemicu gambar ulang saat ada yang lewat jam tutup
 
 export function render() {
   const daftar = P.semua();
@@ -543,8 +575,10 @@ export function render() {
   }
   sidikTerakhir = s;
 
-  const jalan = daftar.filter((x) => !SELESAI.has(x.status));
-  const selesai = daftar.filter((x) => SELESAI.has(x.status));
+  const now = Math.floor(Date.now() / 1000);
+  const jalan = daftar.filter((x) => !sudahSelesai(x, now));
+  const selesai = daftar.filter((x) => sudahSelesai(x, now));
+  jumlahSelesai = selesai.length;
 
   $('c-pantau').textContent = jalan.length || '';
   $('c-jalan').textContent = jalan.length || '';
@@ -565,8 +599,8 @@ export function render() {
 
   if (!tampil.length) {
     $('plist').innerHTML = `<p class="kosong">${riwayatTampil
-      ? 'Belum ada lelang yang ditandai selesai. Tandai <b>menang</b> atau <b>kalah</b> ' +
-        'di kartu lelang, dan lelangnya pindah ke sini.'
+      ? 'Belum ada lelang yang selesai. Begitu jam tutupnya lewat, lelangnya ' +
+        'pindah ke sini sendiri.'
       : 'Belum ada lelang dipantau. Tempel link lelang di atas, dan jam tutupnya ' +
         'akan dibaca sendiri dari caption postingannya.'}</p>`;
   } else {
@@ -677,6 +711,16 @@ function kartu(it, tz) {
 
     ${meta.length ? `<p class="pk-meta">${meta.join('  &middot;  ')}</p>` : ''}
 
+    ${nada === 'lewat' ? `<div class="pk-vonis">
+      <span>${it.memimpin
+        ? 'Kamu yang tertinggi saat lelang ditutup.'
+        : (it.myBid != null
+          ? `Tawaran tertinggimu Rp${fmtRupiah(it.myBid)}, kalah dari Rp${fmtRupiah(it.topBid)}.`
+          : 'Bagaimana hasilnya?')}</span>
+      <button class="btn sm solid" data-aksi="menang">Menang</button>
+      <button class="btn sm" data-aksi="kalah">Kalah</button>
+    </div>` : ''}
+
     <div class="paksi">
       <button class="btn sm" data-aksi="buka">Lihat urutan tawaran</button>
       ${aktif ? '<button class="btn sm quiet" data-aksi="cek">Cek sekarang</button>' : ''}
@@ -687,7 +731,8 @@ function kartu(it, tz) {
              value="${it.finalPrice != null ? 'Rp' + fmtRupiah(it.finalPrice) : ''}">`
         : ''}
       <span class="fill"></span>
-      ${aktif ? '<button class="btn sm quiet" data-aksi="ics" title="Unduh berkas kalender">Kalender</button>' : ''}
+      ${aktif && !sudahSelesai(it, Math.floor(Date.now() / 1000))
+        ? '<button class="btn sm quiet" data-aksi="ics" title="Unduh berkas kalender">Kalender</button>' : ''}
       <button class="btn sm quiet" data-aksi="hapus">Hapus</button>
     </div>
   </article>`;
@@ -784,6 +829,17 @@ export function mulaiDetak(aktif) {
 
   detak = setInterval(() => {
     const now = Math.floor(Date.now() / 1000);
+
+    // Lelang yang jam tutupnya baru saja lewat pindah tab. Perpindahannya
+    // butuh gambar ulang penuh, dan harus terjadi saat itu juga — kalau
+    // menunggu kejadian berikutnya, kartunya menghitung mundur ke angka
+    // negatif di tab yang salah.
+    const kini = P.semua().filter((x) => sudahSelesai(x, now)).length;
+    if (kini !== jumlahSelesai) {
+      jumlahSelesai = kini;
+      if (!sedangDiubah) { render(); return; }
+    }
+
     for (const el of document.querySelectorAll('#plist [data-id]')) {
       const it = P.ambil(el.dataset.id);
       if (!it || it.status !== 'aktif' || it.closeAt == null) continue;
@@ -818,12 +874,24 @@ export function mulaiDetak(aktif) {
  * kehabisan jatah.
  */
 function jarakCek(detikTersisa) {
-  if (detikTersisa <= 0) return null;
   if (detikTersisa < 600) return 45;
   if (detikTersisa < 3600) return 120;
   if (detikTersisa < 6 * 3600) return 600;
   return 1800;
 }
+
+/**
+ * Jeda sebelum penarikan terakhir sesudah lelang tutup.
+ *
+ * Pemeriksaan terjadwal berhenti paling cepat 45 detik sebelum penutupan —
+ * persis jendela tempat tawaran penentu biasanya masuk. Tanpa satu tarikan
+ * sesudahnya, harga yang tercatat di riwayat bukan harga yang benar-benar
+ * menang, dan itu justru angka yang dipakai untuk menyanggah.
+ */
+const JEDA_CEK_AKHIR = 60;
+
+/** Berapa kali tarikan penutup boleh diulang sebelum menyerah. */
+const BATAS_CEK_AKHIR = 3;
 
 let sedangCek = false;
 
@@ -837,24 +905,37 @@ async function perbaruiYangJatuhTempo() {
   const now = Math.floor(Date.now() / 1000);
   const antre = P.semua().filter((it) => {
     if (it.status !== 'aktif' || !it.url || it.closeAt == null) return false;
-    const jarak = jarakCek(it.closeAt - now);
-    if (jarak == null) return false;
-    return now - (it.lastCheckedAt || 0) >= jarak;
+    const sisa = it.closeAt - now;
+    if (sisa > 0) return now - (it.lastCheckedAt || 0) >= jarakCek(sisa);
+    // Sudah tutup: tarikan penutup, lalu berhenti selamanya.
+    return !it.cekAkhir && -sisa >= JEDA_CEK_AKHIR;
   });
   if (!antre.length) return;
 
   // Satu per satu, bukan sekaligus: penarikan serempak paling cepat memicu
   // pembatasan dari Instagram.
+  const it = antre.sort((a, b) => a.closeAt - b.closeAt)[0];
+  const menutup = it.closeAt <= now;
+
   sedangCek = true;
   try {
-    const it = antre.sort((a, b) => a.closeAt - b.closeAt)[0];
     tandaiSegar(it.id, 'memeriksa…');
     const dump = await deps.tarik(it.url);
     simpanDump(it.id, dump);
-    P.simpan(dariDump(dump));
+    const baru = dariDump(dump);
+    if (menutup) baru.cekAkhir = true;
+    P.simpan(baru);
     render();
   } catch {
-    // Gagal sesekali itu wajar — dicoba lagi pada putaran berikutnya.
+    // Gagal sesekali itu wajar — dicoba lagi pada putaran berikutnya. Tapi
+    // lelang yang sudah tutup tidak akan berubah lagi, jadi percobaannya
+    // dibatasi: postingan yang dihapus penjual kalau tidak akan ditarik terus
+    // tiap dua puluh detik sampai jatah lajunya habis.
+    if (menutup) {
+      const gagal = (P.ambil(it.id)?.cekAkhirGagal || 0) + 1;
+      const kini = P.ambil(it.id);
+      if (kini) P.simpan({ ...kini, cekAkhirGagal: gagal, cekAkhir: gagal >= BATAS_CEK_AKHIR });
+    }
   } finally {
     sedangCek = false;
   }
