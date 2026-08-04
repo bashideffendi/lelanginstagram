@@ -116,8 +116,9 @@ function gambarMasuk(pesan = '', kelas = '') {
       '<span class="fill"></span>' +
       '<button class="btn sm quiet" id="pmkeluar">Keluar</button></div>' +
       (pesan ? `<p class="pm-note ${kelas}">${pesan}</p>` : '');
-    $('pmkeluar').onclick = () => {
-      A.keluar();
+    $('pmkeluar').onclick = async () => {
+      $('pmkeluar').disabled = true;
+      await A.keluar();
       gambarMasuk('Keluar. Daftarnya tetap ada di browser ini.');
     };
     return;

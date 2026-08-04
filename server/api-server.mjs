@@ -75,23 +75,42 @@ function sandiCocok(sandi) {
   return uji.length === asli.length && crypto.timingSafeEqual(uji, asli);
 }
 
-// Token hanya di memori: restart layanan = semua sesi berakhir. Untuk kotak
-// pribadi satu orang itu pertukaran yang wajar, dan menghindari satu berkas
-// rahasia lagi di disk.
-const sesi = new Map();
-const SESI_MS = 30 * 24 * 3600 * 1000;
+/**
+ * Sesi disimpan ke disk supaya tetap berlaku setelah layanan dimulai ulang —
+ * pembaruan server tidak boleh memaksa masuk ulang di semua perangkat.
+ *
+ * Sempat kubuat hanya di memori dengan alasan menghindari berkas rahasia
+ * tambahan, tapi itu alasan yang lemah: berkas ini tidak lebih rahasia
+ * daripada sidik kata sandi yang memang sudah tersimpan di sebelahnya.
+ */
+const F_SESI = path.join(DATA_DIR, 'sesi.json');
+const SESI_MS = 365 * 24 * 3600 * 1000;
+
+const sesi = new Map(Object.entries(bacaJson(F_SESI, {})));
+
+function simpanSesi() {
+  // Yang kedaluwarsa dibuang saat menulis, jadi berkasnya tidak menumpuk.
+  const now = Date.now();
+  for (const [t, exp] of sesi) if (now > exp) sesi.delete(t);
+  tulisJson(F_SESI, Object.fromEntries(sesi));
+}
 
 function buatSesi() {
   const t = crypto.randomBytes(24).toString('hex');
   sesi.set(t, Date.now() + SESI_MS);
+  simpanSesi();
   return t;
 }
 
 function sesiSah(t) {
   const exp = sesi.get(t);
   if (!exp) return false;
-  if (Date.now() > exp) { sesi.delete(t); return false; }
+  if (Date.now() > exp) { sesi.delete(t); simpanSesi(); return false; }
   return true;
+}
+
+function hapusSesi(t) {
+  if (sesi.delete(t)) simpanSesi();
 }
 
 function tokenDari(req) {
@@ -278,6 +297,13 @@ const server = http.createServer(async (req, res) => {
     } catch (e) {
       return kirim(res, 400, { error: 'isi_salah', message: e.message }, asal);
     }
+  }
+
+  if (url.pathname === '/akun/keluar' && req.method === 'POST') {
+    // Keluar harus benar-benar mencabut tandanya di server, bukan sekadar
+    // melupakannya di browser — kalau tidak, token yang tercecer tetap sah.
+    hapusSesi(tokenDari(req));
+    return kirim(res, 200, { keluar: true }, asal);
   }
 
   // ------------------------------------------------------------ pantauan

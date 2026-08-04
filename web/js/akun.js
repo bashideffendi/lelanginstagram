@@ -72,7 +72,10 @@ export async function masuk(sandi) {
   return j.token;
 }
 
-export function keluar() {
+export async function keluar() {
+  // Dicabut di server dulu, baru dilupakan di browser. Kebalikannya menyisakan
+  // tanda sesi yang masih sah tapi tidak bisa dicabut lagi dari sini.
+  try { await panggil('/akun/keluar', { method: 'POST' }); } catch { /* tetap keluar */ }
   simpanToken('');
 }
 
