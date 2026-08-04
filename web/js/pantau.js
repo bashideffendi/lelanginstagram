@@ -114,6 +114,44 @@ const BUANG_AWAL = new RegExp('^(' + [
 /** Penanda tata tertib yang bisa muncul di tengah baris, bukan cuma di awal. */
 const BUANG_ISI = /(dibaca|read\s*caption|happy\s*bidding|no\s*php|no\s*cancel|serius\s*bid|ketentuan|terima\s*kasih)/i;
 
+/** Apakah baris ini tata tertib penjual, bukan nama barang? */
+export function judulBoilerplate(teks) {
+  const b = String(teks || '').trim();
+  if (!b) return false;
+  return BUANG_AWAL.test(b) || BUANG_ISI.test(b);
+}
+
+/**
+ * Betulkan judul yang terlanjur tersimpan dari tebakan lama.
+ *
+ * Judul ditebak sekali saat lelang ditambahkan, lalu disimpan. Memperbaiki
+ * penebaknya saja tidak menyentuh yang sudah ada — lelang yang sudah dipantau
+ * tetap memajang "Mohon dibaca keterangan sebelum bid" sampai penarikan
+ * berikutnya kebetulan berjalan. Captionnya ikut tersimpan, jadi tebakannya
+ * bisa diulang di tempat tanpa menyentuh Instagram sama sekali.
+ *
+ * Judul yang kamu ketik sendiri tidak diutak-atik, walau bentuknya kebetulan
+ * mirip tata tertib.
+ */
+export function perbaikiJudul() {
+  const daftar = baca();          // apa adanya, tanpa urutan tampilan
+  let diperbaiki = 0;
+
+  for (const it of daftar) {
+    if ((it.manual || []).includes('title') || !it.caption) continue;
+    if (!judulBoilerplate(it.title)) continue;
+
+    const baru = tebakJudul(it.caption);
+    if (baru && baru !== it.title && !judulBoilerplate(baru)) {
+      it.title = baru;
+      diperbaiki++;
+    }
+  }
+
+  if (diperbaiki) tulis(daftar);
+  return diperbaiki;
+}
+
 export function tebakJudul(caption) {
   if (!caption) return null;
 
@@ -267,8 +305,10 @@ export function buatIcs(items, { alarmMenit = null } = {}) {
     L.push('BEGIN:VEVENT');
     L.push(lipat(`UID:lelanginsta-${esc(it.id)}@lelanginsta`));
     L.push(`DTSTAMP:${now}`);
+    // Panjang 15 menit, bukan nol — acara tanpa durasi tidak punya tinggi di
+    // tampilan kalender dan terlihat seperti tidak tersimpan.
     L.push(`DTSTART:${stampUtc(it.closeAt)}`);
-    L.push(`DTEND:${stampUtc(it.closeAt)}`);
+    L.push(`DTEND:${stampUtc(it.closeAt + 15 * 60)}`);
     L.push(lipat(`SUMMARY:${esc(`Lelang tutup — ${judul} (${penjual})`)}`));
     L.push(lipat(`DESCRIPTION:${esc(rincian)}`));
     if (it.url) L.push(lipat(`URL:${esc(it.url)}`));

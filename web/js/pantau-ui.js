@@ -11,7 +11,7 @@ import * as G from './gcal.js';
 import * as A from './akun.js';
 import { analyze, parseBid, fmtRupiah } from './analysis.js';
 import {
-  fmtDateTime, fmtTime, fmtDate, fmtDuration, wallTimeToEpoch,
+  fmtDateTime, fmtTime, fmtDate, fmtHari, fmtDuration, wallTimeToEpoch,
   parseClock, fmtClock, applyMask
 } from './time.js';
 
@@ -155,6 +155,10 @@ export function initPantau(d) {
     sedangDiubah = null;
     render();
   });
+
+  // Judul yang terlanjur tersimpan dari tebakan lama dibetulkan di tempat,
+  // dari caption yang ikut tersimpan — tanpa menunggu penarikan berikutnya.
+  P.perbaikiJudul();
 
   A.keadaan().then((k) => {
     keadaanAkun = k;
@@ -319,15 +323,28 @@ async function sinkronSekarang({ diam = true } = {}) {
   }
 
   try {
-    const h = await G.sinkron(P.semua(), deps.tz(), { simpan: P.simpan });
+    const daftar = P.semua();
+    const h = await G.sinkron(daftar, deps.tz(), { simpan: P.simpan });
     const bagian = [];
     if (h.dibuat) bagian.push(`${h.dibuat} ditambahkan`);
     if (h.diperbarui) bagian.push(`${h.diperbarui} diperbarui`);
     if (h.dihapus) bagian.push(`${h.dihapus} dihapus`);
+
+    // Disebut tanggalnya, bukan cuma jumlahnya. "1 ditambahkan" tidak memberi
+    // tahu harus membuka kalender di hari yang mana — dan lelang yang tutup
+    // pekan depan tidak akan terlihat di tampilan hari ini.
+    const dikalender = daftar.filter((x) => x.status === 'aktif' && x.closeAt != null && x.gcalId);
+    const kapan = dikalender.length
+      ? ' Cari di ' + [...new Set(dikalender.map((x) => fmtDate(x.closeAt, deps.tz())))]
+        .slice(0, 3).join(', ') + '.'
+      : '';
+
     tandaiGoogle(
       h.gagal.length
         ? `${h.gagal.length} gagal disinkronkan: ${h.gagal[0].pesan}`
-        : (bagian.length ? 'Kalender disamakan — ' + bagian.join(', ') + '.' : 'Kalender sudah sama.'),
+        : (bagian.length
+          ? 'Kalender disamakan — ' + bagian.join(', ') + '.' + kapan
+          : 'Kalender sudah sama.' + kapan),
       h.gagal.length ? 'bad' : ''
     );
     if (!diam) render();
@@ -380,6 +397,18 @@ function dariDump(dump) {
     captionText: caption
   });
 
+  /*
+   * Yang kamu betulkan sendiri menang atas tebakan baru.
+   *
+   * Sebelumnya tiap penarikan menulis ulang judul, harga pembukaan, kelipatan,
+   * dan jam tutup dari caption. Artinya koreksimu bertahan sampai pemeriksaan
+   * otomatis berikutnya — paling cepat 45 detik — lalu diam-diam kembali ke
+   * tebakan yang tadi kamu tolak. Diam-diam, karena tidak ada yang berubah di
+   * layar selain angkanya.
+   */
+  const manual = new Set(lama.manual || []);
+  const pakai = (f, tebakan) => (manual.has(f) ? (lama[f] ?? null) : tebakan);
+
   return {
     ...lama,
     id: src.shortcode || src.media_id,
@@ -387,11 +416,13 @@ function dariDump(dump) {
     shortcode: src.shortcode || null,
     owner: src.owner_username || null,
     caption,
-    title: P.tebakJudul(caption),
-    openBid: hasil.summary.openBid ?? null,
-    increment: P.tebakKelipatan(caption, parseBid),
-    closeAt: tutup ? tutup.epoch : (lama.closeAt ?? null),
-    closeSource: tutup ? 'caption' : (lama.closeSource ?? null),
+    title: pakai('title', P.tebakJudul(caption)),
+    openBid: pakai('openBid', hasil.summary.openBid ?? null),
+    increment: pakai('increment', P.tebakKelipatan(caption, parseBid)),
+    closeAt: manual.has('closeAt')
+      ? (lama.closeAt ?? null)
+      : (tutup ? tutup.epoch : (lama.closeAt ?? null)),
+    closeSource: manual.has('closeAt') ? 'manual' : (tutup ? 'caption' : (lama.closeSource ?? null)),
     sniperMin: lama.sniperMin ?? 0,
     status: lama.status || 'aktif',
     addedAt: lama.addedAt || Math.floor(Date.now() / 1000),
@@ -461,13 +492,23 @@ async function tanganiAksi(e) {
       };
 
       const baru = { ...item };
-      baru.title = ambil('title').trim() || null;
+
+      // Kolom yang kamu ubah dicatat namanya, dan sejak itu kebal dari tebakan
+      // caption pada penarikan berikutnya. Yang tidak kamu sentuh tetap ikut
+      // diperbarui — koreksi satu kolom tidak seharusnya membekukan sisanya.
+      const manual = new Set(item.manual || []);
+      const tandai = (f, nilai) => {
+        if (nilai !== (item[f] ?? null)) manual.add(f);
+        baru[f] = nilai;
+      };
+
+      tandai('title', ambil('title').trim() || null);
       baru.sniperMin = +ambil('sniperMin') || 0;
 
       const ob = parseBid(ambil('openBid'));
       const inc = parseBid(ambil('increment'));
-      baru.openBid = ambil('openBid').trim() ? ob.value : null;
-      baru.increment = ambil('increment').trim() ? inc.value : null;
+      tandai('openBid', ambil('openBid').trim() ? ob.value : null);
+      tandai('increment', ambil('increment').trim() ? inc.value : null);
 
       const jam = ambil('jam').trim();
       const tgl = ambil('tgl').trim();
@@ -475,7 +516,7 @@ async function tanganiAksi(e) {
       if (jam || tgl) {
         const hasil = keEpoch(tgl, jam, deps.tz());
         if (hasil.galat) return catat(hasil.galat);
-        baru.closeAt = hasil.epoch;
+        tandai('closeAt', hasil.epoch);
         baru.closeSource = 'manual';
         // Tanggal yang diisikan sendiri harus disebut, bukan diam-diam
         // dipakai — kalau tebakannya meleset, ini satu-satunya kesempatan
@@ -484,10 +525,11 @@ async function tanganiAksi(e) {
           catatanTgl = ` Tanggal dikosongkan, jadi dipakai <b>${fmtDate(hasil.epoch, deps.tz())}</b>.`;
         }
       } else {
-        baru.closeAt = null;
+        tandai('closeAt', null);
         baru.closeSource = null;
       }
 
+      baru.manual = [...manual];
       P.simpan(baru);
       sedangDiubah = null;
       render();
@@ -709,16 +751,58 @@ function kartu(it, tz) {
   const detik = it.closeAt != null ? it.closeAt - Math.floor(Date.now() / 1000) : null;
   const url = it.url || (it.shortcode ? 'https://www.instagram.com/p/' + it.shortcode + '/' : null);
 
-  // Satu angka besar saja: harga tertinggi sekarang. Sisanya keterangan kecil
-  // dalam satu baris — daftar berlabel yang dulu membuat tiap kartu terbaca
-  // seperti formulir.
+  /*
+   * Angka penting berdiri sendiri-sendiri, berlabel, dan sama besar.
+   *
+   * Sebelumnya cuma harga tertinggi dan hitung mundur yang besar; jam tutup
+   * — yang justru menentukan kapan kamu harus berada di depan layar —
+   * terselip di baris keterangan 12,5px bersama jumlah peserta. Yang genting
+   * dan yang sekadar enak diketahui tercetak sama kecilnya, jadi kartunya
+   * harus dibaca kata per kata, bukan disapu sekilas.
+   */
+  const angka = [];
+
+  angka.push(it.topBid != null
+    ? { l: 'Tertinggi sekarang', v: 'Rp' + fmtRupiah(it.topBid),
+        s: it.topUser ? '@' + esc(it.topUser) : '', kuat: true }
+    : { l: 'Tertinggi sekarang', v: '—', s: 'belum dicek', redup: true });
+
+  if (it.myBid != null) {
+    angka.push({
+      l: 'Tawaranmu', v: 'Rp' + fmtRupiah(it.myBid),
+      s: it.memimpin ? 'memimpin' : 'kalah', kelas: it.memimpin ? 'baik' : 'buruk'
+    });
+  }
+
+  if (it.closeAt != null) {
+    angka.push({
+      l: 'Tutup', v: fmtTime(it.closeAt, tz),
+      s: `${fmtHari(it.closeAt, tz)}, ${fmtDate(it.closeAt, tz)}`
+    });
+  }
+
+  if (aktif && detik != null) {
+    angka.push({
+      l: 'Sisa waktu', mundur: true,
+      v: mundur(detik), s: detik > 0 ? 'lagi' : 'sudah tutup'
+    });
+  } else if (it.finalPrice != null) {
+    angka.push({ l: 'Harga akhir', v: 'Rp' + fmtRupiah(it.finalPrice), s: P.STATUS[it.status] });
+  }
+
+  const selAngka = angka.map((a) => `<div class="pk-a${a.mundur ? ' pk-mundur' : ''}">
+    <span class="pk-l">${a.l}</span>
+    <b class="${a.mundur ? 'jam ' : ''}${a.kelas || ''}${a.redup ? ' redup' : ''}">${a.v}</b>
+    ${a.s ? `<span class="pk-s ${a.kelas || ''}">${a.s}</span>` : ''}
+  </div>`).join('');
+
+  // Sisanya benar-benar keterangan tambahan: enak diketahui, tidak menentukan.
   const meta = [];
-  if (it.closeAt != null) meta.push(`tutup ${fmtTime(it.closeAt, tz)} &middot; ${fmtDate(it.closeAt, tz)}`);
   if (it.openBid != null) {
     meta.push(`buka Rp${fmtRupiah(it.openBid)}` +
       (it.increment != null ? ` &middot; naik Rp${fmtRupiah(it.increment)}` : ''));
   }
-  if (it.sniperMin) meta.push(`sniper ${it.sniperMin} mnt`);
+  if (it.sniperMin) meta.push(`sniper zone ${it.sniperMin} menit terakhir`);
   if (it.peserta) meta.push(`${it.peserta} peserta`);
 
   const status = Object.entries(P.STATUS).map(([k, v]) =>
@@ -734,23 +818,11 @@ function kartu(it, tz) {
           : (it.owner ? '@' + esc(it.owner) : 'penjual tidak diketahui')}</h3>
         ${it.title ? `<p class="pk-barang" title="${esc(it.title)}">${esc(it.title)}</p>` : ''}
       </div>
-      ${aktif && detik != null
-        ? `<div class="pk-mundur"><span class="jam">${mundur(detik)}</span>` +
-          `<span class="ket">${detik > 0 ? 'lagi' : 'sudah tutup'}</span></div>`
-        : ''}
-    </div>
-
-    <div class="pk-harga">
-      ${it.topBid != null
-        ? `<b>Rp${fmtRupiah(it.topBid)}</b><span class="ket">tertinggi` +
-          `${it.topUser ? ' &middot; @' + esc(it.topUser) : ''}</span>`
-        : '<b class="dim">belum dicek</b>'}
-      ${it.myBid != null && !it.memimpin
-        ? `<span class="tag same">tawaranmu Rp${fmtRupiah(it.myBid)}</span>` : ''}
-      <span class="fill"></span>
       <span class="pk-segar" data-segar>${it.lastCheckedAt
         ? 'dicek ' + fmtTime(it.lastCheckedAt, tz) : ''}</span>
     </div>
+
+    <div class="pk-angka">${selAngka}</div>
 
     ${meta.length ? `<p class="pk-meta">${meta.join('  &middot;  ')}</p>` : ''}
 
@@ -765,7 +837,7 @@ function kartu(it, tz) {
     </div>` : ''}
 
     <div class="paksi">
-      <button class="btn sm" data-aksi="buka">Lihat urutan tawaran</button>
+      <button class="btn sm utama" data-aksi="buka">Lihat urutan tawaran</button>
       ${aktif ? '<button class="btn sm quiet" data-aksi="cek">Cek sekarang</button>' : ''}
       <button class="btn sm quiet" data-aksi="ubah">Ubah</button>
       <select class="psel" data-ubah="status">${status}</select>

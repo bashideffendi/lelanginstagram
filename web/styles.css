@@ -730,26 +730,44 @@ tbody tr.r-snipe td { background: var(--warn-soft); }
   overflow: hidden; overflow-wrap: anywhere;
 }
 
-.pk-mundur { flex: none; text-align: right; line-height: 1.1; }
-.pk-mundur .jam {
-  display: block; font-family: var(--mono); font-size: 23px; font-weight: 700;
-  letter-spacing: -.025em; font-variant-numeric: tabular-nums; color: var(--c-ink);
+/*
+ * Angka penting sejajar, berlabel, dan sama besar.
+ *
+ * Dulu jam tutup terselip di baris keterangan 12,5px bersama jumlah peserta —
+ * padahal justru jam itu yang menentukan kapan kamu harus ada di depan layar.
+ * Yang genting dan yang sekadar enak diketahui tercetak sama kecilnya, jadi
+ * kartunya harus dibaca kata per kata, bukan disapu sekilas.
+ */
+.pk-angka {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
+  gap: 14px 20px; margin: 16px 0 12px;
+  padding: 14px 16px; border-radius: var(--r-sm);
+  background: var(--surface); border: 1px solid var(--c-line);
 }
-.pk-mundur .ket { font-size: 10.5px; color: var(--muted); }
+.pk-a { min-width: 0; line-height: 1.25; }
+.pk-l {
+  display: block; font-family: var(--mono); font-size: 9.5px; font-weight: 500;
+  letter-spacing: .1em; text-transform: uppercase; color: var(--muted);
+  margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.pk-a b {
+  display: block; font-family: var(--mono); font-size: 21px; font-weight: 700;
+  letter-spacing: -.025em; font-variant-numeric: tabular-nums; color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.pk-a b.redup { font-size: 17px; font-weight: 400; color: var(--muted); }
+.pk-a b.baik { color: var(--primary-700); }
+.pk-a b.buruk { color: var(--danger); }
+.pk-s { display: block; font-size: 12px; color: var(--muted); margin-top: 2px; }
+.pk-s.baik { color: var(--primary-700); font-weight: 600; }
+.pk-s.buruk { color: var(--danger); font-weight: 600; }
 
-.pk-harga {
-  display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
-  margin: 14px 0 8px;
-}
-.pk-harga b {
-  font-family: var(--mono); font-size: 22px; font-weight: 600;
-  letter-spacing: -.02em; font-variant-numeric: tabular-nums;
-}
-.pk-harga b.dim { font-size: 15px; font-weight: 400; font-family: var(--sans); }
-.pk-harga .ket { font-size: 12.5px; color: var(--muted); }
-.pk-segar { font-size: 11px; color: var(--faint); font-family: var(--mono); }
+/* Hitung mundur memakai warna keadaan — satu-satunya angka yang berubah sendiri. */
+.pk-mundur b.jam { color: var(--c-ink); }
 
-.pk-meta { font-size: 12.5px; color: var(--muted); margin-bottom: 14px; }
+.pk-segar { flex: none; font-size: 11px; color: var(--faint); font-family: var(--mono); }
+
+.pk-meta { font-size: 13px; color: var(--muted); margin-bottom: 14px; }
 
 /*
  * Lelang sudah tutup tapi hasilnya belum dicatat.
@@ -801,6 +819,24 @@ tbody tr.r-snipe td { background: var(--warn-soft); }
 .psel { font-size: 12.5px; padding: 6px 8px; }
 .pharga { width: 130px; font-family: var(--mono); font-size: 12.5px; padding: 6px 9px; }
 
+/*
+ * Semua kendali di kartu berlatar sama.
+ *
+ * .btn.quiet memakai "background: none" — masuk akal di halaman putih, tempat
+ * tanpa latar berarti tenang. Di kartu berwarna artinya berubah: tombolnya
+ * menampilkan biru kartunya sementara tombol sebelahnya putih, jadi terbaca
+ * seperti dua jenis tombol yang berbeda padahal setara.
+ *
+ * Susunannya dibedakan lewat huruf dan garis tepi, bukan lewat latar: satu
+ * tindakan utama berhuruf tebal bergaris warna keadaan, sisanya netral.
+ */
+.paksi .btn, .paksi .psel, .paksi .pharga {
+  background: var(--surface); border-color: var(--c-line);
+}
+.paksi .btn:hover { background: var(--surface-2); border-color: var(--c-ink); }
+.paksi .btn.utama { color: var(--c-ink); border-color: var(--c); font-weight: 700; }
+.paksi .btn.utama:hover { background: var(--c-bg); }
+
 .psub {
   font-size: 17px; font-weight: 700; letter-spacing: -.01em;
   margin: 34px 0 6px; padding-top: 24px; border-top: 1px solid var(--line);
@@ -814,8 +850,11 @@ tbody tr.r-snipe td { background: var(--warn-soft); }
   .pk-atas { gap: 12px; }
   .pk-judul h3 { font-size: 15.5px; }
   .pk-barang { font-size: 12.5px; }
-  .pk-mundur .jam { font-size: 18px; }
-  .pk-harga b { font-size: 19px; }
+  /* Dua kolom, bukan satu: empat angka bertumpuk membuat kartunya sepanjang
+     layar dan harus digulir untuk dibaca utuh. */
+  .pk-angka { grid-template-columns: 1fr 1fr; gap: 12px 14px; padding: 12px 13px; }
+  .pk-a b { font-size: 18px; }
+  .pk-a b.redup { font-size: 15px; }
   .paksi .btn, .paksi .psel, .paksi .pharga { flex: 1 1 calc(50% - 4px); }
   .pbar { gap: 8px; }
   #pakun { flex: 1 1 auto; width: auto; }

@@ -151,6 +151,18 @@ export function fmtDate(epochSec, tz) {
   return `${p.day}/${p.month}/${p.year}`;
 }
 
+/**
+ * Nama hari singkat. "04/08/2026" tidak memberi tahu apa-apa tentang seberapa
+ * dekat tanggal itu; "Sel" langsung terbaca tanpa membuka kalender.
+ */
+export function fmtHari(epochSec, tz) {
+  const HARI = { Sun: 'Min', Mon: 'Sen', Tue: 'Sel', Wed: 'Rab', Thu: 'Kam', Fri: 'Jum', Sat: 'Sab' };
+  const w = dtf(tz, { weekday: 'short' })
+    .formatToParts(new Date(epochSec * 1000))
+    .find((x) => x.type === 'weekday')?.value || '';
+  return HARI[w] || w;
+}
+
 export function fmtIsoUtc(epochSec) {
   return new Date(epochSec * 1000).toISOString().replace('.000Z', 'Z');
 }

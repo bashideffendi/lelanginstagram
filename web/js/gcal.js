@@ -160,8 +160,17 @@ function acara(it, tz) {
   return {
     summary: `Lelang tutup — ${judul} (${penjual})`,
     description: rincian,
+    /*
+     * Acaranya diberi panjang 15 menit, bukan nol.
+     *
+     * Google menerima acara berdurasi nol lewat API dan mengembalikan
+     * "berhasil dibuat", tapi di tampilan kalender benda itu tidak punya
+     * tinggi sama sekali — jadi terlihat seperti tidak ada yang tersimpan.
+     * Mulainya tepat di jam tutup, sehingga hitungan pengingat "sekian menit
+     * sebelum mulai" tetap berarti sekian menit sebelum lelang tutup.
+     */
     start: { dateTime: waktu, timeZone: tz },
-    end: { dateTime: waktu, timeZone: tz },
+    end: { dateTime: new Date((it.closeAt + 15 * 60) * 1000).toISOString(), timeZone: tz },
     // Google hanya menerima menitnya; teks popupnya selalu judul acara, tidak
     // bisa diatur. Karena itu alasan tiap pengingat ditaruh di rincian.
     reminders: {
