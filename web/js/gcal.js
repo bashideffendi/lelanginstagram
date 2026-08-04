@@ -12,6 +12,8 @@
  */
 
 import { CLIENT_ID_GOOGLE } from '../config.js';
+import { pengingat } from './pantau.js';
+import { fmtTime } from './time.js';
 
 const CAKUPAN = 'https://www.googleapis.com/auth/calendar.events';
 const API = 'https://www.googleapis.com/calendar/v3';
@@ -135,11 +137,19 @@ function acara(it, tz) {
   const penjual = it.owner ? '@' + it.owner : 'penjual tidak diketahui';
   const waktu = new Date(it.closeAt * 1000).toISOString();
 
+  // Zona sniper disebut dengan jam mulainya, bukan cuma panjangnya. "Sniper
+  // zone: 5 menit terakhir" masih menuntut hitung-hitungan saat panik;
+  // "mulai 20:55" langsung bisa dibandingkan dengan jam di tangan.
+  const zona = it.sniperMin && it.closeAt != null
+    ? `Sniper zone: mulai ${fmtTime(it.closeAt - it.sniperMin * 60, tz)} ` +
+      `(${it.sniperMin} menit terakhir). Belum pernah menawar sebelum jam itu = tidak boleh ikut.`
+    : null;
+
   const rincian = [
     `Penjual: ${penjual}`,
     it.openBid != null ? `Harga pembukaan: Rp${it.openBid.toLocaleString('id-ID')}` : null,
     it.increment != null ? `Kelipatan: Rp${it.increment.toLocaleString('id-ID')}` : null,
-    it.sniperMin ? `Sniper zone: ${it.sniperMin} menit terakhir` : null,
+    zona,
     it.topBid != null ? `Tertinggi saat terakhir dicek: Rp${it.topBid.toLocaleString('id-ID')}` : null,
     '',
     it.url || '',
@@ -152,12 +162,11 @@ function acara(it, tz) {
     description: rincian,
     start: { dateTime: waktu, timeZone: tz },
     end: { dateTime: waktu, timeZone: tz },
+    // Google hanya menerima menitnya; teks popupnya selalu judul acara, tidak
+    // bisa diatur. Karena itu alasan tiap pengingat ditaruh di rincian.
     reminders: {
       useDefault: false,
-      overrides: [
-        { method: 'popup', minutes: 30 },
-        { method: 'popup', minutes: 5 }
-      ]
+      overrides: pengingat(it).map((p) => ({ method: 'popup', minutes: p.menit }))
     }
   };
 }

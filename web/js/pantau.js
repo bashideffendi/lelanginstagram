@@ -149,11 +149,43 @@ function stampUtc(epoch) {
 }
 
 /**
- * Berkas kalender berisi satu acara per lelang, masing-masing dengan dua alarm.
+ * Kapan pengingatnya berbunyi, dihitung mundur dari jam tutup.
+ *
+ * Bukan sekadar "beberapa menit sebelum tutup". Kalau lelangnya memakai sniper
+ * zone, tenggat yang benar-benar menentukan bukan jam tutup melainkan saat
+ * zona itu dibuka: siapa yang belum pernah menawar sebelum zona dimulai tidak
+ * boleh ikut menawar di dalamnya. Terlambat semenit di titik itu berarti gugur
+ * sama sekali, bukan sekadar kehilangan satu putaran — jadi di situlah
+ * pengingatnya paling berguna, bukan di menit-menit terakhir saat pintunya
+ * sudah tertutup.
+ *
+ * Tiga menit dipilih sebagai jarak siap-siap: cukup untuk membuka Instagram
+ * dan mengetik satu tawaran, tapi belum cukup lama untuk keburu lupa lagi.
+ */
+export function pengingat(it) {
+  const per = new Map([
+    [5, 'tutup 5 menit lagi'],
+    [3, 'tutup 3 menit lagi']
+  ]);
+
+  if (it.sniperMin) {
+    // Ditimpa kalau bentrok: menyebut zona lebih berguna daripada menyebut
+    // sisa waktu, karena yang satu memberi tahu apa yang harus dikerjakan.
+    per.set(it.sniperMin + 3,
+      `sniper zone mulai 3 menit lagi — kalau belum pernah menawar, ini kesempatan terakhir`);
+  }
+
+  return [...per.entries()]
+    .sort((a, b) => b[0] - a[0])          // terjauh dulu
+    .map(([menit, teks]) => ({ menit, teks }));
+}
+
+/**
+ * Berkas kalender berisi satu acara per lelang, masing-masing dengan alarmnya.
  * Acaranya sengaja berdurasi nol menit dan diberi nama jelas, supaya di
  * tampilan kalender langsung terbaca lelang mana yang akan tutup.
  */
-export function buatIcs(items, { alarmMenit = [30, 5] } = {}) {
+export function buatIcs(items, { alarmMenit = null } = {}) {
   const now = stampUtc(Math.floor(Date.now() / 1000));
   const L = [
     'BEGIN:VCALENDAR',
@@ -191,11 +223,15 @@ export function buatIcs(items, { alarmMenit = [30, 5] } = {}) {
     if (it.url) L.push(lipat(`URL:${esc(it.url)}`));
     L.push('STATUS:CONFIRMED');
 
-    for (const menit of alarmMenit) {
+    const alarm = alarmMenit
+      ? alarmMenit.map((menit) => ({ menit, teks: `tutup ${menit} menit lagi` }))
+      : pengingat(it);
+
+    for (const { menit, teks } of alarm) {
       L.push('BEGIN:VALARM');
       L.push('ACTION:DISPLAY');
       L.push(`TRIGGER:-PT${menit}M`);
-      L.push(lipat(`DESCRIPTION:${esc(`${judul} tutup ${menit} menit lagi`)}`));
+      L.push(lipat(`DESCRIPTION:${esc(`${judul} — ${teks}`)}`));
       L.push('END:VALARM');
     }
 
