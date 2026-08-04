@@ -10,7 +10,10 @@ import * as P from './pantau.js';
 import * as G from './gcal.js';
 import * as A from './akun.js';
 import { analyze, parseBid, fmtRupiah } from './analysis.js';
-import { fmtDateTime, fmtTime, fmtDate, fmtDuration, wallTimeToEpoch } from './time.js';
+import {
+  fmtDateTime, fmtTime, fmtDate, fmtDuration, wallTimeToEpoch,
+  parseClock, fmtClock, applyMask
+} from './time.js';
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) =>
@@ -56,18 +59,38 @@ function simpanDump(id, dump) {
   if (dumpTerakhir.size > 12) dumpTerakhir.delete(dumpTerakhir.keys().next().value);
 }
 
-/** "03/08/2026" + "20:30:00" -> epoch, dalam zona waktu yang sedang dipakai. */
+/**
+ * "03/08/2026" + "20:30:00" -> epoch, dalam zona waktu yang sedang dipakai.
+ *
+ * Jamnya diterima seperti orang menuliskannya — 21, 2100, 21.00, 203400 —
+ * memakai pembaca yang sama dengan halaman analisis, supaya tidak ada aturan
+ * penulisan yang berlaku di satu tempat tapi ditolak di tempat lain.
+ *
+ * Tanggal boleh dikosongkan. Dulu tidak boleh, dan itu menghukum orang yang
+ * cuma mau membetulkan jamnya: dia disuruh mengetik tanggal yang tidak pernah
+ * dia sentuh, cuma karena kolomnya kebetulan kosong. Kalau dikosongkan,
+ * diambil kemunculan terdekat jam itu ke depan — hampir selalu yang dimaksud,
+ * karena lelang dipantau justru sebelum tutup.
+ */
 function keEpoch(tgl, jam, tz) {
-  const t = String(tgl).trim().match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
-  if (!t) return { galat: 'Tanggal harus berbentuk 03/08/2026.' };
+  const j = parseClock(jam);
+  if (!j) return { galat: 'Jam belum terbaca. Contoh: 2030, 20:30, atau 20:30:00.' };
 
-  const j = String(jam).trim().match(/^(\d{1,2})[:.](\d{2})(?:[:.](\d{2}))?$/);
-  if (!j) return { galat: 'Jam harus berbentuk 20:30 atau 20:30:00.' };
+  const isiTgl = String(tgl).trim();
+  if (isiTgl) {
+    const t = isiTgl.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
+    if (!t) return { galat: 'Tanggal harus berbentuk 03/08/2026, atau dikosongkan saja.' };
+    return { epoch: wallTimeToEpoch(+t[3], +t[2], +t[1], j.h, j.mi, j.sec, tz) };
+  }
 
-  const [h, mi, s] = [+j[1], +j[2], +(j[3] || 0)];
-  if (h > 23 || mi > 59 || s > 59) return { galat: 'Jam itu tidak masuk akal.' };
-
-  return { epoch: wallTimeToEpoch(+t[3], +t[2], +t[1], h, mi, s, tz) };
+  const now = Math.floor(Date.now() / 1000);
+  const [d, b, th] = fmtDate(now, tz).split('/').map(Number);
+  let epoch = wallTimeToEpoch(th, b, d, j.h, j.mi, j.sec, tz);
+  if (epoch <= now) {
+    const besok = fmtDate(now + 86400, tz).split('/').map(Number);
+    epoch = wallTimeToEpoch(besok[2], besok[1], besok[0], j.h, j.mi, j.sec, tz);
+  }
+  return { epoch, ditebak: true };
 }
 
 export function initPantau(d) {
@@ -111,6 +134,19 @@ export function initPantau(d) {
   // Satu penangan untuk seluruh daftar; barisnya digambar ulang terus-menerus.
   $('plist').addEventListener('click', tanganiAksi);
   $('plist').addEventListener('change', tanganiUbah);
+
+  // Titik dua disisipkan sambil diketik, sama seperti di halaman analisis:
+  // "203400" langsung terbaca "20:34:00" dan tidak ada momen ragu apakah yang
+  // diketik sudah benar. Didelegasikan karena formnya digambar ulang terus.
+  $('plist').addEventListener('input', (e) => {
+    if (e.target.dataset?.f === 'jam') applyMask(e.target);
+  });
+  // focusout, bukan blur — blur tidak merambat ke atas.
+  $('plist').addEventListener('focusout', (e) => {
+    if (e.target.dataset?.f !== 'jam') return;
+    const c = parseClock(e.target.value);
+    if (c) e.target.value = fmtClock(c.h, c.mi, c.sec);
+  });
 
   $('ptab').addEventListener('click', (e) => {
     const t = e.target.closest('[data-ptab]');
@@ -435,11 +471,18 @@ async function tanganiAksi(e) {
 
       const jam = ambil('jam').trim();
       const tgl = ambil('tgl').trim();
+      let catatanTgl = '';
       if (jam || tgl) {
         const hasil = keEpoch(tgl, jam, deps.tz());
         if (hasil.galat) return catat(hasil.galat);
         baru.closeAt = hasil.epoch;
         baru.closeSource = 'manual';
+        // Tanggal yang diisikan sendiri harus disebut, bukan diam-diam
+        // dipakai — kalau tebakannya meleset, ini satu-satunya kesempatan
+        // menyadarinya sebelum lelangnya lewat.
+        if (hasil.ditebak) {
+          catatanTgl = ` Tanggal dikosongkan, jadi dipakai <b>${fmtDate(hasil.epoch, deps.tz())}</b>.`;
+        }
       } else {
         baru.closeAt = null;
         baru.closeSource = null;
@@ -448,7 +491,7 @@ async function tanganiAksi(e) {
       P.simpan(baru);
       sedangDiubah = null;
       render();
-      stat('Keterangan lelang diperbarui.', 'ready');
+      stat('Keterangan lelang diperbarui.' + catatanTgl, 'ready');
       break;
     }
 
@@ -685,11 +728,11 @@ function kartu(it, tz) {
     <div class="pk-atas">
       <div class="pk-judul">
         <span class="pk-tanda">${TANDA[nada] || nada}</span>
-        <h3>${esc(it.title || it.id)}</h3>
-        <p>${url
+        <h3>${url
           ? `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">` +
             `${it.owner ? '@' + esc(it.owner) : 'buka di Instagram'} &#8599;</a>`
-          : `<span class="dim">${it.owner ? '@' + esc(it.owner) : 'penjual tidak diketahui'}</span>`}</p>
+          : (it.owner ? '@' + esc(it.owner) : 'penjual tidak diketahui')}</h3>
+        ${it.title ? `<p class="pk-barang" title="${esc(it.title)}">${esc(it.title)}</p>` : ''}
       </div>
       ${aktif && detik != null
         ? `<div class="pk-mundur"><span class="jam">${mundur(detik)}</span>` +
@@ -755,19 +798,32 @@ function formUbah(it, tz) {
     `<option value="${m}"${(it.sniperMin || 0) === m ? ' selected' : ''}>` +
     `${m ? m + ' menit terakhir' : 'Tidak ada'}</option>`).join('');
 
+  // Dari mana isinya, disebut terang-terangan. Kolom yang terisi hasil tebakan
+  // dan kolom yang kamu ketik sendiri terlihat sama persis, dan tanpa
+  // keterangan ini tidak ada cara membedakannya.
+  const asal = it.closeAt == null
+    ? '<b>Jam tutup tidak ketemu di caption.</b> Isi jamnya saja; tanggal boleh ' +
+      'dikosongkan, nanti diambil kemunculan terdekat ke depan.'
+    : it.closeSource === 'manual'
+      ? 'Jam tutup ini <b>kamu isi sendiri</b> sebelumnya, bukan tebakan.'
+      : 'Jam tutup ini <b>dibaca dari caption</b> postingan — periksa dulu, caption ' +
+        'ditulis bebas dan tebakannya bisa meleset.';
+
   return `<article class="pcard-item sunting" data-id="${esc(it.id)}">
     <div class="pk-atas"><div class="pk-judul"><h3>Ubah keterangan lelang</h3>
       <p class="dim">Isian di bawah ditebak dari caption. Perbaiki yang salah.</p></div></div>
+
+    <p class="pform-asal">${asal}</p>
 
     <div class="pform">
       <label><span>Barang</span>
         <input data-f="title" value="${esc(it.title || '')}" placeholder="nama barang"></label>
 
       <label><span>Jam tutup</span>
-        <input data-f="jam" value="${esc(jam)}" placeholder="20:30:00" class="mn"></label>
+        <input data-f="jam" value="${esc(jam)}" placeholder="ketik 2030" class="mn"></label>
 
       <label><span>Tanggal tutup</span>
-        <input data-f="tgl" value="${esc(tgl)}" placeholder="03/08/2026" class="mn"></label>
+        <input data-f="tgl" value="${esc(tgl)}" placeholder="kosong = otomatis" class="mn"></label>
 
       <label><span>Harga pembukaan</span>
         <input data-f="openBid" value="${esc(rp(it.openBid))}" placeholder="750rb atau 750000"></label>

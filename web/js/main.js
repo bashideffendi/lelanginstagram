@@ -3,7 +3,7 @@ import { analyze, chronoCompare, fmtRupiah, isAnnouncement } from './analysis.js
 import { diffDumps } from './diff.js';
 import {
   browserTz, tzOptions, tzOffsetLabel, fmtDateTime, fmtTime, fmtDate,
-  fmtDuration, wallTimeToEpoch
+  fmtDuration, wallTimeToEpoch, parseClock, maskClock, fmtClock, applyMask
 } from './time.js';
 import {
   download, sha256Hex, commentsCsv, accountsCsv, diffCsv, summaryText
@@ -239,104 +239,6 @@ function tzShort(epoch) {
     'Asia/Makassar': 'WITA', 'Asia/Jayapura': 'WIT', UTC: 'UTC'
   };
   return map[state.tz] || tzOffsetLabel(epoch, state.tz);
-}
-
-// ================================================================ kendali jam tutup
-
-/**
- * Terima jam apa adanya seperti orang menuliskannya: 21, 21.00, 21:00,
- * 2100, 9.30, 210030. Tanggalnya diambil dari pilihan terpisah, karena
- * lelang hampir selalu tutup di hari yang sama dengan komentarnya.
- */
-export function parseClock(raw) {
-  const s = String(raw ?? '').trim();
-  if (!s) return null;
-
-  let h, mi = 0, sec = 0;
-
-  if (/[.:\-\s]/.test(s)) {
-    const p = s.split(/[.:\-\s]+/).filter(Boolean);
-    if (!p.length || p.length > 3 || p.some((x) => !/^\d{1,2}$/.test(x))) return null;
-    h = +p[0]; mi = +(p[1] ?? 0); sec = +(p[2] ?? 0);
-  } else {
-    if (!/^\d+$/.test(s)) return null;
-    if (s.length <= 2) h = +s;
-    else if (s.length === 3) { h = +s.slice(0, 1); mi = +s.slice(1); }
-    else if (s.length === 4) { h = +s.slice(0, 2); mi = +s.slice(2); }
-    else if (s.length === 6) { h = +s.slice(0, 2); mi = +s.slice(2, 4); sec = +s.slice(4); }
-    else return null;
-  }
-
-  if (h > 23 || mi > 59 || sec > 59) return null;
-  return { h, mi, sec };
-}
-
-const pad = (n) => String(n).padStart(2, '0');
-
-// Selalu sampai detik. Alat ini menjual ketelitian detik, jadi menyembunyikan
-// ":00" membuat orang mengira ketelitiannya berhenti di menit.
-const fmtClock = (h, mi, sec) => `${pad(h)}:${pad(mi)}:${pad(sec || 0)}`;
-
-/**
- * Sisipkan titik dua sambil diketik, supaya "2030" langsung terbaca "20:30"
- * dan tidak ada momen ragu apakah yang diketik sudah benar.
- *
- * Kalau pengguna mengetik pemisahnya sendiri, pengelompokannya dihormati —
- * "9:30" tetap 9:30, tidak dipaksa jadi 93:0.
- */
-export function maskClock(raw) {
-  const s = String(raw ?? '');
-
-  if (/[.:]/.test(s)) {
-    // Kelompok yang penuh harus melimpah ke kelompok berikutnya. Sebelumnya
-    // tiap kelompok dipotong dua angka begitu saja, sehingga mengetik
-    // "215059" berhenti di "21:50" — dua angka terakhir hilang tanpa jejak.
-    const parts = s.replace(/[^\d.:]/g, '').split(/[.:]/);
-    const hLen = Math.min(2, (parts[0] || '').length) || 1;
-    const angka = parts.join('').slice(0, 6);
-
-    const h = angka.slice(0, hLen);
-    const sisa = angka.slice(hLen);
-    const mi = sisa.slice(0, 2);
-    const sec = sisa.slice(2, 4);
-
-    return h +
-      (mi || parts.length > 1 ? ':' + mi : '') +
-      (sec ? ':' + sec : '');
-  }
-
-  const d = s.replace(/\D/g, '').slice(0, 6);
-  if (d.length <= 2) return d;
-
-  // Dua digit pertama hanya bisa jadi jam kalau nilainya masuk akal.
-  const hLen = +d.slice(0, 2) <= 23 ? 2 : 1;
-  const h = d.slice(0, hLen);
-  const rest = d.slice(hLen);
-  const mi = rest.slice(0, 2);
-  const sec = rest.slice(2, 4);
-  return h + ':' + mi + (sec ? ':' + sec : '');
-}
-
-/** Terapkan mask tanpa membuat kursor melompat ke ujung saat menyunting di tengah. */
-function applyMask(el) {
-  const digitsBefore = el.value.slice(0, el.selectionStart ?? el.value.length)
-    .replace(/\D/g, '').length;
-  const masked = maskClock(el.value);
-  if (masked === el.value) return;
-
-  el.value = masked;
-
-  let seen = 0;
-  let pos = masked.length;
-  if (digitsBefore === 0) {
-    pos = 0;
-  } else {
-    for (let i = 0; i < masked.length; i++) {
-      if (/\d/.test(masked[i])) seen++;
-      if (seen === digitsBefore) { pos = i + 1; break; }
-    }
-  }
-  try { el.setSelectionRange(pos, pos); } catch { /* input bisa belum fokus */ }
 }
 
 /** Hari-hari yang benar-benar ada komentarnya, dalam zona waktu terpilih. */
