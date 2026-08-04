@@ -5,8 +5,10 @@
   "type": "module",
   "description": "Jam pasti komentar lelang Instagram — web app statis, extension Chrome, dan bookmarklet.",
   "scripts": {
+    "test": "node --test \"test/*.test.mjs\"",
     "build:bookmarklet": "node bookmarklet/build.mjs",
     "samples": "node samples/generate.mjs",
     "dev": "python -m http.server 8777 --directory web"
-  }
+  },
+  "engines": { "node": ">=20" }
 }

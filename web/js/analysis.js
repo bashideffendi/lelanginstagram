@@ -38,16 +38,40 @@ const KATA_TAWAR = /\b(bid|ob|nawar|menawar|tawar|up|naik|gas|ambil|angkat)\b/gi
  * tanpa itu "SKX007K" terbaca sebagai tawaran Rp7.000, dan di lelang jam
  * tangan kode model seperti itu muncul terus-menerus.
  */
+/*
+ * Penjaga tanda hubung, di kedua sisi.
+ *
+ * Lookbehind lama hanya menolak huruf dan angka yang menempel, jadi angka
+ * sesudah tanda hubung lolos: "43-5170" — kode model jam — terbaca sebagai
+ * tawaran 5.170, lalu dikalikan skala jadi Rp5.170.000. Angka yang tidak
+ * pernah ditawarkan siapa pun, di komentar yang bahkan bukan tawaran.
+ *
+ * Deret berpenghubung angka selalu kode atau rentang, tidak pernah harga:
+ * harga ditulis "750rb" atau "Rp750.000", bukan "43-5170". Jadi ditolak dari
+ * dua arah — didahului "angka-", atau diikuti "-angka".
+ */
 const CALON = new RegExp(
-  '(?<![A-Za-z0-9])' +
+  '(?<![A-Za-z0-9])(?<!\\d-)' +
   '(rp\\.?\\s*)?' +
   '(\\d{1,3}(?:\\.\\d{3})+(?:,\\d{1,2})?' +     // 1.500.000 atau 1.500.000,00
   '|\\d{1,3}(?:,\\d{3})+(?:\\.\\d{1,2})?' +     // 1,500,000
   '|\\d+(?:[.,]\\d+)?)' +                        // 1,5 atau 2.30 atau 500
   '\\s*(jt|juta|jeti|mio|rb|ribu|k)?' +
-  '(?![A-Za-z0-9])',
+  '(?![A-Za-z0-9])(?!-\\d)',
   'gi'
 );
+
+/**
+ * Buang nomor telepon sebelum angka dibaca.
+ *
+ * Penjaga "sepuluh digit tanpa satuan" tidak menolong kalau nomornya ditulis
+ * berpenggal — "0812-3456-7890" terbaca sebagai beberapa angka pendek, dan
+ * salah satunya bisa jadi tawaran tertinggi. Sepuluh digit atau lebih dalam
+ * satu deret, dipisah spasi atau tanda hubung sekalipun, bukan harga.
+ */
+function buangNomor(s) {
+  return String(s).replace(/(?<![A-Za-z0-9])(?:\d[\s.-]?){9,}\d(?![A-Za-z0-9])/g, ' ');
+}
 
 /** Ubah tulisan angka jadi bilangan, dengan aturan pemisah Indonesia. */
 function toNumber(raw, adaSatuan) {
@@ -122,9 +146,9 @@ export function parseBid(text) {
   const kosong = { value: null, confidence: null, matched: null };
   if (!text) return kosong;
 
-  const clean = buangJam(
+  const clean = buangNomor(buangJam(
     String(text).replace(/@[\w.]+/g, ' ').replace(/#[\w]+/g, ' ')
-  );
+  ));
 
   // Posisi kata tawar, dipakai memilih angka mana yang dimaksud.
   const posKata = [];

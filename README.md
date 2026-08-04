@@ -55,6 +55,25 @@ memahami tampilannya.
 Kalau di-deploy (Vercel, `outputDirectory` = `web`), langkah ini tidak perlu
 sama sekali.
 
+### Uji
+
+```
+npm test
+```
+
+Tanpa dependensi — `node --test` bawaan Node 20+. Jalankan sebelum mengirim
+perubahan apa pun ke `web/js/analysis.js`, `time.js`, atau `pantau.js`.
+
+Isinya bukan kasus karangan melainkan **kasus yang benar-benar pernah salah**
+di alat ini: `SKX007K` terbaca Rp7.000, `Rp2.500.000` kepotong jadi 500.000,
+nomor telepon jadi pemenang, `OB 100` merusak kalibrasi seluruh lelang,
+`215059` berhenti di `21:50`, kelipatan mengambil harga pembukaan.
+
+Alasannya bukan kerapian. Alat ini dipakai menuduh orang curang, dan kesalahan
+di pembaca tawaran tidak membuatnya rusak — ia membuatnya menghasilkan tuduhan
+yang **kelihatan benar padahal salah**. Tuduhan begitu tidak akan tertangkap
+mata siapa pun sebelum dikirim ke penyelenggara.
+
 ### Pasang extension (untuk kotak tempel-link)
 
 Belum lewat Chrome Web Store, jadi pasangnya manual — sekali saja:
