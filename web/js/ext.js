@@ -108,6 +108,25 @@ export async function probeServer(key) {
   }
 }
 
+/**
+ * Keadaan sesi Instagram di server, tanpa menarik apa pun.
+ *
+ * Sesi Instagram mati sendiri cepat atau lambat, dan sebelumnya matinya baru
+ * ketahuan saat kamu menarik lelang yang sedang panas — waktu paling buruk
+ * untuk mengurus cookie. Server memeriksanya tiap empat jam; ini cuma membaca
+ * hasilnya, jadi murah dan bisa dipanggil tiap halaman dibuka.
+ */
+export async function keadaanSesiServer() {
+  try {
+    const r = await fetch(apiBase() + '/sehat', { headers: { accept: 'application/json' } });
+    if (!r.ok) return null;
+    const j = await r.json();
+    return j?.sesiIg || null;
+  } catch {
+    return null;                  // server mati itu urusan lain, bukan ini
+  }
+}
+
 export async function extractViaServer(url, key) {
   const r = await callServer('/api/comments?url=' + encodeURIComponent(url), key);
   if (!r.ok) {

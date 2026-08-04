@@ -10,6 +10,7 @@ import * as P from './pantau.js';
 import * as G from './gcal.js';
 import * as A from './akun.js';
 import { analyze, parseBid, fmtRupiah, tebakOpenBid } from './analysis.js';
+import { keadaanSesiServer } from './ext.js';
 import {
   fmtDateTime, fmtTime, fmtDate, fmtHari, fmtDuration, wallTimeToEpoch,
   parseClock, fmtClock, applyMask
@@ -160,6 +161,7 @@ export function initPantau(d) {
   // supaya tidak ada kartu yang masih memajang tebakan lama.
   P.bersihkanJudulTebakan();
   P.perbaikiAngkaTelanjang();
+  periksaSesi();
 
   A.keadaan().then((k) => {
     keadaanAkun = k;
@@ -179,6 +181,39 @@ export function initPantau(d) {
 function stat(teks, kelas = '') {
   $('paddstat').className = 'take-stat ' + kelas;
   $('paddstat').innerHTML = teks;
+}
+
+// ---------------------------------------------------------------- sesi IG
+
+/**
+ * Peringatan sesi Instagram, muncul sebelum kamu membutuhkannya.
+ *
+ * Sesi Instagram di server mati sendiri cepat atau lambat — itu batas dari
+ * Instagram, bukan sesuatu yang bisa dibuat abadi. Yang bisa dihilangkan
+ * adalah caranya ketahuan: dulu selalu di detik kamu menarik lelang yang
+ * sedang panas, dalam bentuk kegagalan. Sekarang server mendenyutkannya tiap
+ * empat jam dan hasilnya dipajang di sini, jadi kamu sempat mengurusnya saat
+ * tidak sedang mengejar apa pun.
+ */
+async function periksaSesi() {
+  const kotak = $('psesi');
+  if (!kotak) return;
+
+  const s = await keadaanSesiServer();
+  if (!s || s.keadaan === 'hidup' || s.keadaan === 'belum' || s.keadaan === 'tak_tentu') {
+    kotak.innerHTML = '';
+    return;
+  }
+
+  const sejak = s.hidupTerakhir
+    ? ` Terakhir masih diterima ${fmtDateTime(Math.floor(s.hidupTerakhir / 1000), deps.tz())}.`
+    : '';
+
+  kotak.innerHTML =
+    '<div class="psesi-bad"><b>Sesi Instagram di server sudah tidak diterima.</b>' +
+    `<span>Penarikan lelang akan gagal sampai cookie-nya diambil ulang.${esc(sejak)}</span>` +
+    '<span>Jalankan <code>server\\isi-cookie.ps1</code> di laptop — klik kanan, ' +
+    '<b>Run with PowerShell</b>, lalu tempel tiga cookie dari akun khusus.</span></div>';
 }
 
 // ---------------------------------------------------------------- masuk

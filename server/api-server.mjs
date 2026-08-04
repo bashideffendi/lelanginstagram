@@ -21,7 +21,7 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { extract } from '../shared/ig-core.js';
+import { extract, APP_ID } from '../shared/ig-core.js';
 
 // ---------------------------------------------------------------- akun
 
@@ -197,6 +197,65 @@ function cookieTerkirim() {
   ].filter(Boolean);
 }
 
+/*
+ * Denyut sesi Instagram.
+ *
+ * Sesi Instagram tidak bisa dibuat abadi — tidak ada cara memperpanjangnya
+ * selain masuk lagi. Tapi dua hal yang membuat matinya terasa menyakitkan bisa
+ * dihilangkan.
+ *
+ * Pertama, sesi yang menganggur mati lebih cepat daripada sesi yang dipakai.
+ * Satu permintaan ringan tiap empat jam membuatnya terhitung aktif, dan itu
+ * memperpanjang umurnya secara nyata tanpa membebani apa pun.
+ *
+ * Kedua — dan ini yang lebih penting — matinya selalu ketahuan pada saat
+ * terburuk: waktu kamu menarik lelang yang sedang panas. Denyut ini membuatnya
+ * ketahuan berjam-jam lebih awal, saat kamu masih sempat mengambil cookie baru
+ * dengan tenang.
+ */
+const DENYUT_MS = 4 * 3600 * 1000;
+
+let sesiIg = { keadaan: 'belum', dicek: null, hidupTerakhir: null, pesan: '' };
+
+async function periksaSesiIg() {
+  const cookie = cookieHeader();
+  if (!cookie.includes('sessionid=')) {
+    sesiIg = { ...sesiIg, keadaan: 'kosong', dicek: Date.now(),
+      pesan: 'Cookie Instagram belum diisi di server.' };
+    return sesiIg;
+  }
+
+  try {
+    const r = await fetch('https://www.instagram.com/api/v1/accounts/current_user/', {
+      headers: { ...HEADER_IG, cookie, 'x-ig-app-id': APP_ID },
+      redirect: 'manual'                    // pengalihan = sesi ditolak, bukan 200
+    });
+    const hidup = r.status === 200;
+    sesiIg = {
+      keadaan: hidup ? 'hidup' : 'ditolak',
+      dicek: Date.now(),
+      hidupTerakhir: hidup ? Date.now() : sesiIg.hidupTerakhir,
+      pesan: hidup ? '' : `Instagram menolak sesi (HTTP ${r.status}).`
+    };
+  } catch (e) {
+    // Jaringan bermasalah bukan berarti sesinya mati; jangan menakut-nakuti.
+    sesiIg = { ...sesiIg, keadaan: 'tak_tentu', dicek: Date.now(),
+      pesan: 'Tidak bisa menghubungi Instagram: ' + (e.cause?.code || e.message) };
+  }
+  return sesiIg;
+}
+
+/** Dilaporkan ke halaman supaya peringatannya muncul sebelum dibutuhkan. */
+function keadaanSesi() {
+  return {
+    keadaan: sesiIg.keadaan,
+    pesan: sesiIg.pesan,
+    dicek: sesiIg.dicek,
+    hidupTerakhir: sesiIg.hidupTerakhir,
+    cookie: cookieTerkirim()
+  };
+}
+
 function samaPanjang(a, b) {
   const x = String(a ?? ''), y = String(b ?? '');
   if (x.length !== y.length) return false;
@@ -257,7 +316,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (url.pathname === '/sehat') {
-    return kirim(res, 200, { sehat: true, cookie: cookieTerkirim() }, asal);
+    return kirim(res, 200, { sehat: true, cookie: cookieTerkirim(), sesiIg: keadaanSesi() }, asal);
   }
 
   // ------------------------------------------------------------ akun
@@ -424,4 +483,10 @@ server.listen(PORT, HOST, () => {
   console.log(`[lelanginsta] cookie tersedia: ${cookieTerkirim().join(', ') || 'BELUM ADA'}`);
   console.log(`[lelanginsta] identitas: ${PERAMBAN ? 'peramban' : 'aplikasi Instagram'}`);
   console.log(`[lelanginsta] gembok: ${process.env.KETOK_KEY ? 'aktif' : 'terbuka untuk umum'}`);
+
+  const denyut = () => periksaSesiIg().then((s) =>
+    console.log(`[lelanginsta] sesi IG: ${s.keadaan}${s.pesan ? ' — ' + s.pesan : ''}`));
+  denyut();
+  // unref supaya pemeriksaan berkala tidak menahan proses saat dimatikan.
+  setInterval(denyut, DENYUT_MS).unref();
 });

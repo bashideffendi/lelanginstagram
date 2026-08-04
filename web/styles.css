@@ -604,6 +604,16 @@ tbody tr.r-snipe td { background: var(--warn-soft); }
 .pgcal-akun + .pgcal-note { margin-top: 4px; }
 .pgcal-note.bad { color: var(--danger); }
 
+/* Sesi Instagram server sudah mati — muncul sebelum ada penarikan yang gagal. */
+.psesi-bad {
+  display: grid; gap: 5px; margin: 20px 0 4px; padding: 14px 18px;
+  border: 1px solid rgba(192, 67, 47, .3); border-left: 4px solid var(--danger);
+  border-radius: var(--r); background: var(--danger-soft);
+}
+.psesi-bad b { font-size: 14px; color: var(--danger); }
+.psesi-bad span { font-size: 13px; color: var(--ink-soft); line-height: 1.5; }
+.psesi-bad code { background: var(--surface); }
+
 .pmasuk:not(:empty) {
   margin: 22px 0 4px; padding: 14px 18px;
   border: 1px solid var(--line); border-left: 3px solid var(--primary);
