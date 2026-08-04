@@ -253,7 +253,7 @@ function cookieTerkirim() {
  */
 const DENYUT_MS = 4 * 3600 * 1000;
 
-let sesiIg = { keadaan: 'belum', dicek: null, hidupTerakhir: null, pesan: '' };
+let sesiIg = { keadaan: 'belum', dicek: null, hidupTerakhir: null, akun: null, pesan: '' };
 
 async function periksaSesiIg() {
   const cookie = cookieHeader();
@@ -269,10 +269,23 @@ async function periksaSesiIg() {
       redirect: 'manual'                    // pengalihan = sesi ditolak, bukan 200
     });
     const hidup = r.status === 200;
+
+    // Nama akunnya ikut dicatat. Server ini bekerja atas nama satu akun
+    // Instagram, dan salah akun bukan gangguan kecil: penarikan dari IP pusat
+    // data adalah pola yang rutin dibatasi, jadi kalau yang tertanam ternyata
+    // akun yang dipakai ikut lelang, yang dipertaruhkan adalah akun itu.
+    // Menyebutnya terang-terangan jauh lebih murah daripada menyadarinya
+    // sesudah akunnya kena.
+    let akun = sesiIg.akun || null;
+    if (hidup) {
+      try { akun = (await r.clone().json())?.user?.username || null; } catch { /* diabaikan */ }
+    }
+
     sesiIg = {
       keadaan: hidup ? 'hidup' : 'ditolak',
       dicek: Date.now(),
       hidupTerakhir: hidup ? Date.now() : sesiIg.hidupTerakhir,
+      akun,
       pesan: hidup ? '' : `Instagram menolak sesi (HTTP ${r.status}).`
     };
   } catch (e) {
@@ -290,6 +303,7 @@ function keadaanSesi() {
     pesan: sesiIg.pesan,
     dicek: sesiIg.dicek,
     hidupTerakhir: sesiIg.hidupTerakhir,
+    akun: sesiIg.akun || null,
     cookie: cookieTerkirim()
   };
 }

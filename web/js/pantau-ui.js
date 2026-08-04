@@ -214,14 +214,33 @@ async function periksaSesi() {
    * lalu menjalankan skrip untuk memindahkan sesuatu yang sudah ada di
    * genggaman adalah kerepotan yang diciptakan sendiri oleh alat ini.
    */
-  if (deps.punyaExtension?.() && A.sudahMasuk()) {
+  const adaExt = deps.punyaExtension?.();
+
+  // Extension ada tapi belum masuk: itu keadaan yang sangat mungkin di browser
+  // yang baru, karena tanda masuk disimpan per-browser. Disebut apa adanya —
+  // menyuruh memasang extension yang jelas-jelas sudah terpasang cuma membuat
+  // orang mencari-cari kesalahan di tempat yang salah.
+  if (adaExt && !A.sudahMasuk()) {
+    kotak.innerHTML =
+      '<div class="psesi-bad"><b>Sesi Instagram di server sudah tidak diterima.</b>' +
+      '<span>Extension di browser ini bisa menyegarkannya sendiri, tapi perlu kamu ' +
+      '<b>masuk dulu di kotak bawah ini</b> — servernya menolak permintaan tanpa itu.</span>' +
+      '<span>Sesudah masuk, muat ulang halaman ini sekali.</span></div>';
+    return;
+  }
+
+  if (adaExt && A.sudahMasuk()) {
     kotak.innerHTML = '<div class="psesi-kerja">Sesi Instagram server kedaluwarsa — menyegarkan sendiri&hellip;</div>';
     try {
       const h = await segarkanSesiViaExtension(A.token());
       if (h.keadaan === 'hidup') {
-        kotak.innerHTML = '<div class="psesi-ok">Sesi Instagram server disegarkan sendiri dari browser ini. ' +
-          'Tidak ada yang perlu kamu lakukan.</div>';
-        setTimeout(() => { if ($('psesi')) $('psesi').innerHTML = ''; }, 8000);
+        // Nama akunnya disebut. Kalau yang tertanam ternyata akun yang kamu
+        // pakai ikut lelang, ini satu-satunya kesempatan menyadarinya sebelum
+        // server mulai bekerja atas namanya dari IP pusat data.
+        const lagi = await keadaanSesiServer().catch(() => null);
+        kotak.innerHTML = '<div class="psesi-ok">Sesi Instagram server disegarkan sendiri dari browser ini' +
+          (lagi?.akun ? ` — server sekarang bekerja sebagai <b>@${esc(lagi.akun)}</b>` : '') +
+          '. Tidak ada yang perlu kamu lakukan.</div>';
         return;
       }
       // Gagal juga: berarti browser ini pun tidak lagi login Instagram.
