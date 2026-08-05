@@ -1078,3 +1078,52 @@ tbody tr.r-snipe td { background: var(--warn-soft); }
   .row .btn { flex: 1 1 100%; }
   .rules-body { max-height: 160px; }
 }
+
+/*
+ * Menawar otomatis.
+ *
+ * Dipisah dari isian keterangan biasa, dan diberi warna sendiri. Yang di atas
+ * cuma catatan; yang ini bisa mengeluarkan uang tanpa kamu menekan apa pun,
+ * dan pemisahannya harus terlihat sebelum disalakan — bukan sesudah.
+ */
+.pauto {
+  margin-top: 14px; border: 1px solid var(--line-2); border-radius: var(--r-sm);
+  background: var(--surface);
+}
+.pauto summary {
+  cursor: pointer; padding: 10px 14px; font-size: 13.5px; font-weight: 600;
+  color: var(--ink-soft); list-style: none;
+}
+.pauto summary::-webkit-details-marker { display: none; }
+.pauto summary::before { content: "+"; color: var(--primary); font-weight: 700; margin-right: 8px; }
+.pauto[open] summary::before { content: "–"; }
+.pauto-on {
+  font-family: var(--mono); font-size: 9.5px; letter-spacing: .09em;
+  text-transform: uppercase; background: var(--primary); color: #fff;
+  padding: 2px 7px; border-radius: 4px; margin-left: 6px;
+}
+.pauto-nota {
+  font-size: 12.5px; color: var(--muted); line-height: 1.5;
+  padding: 0 14px 4px;
+}
+.pauto .pform { padding: 0 14px 14px; margin-top: 8px; }
+
+/* Baris di kartu: angka yang benar-benar akan ditembakkan. */
+.pauto-baris {
+  display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
+  padding: 10px 13px; margin-bottom: 14px;
+  border-radius: var(--r-sm); background: var(--surface);
+  border: 1px solid var(--c-line); border-left: 3px solid var(--line-2);
+}
+.pauto-baris .pk-l { margin-bottom: 0; flex: none; }
+.pauto-baris b {
+  font-family: var(--mono); font-size: 15px; font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.pauto-baris > span:last-child { font-size: 12.5px; color: var(--muted); }
+.pauto-baris.siap { border-left-color: var(--primary); }
+.pauto-baris.siap b { color: var(--primary-700); }
+.pauto-baris.ok { border-left-color: var(--primary); background: var(--primary-soft); }
+.pauto-baris.bad { border-left-color: var(--danger); }
+.pauto-baris.bad b { color: var(--danger); }
+.pauto-baris .bad { color: var(--danger); font-weight: 700; }

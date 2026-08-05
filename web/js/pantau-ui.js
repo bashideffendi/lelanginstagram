@@ -10,6 +10,7 @@ import * as P from './pantau.js';
 import * as G from './gcal.js';
 import * as A from './akun.js';
 import * as J from './jam.js';
+import * as T from './tawar.js';
 import { analyze, parseBid, fmtRupiah, tebakOpenBid } from './analysis.js';
 import { keadaanSesiServer, segarkanSesiViaExtension } from './ext.js';
 import {
@@ -866,6 +867,17 @@ async function tanganiAksi(e) {
       tandai('openBid', ambil('openBid').trim() ? ob.value : null);
       tandai('increment', ambil('increment').trim() ? inc.value : null);
 
+      // Menawar otomatis: hanya boleh hidup kalau batasnya terisi. Menyalakan
+      // tanpa batas berarti tidak ada yang menghentikan tawaran, jadi keadaan
+      // itu ditolak di sini alih-alih diam-diam tidak berbuat apa-apa nanti.
+      const mb = parseBid(ambil('maksBid'));
+      baru.maksBid = ambil('maksBid').trim() ? mb.value : null;
+      baru.leadDetik = +ambil('leadDetik') || 5;
+      baru.autoBid = ambil('autoBid') === '1';
+      if (baru.autoBid && baru.maksBid == null) {
+        return catat('Menawar otomatis butuh batas atas. Isi dulu, atau matikan.');
+      }
+
       const jam = ambil('jam').trim();
       const tgl = ambil('tgl').trim();
       let catatanTgl = '';
@@ -1108,6 +1120,50 @@ export function nadaKartu(it) {
   return 'jalan';
 }
 
+/**
+ * Baris menawar otomatis, dengan angka yang benar-benar akan ditembakkan.
+ *
+ * Ditampilkan terus-menerus, bukan hanya saat menembak. Alat yang bertindak
+ * sendiri harus bisa diawasi sebelum bertindak — kalau angkanya baru terlihat
+ * sesudah terkirim, tidak ada gunanya melihat.
+ */
+function barisAuto(it) {
+  if (!it.autoBid && it.autoTembakPada == null) return '';
+
+  const akun = P.akunku().trim().toLowerCase();
+  const p = T.putusan(it, { now: J.sekarangDetik(), akun });
+  const rp = (v) => 'Rp' + fmtRupiah(v);
+
+  // Sudah ditembakkan: yang ditampilkan hasilnya, bukan rencananya.
+  if (it.autoTembakPada != null) {
+    const ok = it.autoTembakGalat == null;
+    return `<div class="pauto-baris ${ok ? 'ok' : 'bad'}">
+      <span class="pk-l">Menawar otomatis</span>
+      <b>${ok ? rp(it.autoTembakNilai) + ' terkirim' : 'gagal'}</b>
+      <span>${ok
+        ? `pada ${fmtTime(it.autoTembakPada, deps.tz())}` +
+          (it.autoTembakStempel != null
+            ? ` &middot; dicatat Instagram ${fmtTime(it.autoTembakStempel, deps.tz())}` +
+              `, ${it.closeAt != null && it.autoTembakStempel <= it.closeAt
+                ? '<b>sebelum tutup</b>' : '<b class="bad">SESUDAH TUTUP</b>'}`
+            : ' &middot; menunggu pemeriksaan')
+        : esc(it.autoTembakGalat)}</span>
+    </div>`;
+  }
+
+  const kelas = p.tembak ? 'siap'
+    : p.kode === T.SEBAB.LEWAT_BATAS || p.kode === T.SEBAB.BELUM_MENAWAR ? 'bad' : '';
+
+  return `<div class="pauto-baris ${kelas}">
+    <span class="pk-l">Menawar otomatis</span>
+    <b>${p.nilai != null ? rp(p.nilai) : '&mdash;'}</b>
+    <span>${p.kode === T.SEBAB.BELUM_WAKTUNYA
+      ? `siap &middot; ditembakkan ${it.leadDetik || 5} detik sebelum tutup ` +
+        `&middot; batas ${rp(it.maksBid)}`
+      : esc(p.pesan)}</span>
+  </div>`;
+}
+
 function kartu(it, tz) {
   if (sedangDiubah === it.id) return formUbah(it, tz);
 
@@ -1212,6 +1268,8 @@ function kartu(it, tz) {
       <div class="pk-baris pk-rinci">${selRinci}</div>
     </div>
 
+    ${barisAuto(it)}
+
     ${nada === 'lewat' ? `<div class="pk-vonis">
       <span>${aku.memimpin
         ? 'Kamu yang tertinggi saat lelang ditutup.'
@@ -1294,6 +1352,38 @@ function formUbah(it, tz) {
       <label><span>Sniper zone</span>
         <select data-f="sniperMin">${sniper}</select></label>
     </div>
+
+    <!--
+      Menawar otomatis dipisah ke kotaknya sendiri, bukan disatukan dengan
+      isian di atas. Yang di atas cuma keterangan; yang di sini bisa
+      mengeluarkan uang tanpa kamu menekan apa pun, dan pemisahan itu harus
+      terlihat sebelum disalakan, bukan sesudah.
+    -->
+    <details class="pauto" ${it.autoBid ? 'open' : ''}>
+      <summary>Menawar otomatis${it.autoBid ? ' <b class="pauto-on">hidup</b>' : ''}</summary>
+
+      <p class="pauto-nota">Alat ini menawar sekadar cukup untuk memimpin, dan
+        <b>berhenti begitu harga melewati batas atasmu</b>. Syaratnya kamu sudah
+        menawar sendiri lebih dulu di postingannya &mdash; itu yang membuatmu
+        berhak menawar di sniper zone.</p>
+
+      <div class="pform">
+        <label><span>Menawar otomatis</span>
+          <select data-f="autoBid">
+            <option value="0"${!it.autoBid ? ' selected' : ''}>Mati</option>
+            <option value="1"${it.autoBid ? ' selected' : ''}>Hidup</option>
+          </select></label>
+
+        <label><span>Batas atas</span>
+          <input data-f="maksBid" value="${esc(rp(it.maksBid))}" placeholder="1jt atau 1000000">
+          <small>Tidak akan menawar melebihi ini. Kosong = tidak menawar sama sekali.</small></label>
+
+        <label><span>Tembak berapa detik sebelum tutup</span>
+          <select data-f="leadDetik">${[3, 5, 10, 20, 30, 60].map((d) =>
+            `<option value="${d}"${(it.leadDetik || 5) === d ? ' selected' : ''}>${d} detik</option>`).join('')}</select>
+          <small>Diukur: membaca harga 0,95 dtk, mengirim 0,3 dtk.</small></label>
+      </div>
+    </details>
 
     <p class="pform-note" id="pformnote"></p>
 
