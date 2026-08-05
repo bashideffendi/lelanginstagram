@@ -40,12 +40,37 @@ async function bacaCookieIg() {
  * sini: extension tidak perlu tahu apa-apa tentang akunmu, dan server yang
  * menolak tanda masuk yang salah.
  */
+/**
+ * Alamat server yang boleh menerima cookie Instagram.
+ *
+ * Halaman menyebut alamatnya, dan tanpa daftar ini alamat apa pun diterima —
+ * satu halaman jahat di localhost:8777 (port yang dipakai bermacam alat
+ * pengembangan, bukan cuma proyek ini) cukup mengirim pesan berisi alamatnya
+ * sendiri untuk memanen sesi Instagram-mu. Cookie ini bukan sekadar data:
+ * pemegangnya bisa berkomentar, mengikuti, dan membaca DM atas namamu.
+ */
+const API_DIIZINKAN = [
+  'https://lelanginsta-api.tempuscollective.com',
+  'http://localhost:8791',
+  'http://127.0.0.1:8791'
+];
+
+function apiSah(alamat) {
+  const bersih = String(alamat || '').replace(/\/+$/, '');
+  return API_DIIZINKAN.includes(bersih) ? bersih : null;
+}
+
 async function segarkanSesi(msg) {
+  const api = apiSah(msg.api);
+  if (!api) {
+    return { kind: 'error', message: 'Alamat server itu tidak ada di daftar yang diizinkan extension ini.' };
+  }
+
   const { isi, galat } = await bacaCookieIg();
   if (galat) return { kind: 'error', message: galat };
 
   try {
-    const r = await fetch(String(msg.api).replace(/\/+$/, '') + '/sesi-ig', {
+    const r = await fetch(api + '/sesi-ig', {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-lelang-token': msg.token || '' },
       body: JSON.stringify({

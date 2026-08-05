@@ -68,10 +68,16 @@ export function createApi(base, extraHeaders, opts) {
 
     return fetch(base + path, init).then(function (r) {
       if (r.status >= 300 && r.status < 400) {
+        // Tujuan pengalihan membedakan sesi yang ditolak (/accounts/login/)
+        // dari akun yang sedang diminta verifikasi (/challenge/).
+        var tujuan = '';
+        try { tujuan = r.headers.get('location') || ''; } catch (e) { /* diabaikan */ }
+
         var alih = new Error(
           'Instagram mengalihkan permintaan ke halaman login — sesi tidak diterima.'
         );
         alih.status = 401;
+        alih.tujuan = tujuan;
         throw alih;
       }
       if (!r.ok) {
@@ -275,6 +281,23 @@ export function extract(opts) {
     })
     .then(function (top) {
       rawTop = top;
+
+      /*
+       * Balasan bisa dilewati sepenuhnya.
+       *
+       * Balasan ditarik satu utas per permintaan, berurutan, dengan jeda sopan
+       * di antaranya — dan itulah biaya sebenarnya dari satu penarikan, bukan
+       * jumlah halamannya. Diukur pada lelang sungguhan: 5 komentar 0,9 detik,
+       * 16 komentar 2,0 detik, dan keduanya cuma satu halaman.
+       *
+       * Untuk menawar di detik terakhir, dua detik itu terlalu lama: harga yang
+       * dipakai menghitung jadi basi. Tawaran hampir selalu komentar utama,
+       * jadi menjelang menembak balasannya dilewati. Untuk penarikan bukti —
+       * tempat balasan yang hilang justru bisa berisi tawaran — semuanya tetap
+       * diambil seperti biasa.
+       */
+      if (opts.skipReplies) return [];
+
       var threads = top.filter(function (c) { return (c.child_comment_count || 0) > 0; });
       if (!threads.length) return [];
 

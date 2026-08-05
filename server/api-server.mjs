@@ -681,9 +681,27 @@ const server = http.createServer(async (req, res) => {
     return kirim(res, 405, { error: 'metode', message: 'Hanya menerima GET.' }, asal);
   }
 
+  /*
+   * Menarik komentar menuntut masuk. Bukan lagi terbuka untuk umum.
+   *
+   * Dulu dibuka dengan alasan "biar orang lain bisa mencoba", dan penjaganya
+   * cuma KETOK_KEY yang memang sengaja dikosongkan — jadi tidak ada penjaga
+   * sama sekali. Yang membuatnya berbahaya bukan bebannya, melainkan atas nama
+   * siapa penarikannya berjalan: sesi server sekarang milik akun yang dipakai
+   * MENAWAR. Siapa pun yang menemukan alamat ini bisa membakar jatah akun itu
+   * sampai Instagram membatasinya — dan yang kehilangan kemampuan ikut lelang
+   * adalah pemiliknya, bukan pemanggilnya.
+   *
+   * Kunci lama tetap diterima supaya jalur bookmarklet dan pemakaian lama
+   * tidak mendadak mati, tapi salah satunya wajib ada.
+   */
   const kunci = process.env.KETOK_KEY;
-  if (kunci && !samaPanjang(req.headers['x-ketok-key'], kunci)) {
-    return kirim(res, 401, { error: 'kunci_salah', message: 'Kunci mode server salah atau belum diisi.' }, asal);
+  const kunciCocok = kunci && samaPanjang(req.headers['x-ketok-key'], kunci);
+  if (!kunciCocok && !sesiSah(tokenDari(req))) {
+    return kirim(res, 401, {
+      error: 'belum_masuk',
+      message: 'Perlu masuk dulu untuk menarik komentar lewat server ini.'
+    }, asal);
   }
 
   const cookie = cookieHeader();
