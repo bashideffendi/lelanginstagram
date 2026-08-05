@@ -180,28 +180,52 @@ export function perbaikiAngkaTelanjang() {
   return diperbaiki;
 }
 
-export function tebakKelipatan(caption, parseBid) {
-  if (!caption) return null;
-  const nilai = '((?:rp\\.?\\s*)?[\\d.,]+\\s*(?:jt|juta|rb|ribu|k)?)';
-  const re = new RegExp(
-    '(?:kelipatan|minimal\\s*bid|min\\.?\\s*bid|increment|naik(?:an)?)\\s*[:=]?\\s*\\+?\\s*' + nilai +
-    '|(?:^|[\\s(])\\+\\s*' + nilai,
-    'gi');
+const NILAI_KELIPATAN = '((?:rp\\.?\\s*)?[\\d.,]+\\s*(?:jt|juta|rb|ribu|k)?)';
 
+/** Satuan waktu sesudah angka: "+1 menit" itu aturan, bukan harga. */
+const SATUAN_WAKTU = /^\s*(menit|mnt|jam|detik|dtk|hari|hr)\b/i;
+
+function cariKelipatan(caption, parseBid, pola) {
+  const re = new RegExp(pola, 'gi');
   let m;
   while ((m = re.exec(caption)) !== null) {
-    const v = parseBid(m[1] ?? m[2]);
-    if (v.value == null) continue;
-    const teks = m[1] ?? m[2];
+    const teks = m[1];
+    if (SATUAN_WAKTU.test(caption.slice(m.index + m[0].length))) continue;
 
-    // "kelipatan 50" maksudnya Rp50.000, bukan Rp50. Aturan yang sama sudah
-    // dipakai untuk tawaran di komentar; tanpa ini, kartunya memajang
-    // "naik Rp50" — angka yang tidak pernah ada di lelang mana pun, dan
-    // salahnya tidak kentara karena bentuknya tetap masuk akal.
+    const v = parseBid(teks);
+    if (v.value == null) continue;
+
+    // "kelipatan 50" maksudnya Rp50.000, bukan Rp50. Aturan yang sama dipakai
+    // untuk tawaran di komentar; tanpa ini kartunya memajang "naik Rp50" —
+    // angka yang tidak pernah ada di lelang mana pun, dan salahnya tidak
+    // kentara karena bentuknya tetap masuk akal.
     const telanjang = !/(jt|juta|rb|ribu|k|\.|,)/i.test(teks);
     return telanjang && v.value < 1000 ? v.value * 1000 : v.value;
   }
   return null;
+}
+
+export function tebakKelipatan(caption, parseBid) {
+  if (!caption) return null;
+
+  /*
+   * Kata kunci lebih dipercaya daripada tanda tambah.
+   *
+   * Pola "+angka" dipasang untuk menangkap "(+50rb)", tapi caption aturan
+   * lelang penuh tanda tambah yang bukan harga. Terjadi betulan: baris
+   * "+1 menit tidak sah" tertangkap lebih dulu daripada "Bid kelipatan : 25 rb"
+   * — karena letaknya di atas — lalu kelipatannya terbaca Rp1.000. Angka
+   * sekecil itu membuat tawaran otomatis menaikkan harga seribu rupiah
+   * sekali jalan, dan kalah sambil terlihat sedang bekerja.
+   *
+   * Jadi yang menyebut kenaikan secara terang-terangan dicari lebih dulu di
+   * seluruh caption; tanda tambah hanya dipakai kalau tidak ada satu pun.
+   */
+  const berkata = cariKelipatan(caption, parseBid,
+    '(?:kelipatan|minimal\\s*bid|min\\.?\\s*bid|increment|naik(?:an)?)\\s*[:=]?\\s*\\+?\\s*' + NILAI_KELIPATAN);
+  if (berkata != null) return berkata;
+
+  return cariKelipatan(caption, parseBid, '(?:^|[\\s(])\\+\\s*' + NILAI_KELIPATAN);
 }
 
 // ---------------------------------------------------------------- kalender

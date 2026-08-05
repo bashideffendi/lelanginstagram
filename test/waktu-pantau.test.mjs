@@ -147,6 +147,30 @@ test('kelipatan telanjang berarti ribuan', () => {
   }
 });
 
+test('caption sungguhan @jamsekensingapur: aturan bertanda tambah', () => {
+  // Kasus nyata. "+1 menit tidak sah" tertangkap lebih dulu daripada
+  // "Bid kelipatan : 25 rb" karena letaknya di atas, lalu kelipatannya
+  // terbaca Rp1.000 — cukup kecil untuk membuat tawaran otomatis menaikkan
+  // harga seribu rupiah sekali jalan, dan kalah sambil terlihat bekerja.
+  const cap = [
+    '- Bid Yang Sah Akan Di Like (Agar Kelihatan Rapi)',
+    '- Pemenang SAH di menit paling terakhir, +1 menit tidak sah.',
+    '- SNIPER BID (15 Menit Sebelum Waktu Berakhir) WAJIB SUDAH PERNAH BID',
+    '- Comment hanya untuk bidder, tanya2 via DM atau WA 081322801805',
+    'Open Bid : 850',
+    'Bid kelipatan : 25 rb (angka langsung ditambah dengan BID sebelumnya)'
+  ].join('\n');
+
+  assert.equal(tebakKelipatan(cap, parseBid), 25000);
+});
+
+test('angka bersatuan waktu bukan harga', () => {
+  assert.equal(tebakKelipatan('+1 menit tidak sah', parseBid), null);
+  assert.equal(tebakKelipatan('naik 5 menit sebelum tutup', parseBid), null);
+  // Tapi "+50rb" yang memang harga tetap terbaca.
+  assert.equal(tebakKelipatan('Open bid 750rb (+50rb)', parseBid), 50000);
+});
+
 test('kelipatan tidak mengambil harga pembukaan', () => {
   // Kata "bid" pernah jadi kata kunci di sini, dan caption hampir selalu
   // menyebut "Open bid" SEBELUM kelipatannya — jadi yang terbaca justru harga
