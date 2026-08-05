@@ -915,6 +915,18 @@ async function tanganiAksi(e) {
         return catat('Menawar otomatis butuh batas atas. Isi dulu, atau matikan.');
       }
 
+      /*
+       * Menyalakan menawar otomatis sekalian menandai akun penembaknya.
+       *
+       * Yang menembak memang selalu akun itu, jadi menandainya sendiri cuma
+       * langkah yang pasti kamu kerjakan tiap kali. Yang sudah kamu tandai
+       * sengaja tidak ditimpa: kalau kamu memilih akun lain, itu keputusan,
+       * dan kartunya tetap menyebut siapa yang benar-benar akan menembak.
+       */
+      if (baru.autoBid && !baru.akunDipakai && akunPenembak) {
+        baru.akunDipakai = akunPenembak;
+      }
+
       const jam = ambil('jam').trim();
       const tgl = ambil('tgl').trim();
       let catatanTgl = '';
