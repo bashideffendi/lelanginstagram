@@ -748,8 +748,25 @@ function petaTawaran(rows) {
     if (!u) continue;
     if (!peta.has(u) || peta.get(u) < r.bid) peta.set(u, r.bid);
   }
-  return Object.fromEntries(
-    [...peta.entries()].sort((a, b) => b[1] - a[1]).slice(0, 60));
+
+  const teratas = [...peta.entries()].sort((a, b) => b[1] - a[1]).slice(0, 60);
+
+  /*
+   * Namamu selalu ikut, walau tawaranmu tidak masuk enam puluh teratas.
+   *
+   * Menawar otomatis menolak menembak kalau kamu belum pernah menawar sendiri
+   * — syarat sniper zone. Petanya dipotong supaya simpanannya tidak
+   * membengkak, dan di lelang ramai justru tawaranmu yang paling mungkin
+   * terpotong: kamu tersalip, tawaranmu rendah, dan itu persis keadaan saat
+   * kamu paling butuh menembak. Tanpa baris ini, alat ini menolak menolongmu
+   * tepat di lelang yang paling membutuhkannya.
+   */
+  const aku = P.akunku().trim().toLowerCase();
+  if (aku && peta.has(aku) && !teratas.some(([u]) => u === aku)) {
+    teratas.push([aku, peta.get(aku)]);
+  }
+
+  return Object.fromEntries(teratas);
 }
 
 /** Posisimu di satu lelang, dihitung dari akun yang sedang dipakai sekarang. */
