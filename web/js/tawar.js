@@ -55,11 +55,21 @@ export function tawaranBerikut(it) {
 /**
  * Boleh menembak sekarang?
  *
- * @param it     catatan lelang
- * @param now    detik sekarang, dari jam yang sudah dikoreksi
- * @param akun   username Instagram-mu, huruf kecil
+ * Dua daftar akun, dan bedanya penting:
+ *
+ *   akunSaya      semua akun milikmu. Dipakai memutuskan apakah kamu sudah
+ *                 memimpin — kalau salah satunya yang tertinggi, menembak
+ *                 berarti menawar melawan dirimu sendiri.
+ *   akunPenembak  akun yang sesinya dipegang alat ini, satu-satunya yang bisa
+ *                 benar-benar berkomentar. Syarat sniper zone melekat pada
+ *                 akun INI, bukan pada akunmu yang lain: yang berhak menawar
+ *                 di dalam zona hanya yang sudah menawar sebelum zona dibuka,
+ *                 dan penjual menilainya per akun.
+ *
+ * @param it   catatan lelang
+ * @param now  detik sekarang, dari jam yang sudah dikoreksi
  */
-export function putusan(it, { now, akun }) {
+export function putusan(it, { now, akunSaya = [], akunPenembak = '' }) {
   const tidak = (kode, tambahan = {}) =>
     ({ tembak: false, kode, pesan: PESAN[kode] || kode, ...tambahan });
 
@@ -78,12 +88,25 @@ export function putusan(it, { now, akun }) {
    * seluruh gunanya alat ini adalah menang dengan cara yang tidak bisa
    * disanggah.
    */
-  const punyaku = it.tawaranPer?.[String(akun || '').toLowerCase()];
-  if (!akun || punyaku == null) return tidak(SEBAB.BELUM_MENAWAR);
+  const peta = it.tawaranPer || {};
+  const penembak = String(akunPenembak || '').toLowerCase();
+  if (!penembak || peta[penembak] == null) return tidak(SEBAB.BELUM_MENAWAR);
+
+  /*
+   * Memimpin dinilai atas SEMUA akunmu, bukan cuma akun penembaknya.
+   *
+   * Kalau akunmu yang lain yang tertinggi, menembak berarti menyalip dirimu
+   * sendiri: harganya naik, yang membayar tetap kamu, dan bagi penjual dua
+   * akun yang saling menyalip terlihat seperti shill bidding.
+   */
+  const milikku = akunSaya.length ? akunSaya : [penembak];
+  const tertinggiku = milikku
+    .map((u) => peta[u])
+    .filter((v) => typeof v === 'number')
+    .reduce((a, b) => Math.max(a, b), -Infinity);
 
   const tertinggi = it.topBid;
-  const akuTertinggi = tertinggi != null && punyaku >= tertinggi;
-  if (akuTertinggi) return tidak(SEBAB.MEMIMPIN);
+  if (tertinggi != null && tertinggiku >= tertinggi) return tidak(SEBAB.MEMIMPIN);
 
   const nilai = tawaranBerikut(it);
   if (nilai == null) return tidak(SEBAB.TANPA_KELIPATAN);

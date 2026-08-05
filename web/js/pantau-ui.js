@@ -178,6 +178,7 @@ export function initPantau(d) {
   // "belum terukur" menjadi keadaan yang sebenarnya.
   J.mulai();
   J.ukur().then(() => { gambarJam(); render(); });
+  ambilAkunPenembak();
   periksaSesi();
 
   A.keadaan().then((k) => {
@@ -343,6 +344,21 @@ function gambarSesiGagal(kotak, s, tambahan) {
 // ---------------------------------------------------------------- masuk
 
 let keadaanAkun = { ada: false, terpasang: false };
+
+/**
+ * Akun Instagram yang sesinya dipegang server — satu-satunya yang bisa
+ * benar-benar berkomentar, jadi satu-satunya yang syarat sniper zone-nya
+ * berlaku. Diambil dari server, bukan dari isian, supaya tidak mungkin
+ * berbeda dari kenyataan.
+ */
+let akunPenembak = '';
+
+async function ambilAkunPenembak() {
+  try {
+    const s = await keadaanSesiServer();
+    if (s?.akun) { akunPenembak = String(s.akun).toLowerCase(); render(); }
+  } catch { /* nanti dicoba lagi saat sesi diperiksa */ }
+}
 
 function gambarMasuk(pesan = '', kelas = '') {
   const kotak = $('pmasuk');
@@ -772,14 +788,16 @@ function petaTawaran(rows) {
 
 /** Posisimu di satu lelang, dihitung dari akun yang sedang dipakai sekarang. */
 function posisiku(it) {
-  const aku = P.akunku().trim().toLowerCase();
-  if (!aku) return { myBid: null, memimpin: false, tanpaAkun: true };
+  // Semua akunmu dihitung sebagai satu pihak. Kalau akunmu yang lain yang
+  // tertinggi, kamu memang sedang memimpin — bukan sedang tersalip oleh lawan.
+  const milikku = P.akunSaya();
+  if (!milikku.length) return { myBid: null, memimpin: false, tanpaAkun: true };
 
-  const memimpin = String(it.topUser || '').toLowerCase() === aku;
+  const memimpin = milikku.includes(String(it.topUser || '').toLowerCase());
   const peta = it.tawaranPer;
   if (peta && typeof peta === 'object') {
-    const v = peta[aku];
-    return { myBid: typeof v === 'number' ? v : null, memimpin };
+    const nilai = milikku.map((u) => peta[u]).filter((v) => typeof v === 'number');
+    return { myBid: nilai.length ? Math.max(...nilai) : null, memimpin };
   }
   // Catatan lama tanpa peta tawaran: kalau namamu yang tertinggi, nilainya
   // sudah pasti — itu angka yang sama.
@@ -1130,8 +1148,11 @@ export function nadaKartu(it) {
 function barisAuto(it) {
   if (!it.autoBid && it.autoTembakPada == null) return '';
 
-  const akun = P.akunku().trim().toLowerCase();
-  const p = T.putusan(it, { now: J.sekarangDetik(), akun });
+  const p = T.putusan(it, {
+    now: J.sekarangDetik(),
+    akunSaya: P.akunSaya(),
+    akunPenembak: akunPenembak
+  });
   const rp = (v) => 'Rp' + fmtRupiah(v);
 
   // Sudah ditembakkan: yang ditampilkan hasilnya, bukan rencananya.

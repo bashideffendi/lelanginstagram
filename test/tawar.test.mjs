@@ -25,11 +25,13 @@ const lelang = (ubah = {}) => ({
   leadDetik: 5,
   topBid: 800000,
   topUser: 'orang',
-  tawaranPer: { bashide: 750000, orang: 800000 },
+  tawaranPer: { durian: 750000, orang: 800000 },
   ...ubah
 });
 
-const saat = (jarak, akun = 'bashide') => ({ now: TUTUP - jarak, akun });
+const saat = (jarak, penembak = 'durian') => ({
+  now: TUTUP - jarak, akunPenembak: penembak, akunSaya: [penembak]
+});
 
 test('keadaan normal: menembak sekadar cukup untuk memimpin', () => {
   const p = putusan(lelang(), saat(3));
@@ -46,7 +48,7 @@ test('tidak menembak sebelum waktunya', () => {
 
 test('berhenti begitu harga melewati batas atas', () => {
   // Tertinggi 980rb, berikutnya 1,03jt — lewat batas 1jt.
-  const p = putusan(lelang({ topBid: 980000, tawaranPer: { bashide: 750000, orang: 980000 } }), saat(3));
+  const p = putusan(lelang({ topBid: 980000, tawaranPer: { durian: 750000, orang: 980000 } }), saat(3));
   assert.equal(p.tembak, false);
   assert.equal(p.kode, SEBAB.LEWAT_BATAS);
   assert.equal(p.kurang, 30000);
@@ -55,14 +57,14 @@ test('berhenti begitu harga melewati batas atas', () => {
 
 test('tepat sama dengan batas atas masih boleh', () => {
   // Tertinggi 950rb + 50rb = 1jt, persis batasnya.
-  const p = putusan(lelang({ topBid: 950000, tawaranPer: { bashide: 750000, orang: 950000 } }), saat(3));
+  const p = putusan(lelang({ topBid: 950000, tawaranPer: { durian: 750000, orang: 950000 } }), saat(3));
   assert.equal(p.tembak, true);
   assert.equal(p.nilai, 1000000);
 });
 
 test('tidak menawar melawan diri sendiri', () => {
   const p = putusan(lelang({
-    topBid: 900000, topUser: 'bashide', tawaranPer: { bashide: 900000, orang: 800000 }
+    topBid: 900000, topUser: 'durian', tawaranPer: { durian: 900000, orang: 800000 }
   }), saat(3));
   assert.equal(p.tembak, false);
   assert.equal(p.kode, SEBAB.MEMIMPIN);
@@ -76,7 +78,7 @@ test('menolak kalau kamu belum pernah menawar sendiri', () => {
   assert.equal(p.kode, SEBAB.BELUM_MENAWAR);
 
   // Akun sendiri belum diisi pun ditolak — tidak ada yang bisa dicocokkan.
-  assert.equal(putusan(lelang(), { now: TUTUP - 3, akun: '' }).kode, SEBAB.BELUM_MENAWAR);
+  assert.equal(putusan(lelang(), { now: TUTUP - 3, akunPenembak: '' }).kode, SEBAB.BELUM_MENAWAR);
 });
 
 test('menolak tanpa batas atas', () => {
@@ -92,7 +94,7 @@ test('menolak kalau kelipatan tidak diketahui', () => {
 });
 
 test('menolak sesudah lelang tutup', () => {
-  const p = putusan(lelang(), { now: TUTUP + 1, akun: 'bashide' });
+  const p = putusan(lelang(), { now: TUTUP + 1, akunPenembak: 'durian', akunSaya: ['durian'] });
   assert.equal(p.tembak, false);
   assert.equal(p.kode, SEBAB.SUDAH_TUTUP);
 });
@@ -130,4 +132,32 @@ test('teks komentarnya tidak bisa disalahartikan', () => {
   assert.equal(teksTawaran(900000), 'Rp900.000');
   assert.equal(teksTawaran(1500000), 'Rp1.500.000');
   assert.equal(teksTawaran(900000, 'ikut {nilai}'), 'ikut 900.000');
+});
+
+test('tidak menyalip akunmu sendiri yang lain', () => {
+  // Terjadi betulan: dua akun menawar di angka yang sama di satu lelang.
+  // Alat yang cuma mengenal satu akan menganggap yang lain sebagai lawan,
+  // lalu menaikkan harga yang tetap kamu sendiri yang membayar — dan bagi
+  // penjual itu terlihat seperti shill bidding.
+  const l = lelang({
+    topBid: 900000, topUser: 'bashide',
+    tawaranPer: { bashide: 900000, durian: 750000, orang: 800000 }
+  });
+
+  const dua = putusan(l, { now: TUTUP - 3, akunPenembak: 'durian', akunSaya: ['durian', 'bashide'] });
+  assert.equal(dua.tembak, false);
+  assert.equal(dua.kode, SEBAB.MEMIMPIN);
+
+  // Tanpa tahu bashide juga milikmu, dia justru menembak — inilah bugnya.
+  const satu = putusan(l, { now: TUTUP - 3, akunPenembak: 'durian', akunSaya: ['durian'] });
+  assert.equal(satu.tembak, true, 'bukti bahwa daftar akunnya memang menentukan');
+});
+
+test('syarat sniper zone melekat pada akun penembaknya', () => {
+  // bashide sudah menawar, durian belum. Yang akan berkomentar durian, jadi
+  // durian yang harus memenuhi syarat — penjual menilainya per akun.
+  const l = lelang({ tawaranPer: { bashide: 750000, orang: 800000 } });
+  const p = putusan(l, { now: TUTUP - 3, akunPenembak: 'durian', akunSaya: ['durian', 'bashide'] });
+  assert.equal(p.tembak, false);
+  assert.equal(p.kode, SEBAB.BELUM_MENAWAR);
 });

@@ -88,6 +88,25 @@ export function akunku() {
   try { return localStorage.getItem(KUNCI_AKU) || ''; } catch { return ''; }
 }
 
+/**
+ * Semua akun Instagram yang kamu pakai, huruf kecil.
+ *
+ * Boleh lebih dari satu, dipisah koma. Bukan kemewahan: begitu dua akunmu
+ * menawar di lelang yang sama, alat yang cuma mengenal satu akan menganggap
+ * akunmu yang lain sebagai lawan — lalu menawar melawan dirimu sendiri dan
+ * menaikkan harga yang kamu bayar sendiri. Terjadi betulan: dua akun menawar
+ * di angka yang sama di satu lelang.
+ *
+ * Bagi penjual, dua akun yang saling menyalip terlihat seperti shill bidding.
+ * Itu tuduhan yang jauh lebih berat daripada menawar di detik akhir.
+ */
+export function akunSaya() {
+  return akunku()
+    .split(',')
+    .map((s) => s.trim().replace(/^@/, '').toLowerCase())
+    .filter(Boolean);
+}
+
 export function setAkunku(nama) {
   try { localStorage.setItem(KUNCI_AKU, String(nama || '').replace(/^@/, '').trim()); } catch { /* diabaikan */ }
 }
