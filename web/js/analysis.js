@@ -340,12 +340,28 @@ export function fmtRupiah(v) {
 export function tebakOpenBid(teks) {
   const ob = cariOpenBid(teks);
   if (!ob) return null;
-  return ob.kuat || ob.value >= 1000 ? ob.value : ob.value * 1000;
+  if (ob.kuat || ob.value >= 1000) return ob.value;
+
+  // Desimal kecil berarti juta, bukan ribu. "OB 1,5" itu satu setengah juta —
+  // tidak ada yang membuka lelang di seribu lima ratus rupiah, dan mengalikan
+  // seribu menghasilkan angka yang salah tapi tetap kelihatan wajar.
+  if (!Number.isInteger(ob.value) && ob.value < 100) return Math.round(ob.value * 1e6);
+
+  return ob.value * 1000;
 }
 
 export function cariOpenBid(teks) {
   if (!teks) return null;
-  const re = /\b(?:ob|open\s*bid|opening\s*bid)\b\s*[:=.]?\s*((?:rp\.?\s*)?[\d.,]+\s*(?:jt|juta|jeti|mio|rb|ribu|k)?)/gi;
+  /*
+   * Satuan diberi penjaga kanan, dan ekor tanda baca tidak ikut terbawa.
+   *
+   * Grup satuan lama tidak berbatas kata, jadi ia menelan huruf pertama kata
+   * berikutnya: "OB 1,5. Kelipatan 50rb" tertangkap sebagai "1,5. K", dicap
+   * bersatuan, dan harga pembukaan terbaca Rp1,5 untuk lelang satu setengah
+   * juta. Lebih jauh: nilai palsu-bersatuan itu masuk ke kumpulan acuan
+   * kalibrasi, dan seluruh tawaran di lelang itu ikut terbaca ratusan rupiah.
+   */
+  const re = /\b(?:ob|open\s*bid|opening\s*bid)\b\s*[:=.]?\s*((?:rp\.?\s*)?\d[\d.]*(?:,\d+)?(?:\s*(?:jt|juta|jeti|mio|rb|ribu|k))?)(?![A-Za-z0-9])/gi;
   let m;
   while ((m = re.exec(String(teks))) !== null) {
     const nilai = parseBid(m[1]);
@@ -387,11 +403,32 @@ export function terapkanSniperZone(rows, cutoff, sniperSec) {
   const mulai = cutoff - sniperSec;
   const pelanggar = [];
 
-  // Siapa saja yang sudah menawar sebelum zona dimulai.
+  const nama = (r) => String(r.username || '').toLowerCase();
+  const praZona = (r) => !r.isOwner && !r.isAnnouncement && r.created_at < mulai;
+
+  // Siapa saja yang sudah menawar sebelum zona dimulai. Tawaran relatif
+  // ("naik 50") ikut dihitung: nilainya memang tidak kami hitung, tapi orangnya
+  // jelas sudah ikut menawar — dan itu yang ditanyakan aturannya.
   const sudahMenawar = new Set(
+    rows.filter((r) => praZona(r) && (r.bid != null || r.bidRelatif)).map(nama)
+  );
+
+  /*
+   * Yang pra-zonanya BERANGKA tapi gagal kami baca nilainya.
+   *
+   * Aturan sniper zone dinilai dari "sudah pernah menawar atau belum", dan
+   * jawaban itu di sini bersandar pada pembaca tawaran yang bisa meleset.
+   * Kalau seseorang menulis angka sebelum zona dibuka tapi kami gagal
+   * membacanya, kami TIDAK BOLEH menyimpulkan dia belum menawar — menuduh
+   * orang melanggar dengan nama dan jam di berkas sanggahan adalah kesalahan
+   * yang paling mahal yang bisa dibuat alat ini.
+   *
+   * Keadaan begitu ditandai ragu, bukan ilegal, supaya diperiksa mata dulu.
+   */
+  const raguMenawar = new Set(
     rows
-      .filter((r) => r.bid != null && !r.isOwner && !r.isAnnouncement && r.created_at < mulai)
-      .map((r) => String(r.username || '').toLowerCase())
+      .filter((r) => praZona(r) && r.bid == null && !r.bidRelatif && /\d/.test(r.text || ''))
+      .map(nama)
   );
 
   for (const r of rows) {
@@ -399,13 +436,18 @@ export function terapkanSniperZone(rows, cutoff, sniperSec) {
     if (r.created_at < mulai || r.created_at > cutoff) continue;
 
     r.diZonaSniper = true;
-    if (!sudahMenawar.has(String(r.username || '').toLowerCase())) {
-      r.sniperIlegal = true;
-      pelanggar.push(r);
+    const u = nama(r);
+    if (sudahMenawar.has(u)) continue;
+
+    if (raguMenawar.has(u)) {
+      r.sniperRagu = true;                       // perlu diperiksa, bukan dituduh
+      continue;
     }
+    r.sniperIlegal = true;
+    pelanggar.push(r);
   }
 
-  return { aktif: true, mulai, pelanggar };
+  return { aktif: true, mulai, pelanggar, ragu: rows.filter((r) => r.sniperRagu) };
 }
 
 export function analyze(comments, opts = {}) {
@@ -541,6 +583,7 @@ export function analyze(comments, opts = {}) {
     if (r.isOwner) r.flags.push('penyelenggara');
     else if (r.isAnnouncement) r.flags.push('pengumuman');
     if (r.sniperIlegal) r.flags.push('sniper-ilegal');
+    if (r.sniperRagu) r.flags.push('sniper-ragu');
 
     if (cutoffBerlaku != null) {
       if (r.created_at > cutoffBerlaku) {

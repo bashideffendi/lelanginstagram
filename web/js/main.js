@@ -406,11 +406,23 @@ function guessCutoff(caption, comments, tz) {
   }
   if (!kandidat.length) return null;
 
-  // Yang berlabel menang. Di antara yang setara, yang paling dekat dengan
-  // komentar terakhir paling mungkin jadi penutupnya.
+  /*
+   * Yang berlabel menang, lalu yang PALING AWAL — bukan yang paling dekat
+   * dengan komentar terakhir.
+   *
+   * Ini jebakan yang komentar fungsi ini sendiri klaim sudah dicegah, padahal
+   * belum. Kalau obrolan berlanjut ke hari berikutnya, hari 'besok' ikut jadi
+   * kandidat, dan "paling dekat dengan komentar terakhir" memilih penutup yang
+   * telat 24 jam. Akibatnya setiap tawaran yang masuk sesudah lelang tutup
+   * terlihat masih di dalam waktu — seluruh pelanggaran raib, dan berkas
+   * buktinya justru membenarkan orang yang mau kamu sanggah.
+   *
+   * Penutup lelang adalah kemunculan PERTAMA jam itu yang tidak mendahului
+   * tawaran terakhir yang masuk akal, bukan yang terakhir.
+   */
   kandidat.sort((a, b) => {
     if (a.berlabel !== b.berlabel) return a.berlabel ? -1 : 1;
-    return Math.abs(a.epoch - last) - Math.abs(b.epoch - last);
+    return a.epoch - b.epoch;
   });
 
   const pilih = kandidat[0];
