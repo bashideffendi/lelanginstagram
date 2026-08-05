@@ -22,6 +22,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { extract, APP_ID } from '../shared/ig-core.js';
+import { buatPenembak } from './penembak.mjs';
+import { parseBid, hitungSkala } from '../web/js/analysis.js';
 
 // ---------------------------------------------------------------- akun
 
@@ -814,6 +816,36 @@ server.listen(PORT, HOST, () => {
   console.log(`[lelanginsta] cookie tersedia: ${cookieTerkirim().join(', ') || 'BELUM ADA'}`);
   console.log(`[lelanginsta] identitas: ${PERAMBAN ? 'peramban' : 'aplikasi Instagram'}`);
   console.log(`[lelanginsta] gembok: ${process.env.KETOK_KEY ? 'aktif' : 'terbuka untuk umum'}`);
+
+  /*
+   * Penembak dinyalakan hanya kalau AUTO_BID_SERVER=1.
+   *
+   * Bagian ini mengeluarkan uang tanpa ada manusia yang menekan apa pun, jadi
+   * bawaannya mati. Menyalakannya harus keputusan yang diketik sendiri, bukan
+   * akibat memasang pembaruan.
+   */
+  if (process.env.AUTO_BID_SERVER === '1') {
+    const penembak = buatPenembak({
+      berkasPantau: F_PANTAU,
+      headerIg: HEADER_IG,
+      igBase: IG_BASE,
+      // Fungsi, bukan nilai: cookie disegarkan extension tanpa restart,
+      // jadi menyalinnya sekali berarti memakai sesi mati selamanya.
+      cookie: () => cookieHeader(),
+      akunSekarang: () => sesiIg.akun,
+      log: console.log
+    });
+    // Pembaca nilai yang sama dengan yang dipakai halaman.
+    penembak.pakaiPembaca((teks) => {
+      const b = parseBid(teks);
+      if (b.value == null || b.relatif) return null;
+      if (b.kuat) return b.value;
+      return b.value < 10000 ? b.value * 1000 : b.value;
+    });
+    penembak.mulai();
+  } else {
+    console.log('[lelanginsta] penembak otomatis: MATI (AUTO_BID_SERVER != 1)');
+  }
 
   const denyut = () => periksaSesiIg().then((s) =>
     console.log(`[lelanginsta] sesi IG: ${s.keadaan}${s.pesan ? ' — ' + s.pesan : ''}`));
