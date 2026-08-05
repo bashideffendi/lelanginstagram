@@ -17,7 +17,7 @@ import assert from 'node:assert/strict';
 
 import {
   parseBid, analyze, cariOpenBid, tebakOpenBid, hitungSkala,
-  isAnnouncement, terapkanSniperZone, fmtRupiah
+  isAnnouncement, terapkanSniperZone, fmtRupiah, skalaSatuan
 } from '../web/js/analysis.js';
 
 /** terapkanSniperZone menerima DETIK, bukan menit. */
@@ -225,4 +225,62 @@ test('rupiah ditulis dengan pemisah ribuan Indonesia', () => {
   assert.equal(fmtRupiah(750000), '750.000');
   assert.equal(fmtRupiah(1500000), '1.500.000');
   assert.equal(fmtRupiah(0), '0');
+});
+
+// ---------------------------------------------- temuan audit 2026-08-05
+
+test('tangga yang menyeberang ke notasi juta tetap terbaca benar', () => {
+  // Tangga paling lazim di lelang Indonesia. Skala tunggal untuk seluruh
+  // lelang memaksa "1", "1,05", "1,1" memakai pengali yang sama dengan "800",
+  // jadi tiga tawaran TERTINGGI terbaca Rp1.000-an, ketiganya dicap turun, dan
+  // pemenang sebenarnya lenyap dari berkas bukti.
+  const h = analyze(['800', '850', '900', '950', '1', '1,05', '1,1']
+    .map((t, i) => k('u' + i, t, i * 10)), { captionText: '', cutoffEpoch: null, ownerUsername: null });
+
+  assert.deepEqual(h.rows.map((r) => r.bid),
+    [800000, 850000, 900000, 950000, 1000000, 1050000, 1100000]);
+  assert.equal(h.summary.winner.bid, 1100000);
+  assert.equal(h.summary.bidDown, 0, 'tidak ada tawaran sah yang dicap turun');
+});
+
+test('komentar bertahun tidak jadi tawaran dan tidak jadi pemenang', () => {
+  // "ini keluaran tahun 2020 ya om?" pernah terbaca Rp2.020.000 dan
+  // menobatkan penanya sebagai pemenang di berkas sanggahan.
+  assert.equal(parseBid('ini keluaran tahun 2020 ya om?').value, null);
+  assert.equal(parseBid('seri 1978').value, null);
+  assert.equal(parseBid('diameter 40 mm').value, null);
+  assert.equal(parseBid('berat 120 gram').value, null);
+
+  const h = analyze([
+    k('a', '800rb', 10), k('b', '850rb', 20),
+    k('c', 'ini keluaran tahun 2020 ya om?', 30), k('d', '900rb', 40)
+  ], { captionText: '', cutoffEpoch: null, ownerUsername: null });
+
+  assert.equal(h.summary.winner.username, 'd');
+  assert.equal(h.summary.winner.bid, 900000);
+  assert.equal(h.summary.bidDown, 0);
+});
+
+test('bid relatif ditandai, tidak dihitung, dan tidak menang', () => {
+  // "naik 50" itu kenaikan, bukan harga penuh. Nilainya sengaja TIDAK
+  // dikarang jadi prevHigh + 50rb — alat ini dipakai menuduh, dan
+  // menghitungkan tawaran yang tidak pernah ditulis lebih berbahaya daripada
+  // kehilangannya.
+  assert.equal(parseBid('naik 50').relatif, true);
+  assert.equal(parseBid('up 100').relatif, true);
+  assert.equal(parseBid('naik 50rb').relatif, false, 'yang bersatuan bukan relatif');
+
+  const h = analyze([k('a', '800rb', 10), k('b', 'naik 50', 20), k('c', 'up 100', 30)],
+    { captionText: '', cutoffEpoch: null, ownerUsername: null });
+
+  assert.equal(h.summary.winner.username, 'a');
+  assert.equal(h.summary.bidDown, 0, 'bid relatif tidak boleh mencap tawaran lain turun');
+  assert.ok(h.rows[1].flags.includes('bid-relatif'));
+});
+
+test('skalaSatuan memilih pengali terhadap acuan berjalan', () => {
+  assert.equal(skalaSatuan(950, 900000), 1000);
+  assert.equal(skalaSatuan(1.1, 950000), 1e6);
+  assert.equal(skalaSatuan(850000, 900000), 1);
+  assert.equal(skalaSatuan(750, null), 1000, 'tanpa acuan, di bawah 10 ribu berarti ribuan');
 });

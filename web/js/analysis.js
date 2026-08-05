@@ -69,6 +69,26 @@ const CALON = new RegExp(
  * salah satunya bisa jadi tawaran tertinggi. Sepuluh digit atau lebih dalam
  * satu deret, dipisah spasi atau tanda hubung sekalipun, bukan harga.
  */
+/**
+ * Angka yang jelas-jelas bukan harga, dibuang sebelum dibaca.
+ *
+ * Di lelang jam tangan, kolom komentar penuh angka yang bukan tawaran: tahun
+ * keluaran, diameter, panjang tali, berat. Tahun paling berbahaya karena
+ * besarnya kebetulan masuk akal sebagai harga — "ini keluaran tahun 2020 ya
+ * om?" di lelang 800rb-an terbaca Rp2.020.000 dan menobatkan penanya sebagai
+ * pemenang, sekaligus mencap tawaran sah berikutnya sebagai "bid turun".
+ */
+function buangBukanHarga(s) {
+  return String(s)
+    // Tahun: 1900-2100 berdiri sendiri, dengan atau tanpa kata penanda.
+    .replace(/(?:\b(?:tahun|thn|th|seri|tipe|type|keluaran|prod(?:uksi)?)\s*[:.]?\s*)?(?<![A-Za-z0-9])(19\d{2}|20\d{2}|2100)(?![A-Za-z0-9])/gi, ' ')
+    // Ukuran fisik berspasi: "40 mm", "120 gram", "20 cm".
+    .replace(/(?<![A-Za-z0-9])\d+(?:[.,]\d+)?\s*(mm|cm|inch|inci|gram|gr|kg|ml)\b/gi, ' ');
+}
+
+/** Kata yang menandai angka sesudahnya sebagai KENAIKAN, bukan harga penuh. */
+const KATA_RELATIF = /\b(naik|nambah|tambah|up|plus)\s*$/i;
+
 function buangNomor(s) {
   return String(s).replace(/(?<![A-Za-z0-9])(?:\d[\s.-]?){9,}\d(?![A-Za-z0-9])/g, ' ');
 }
@@ -146,9 +166,9 @@ export function parseBid(text) {
   const kosong = { value: null, confidence: null, matched: null };
   if (!text) return kosong;
 
-  const clean = buangNomor(buangJam(
+  const clean = buangBukanHarga(buangNomor(buangJam(
     String(text).replace(/@[\w.]+/g, ' ').replace(/#[\w]+/g, ' ')
-  ));
+  )));
 
   // Posisi kata tawar, dipakai memilih angka mana yang dimaksud.
   const posKata = [];
@@ -170,10 +190,19 @@ export function parseBid(text) {
     if (!unit && !rp && digit >= 10) continue;
 
     const kuat = !!unit || !!rp;
+
+    // "naik 50" / "up 100" itu KENAIKAN, bukan harga penuh. Nilainya sengaja
+    // tidak dikarang jadi prevHigh + 50rb: alat ini dipakai menuduh, dan
+    // menghitungkan tawaran yang tidak pernah ditulis orang lebih berbahaya
+    // daripada kehilangannya. Ditandai saja, lalu dikeluarkan dari penentuan
+    // pemenang di analyze().
+    const relatif = !kuat && KATA_RELATIF.test(clean.slice(0, m.index));
+
     calon.push({
       value: nilai,
       matched: full.trim(),
       kuat,
+      relatif,
       confidence: kuat ? 'high'
         : (/[.,]/.test(angka) || digit >= 4) ? 'medium' : 'low',
       dekatKata: posKata.some((p) => m.index >= p && m.index - p <= 15)
@@ -201,7 +230,10 @@ function pilihTerbesar(list) {
 }
 
 function bersih(c) {
-  return { value: c.value, confidence: c.confidence, matched: c.matched, kuat: !!c.kuat };
+  return {
+    value: c.value, confidence: c.confidence, matched: c.matched,
+    kuat: !!c.kuat, relatif: !!c.relatif
+  };
 }
 
 function median(arr) {
@@ -222,6 +254,34 @@ function median(arr) {
  * termasuk yang tertulis di pengumuman aturan. Angka telanjang lalu dinaikkan
  * ke besaran yang sama.
  */
+/**
+ * Pengali untuk SATU angka telanjang, terhadap satu acuan.
+ *
+ * Dipisah dari hitungSkala karena satu lelang tidak selalu memakai satu
+ * besaran. Tangga paling lazim di lelang Indonesia berpindah notasi begitu
+ * melewati sejuta: "800, 850, 900, 950, 1, 1,05, 1,1". Skala tunggal memaksa
+ * ketujuhnya memakai pengali yang sama, jadi tiga tawaran TERTINGGI dan
+ * penentu terbaca Rp1.000 sampai Rp1.100 — ketiganya dicap turun, dan
+ * pemenang sebenarnya lenyap dari berkas bukti.
+ *
+ * Acuannya harga tertinggi yang sudah sah saat itu (tangga lelang naik), jadi
+ * "950" tetap 950 ribu sementara "1,05" sesudahnya jadi 1,05 juta.
+ */
+export function skalaSatuan(nilai, acuan) {
+  if (!Number.isFinite(nilai) || nilai <= 0) return 1;
+
+  // Tanpa acuan sama sekali: angka di bawah sepuluh ribu hampir pasti ribuan.
+  if (!acuan) return nilai < 10000 ? 1000 : 1;
+
+  let terbaik = 1;
+  let jarakTerdekat = Infinity;
+  for (const m of [1, 1e3, 1e6]) {
+    const jarak = Math.abs(Math.log10(nilai * m) - Math.log10(acuan));
+    if (jarak < jarakTerdekat) { jarakTerdekat = jarak; terbaik = m; }
+  }
+  return terbaik;
+}
+
 export function hitungSkala(nilaiKuat, nilaiTelanjang) {
   if (!nilaiTelanjang.length) return 1;
 
@@ -384,6 +444,7 @@ export function analyze(comments, opts = {}) {
     const bid = parseBid(r.text);
     r.bidRaw = bid.value;
     r.bidStrong = bid.kuat;
+    r.bidRelatif = !!bid.relatif;
     r.bidConfidence = bid.confidence;
     r.bidMatched = bid.matched;
   }
@@ -415,9 +476,38 @@ export function analyze(comments, opts = {}) {
     .map((r) => r.bidRaw);
   const skala = hitungSkala(acuan, polos);
 
+  /*
+   * Tiap angka telanjang diskalakan terhadap harga tertinggi yang sudah sah
+   * SAAT ITU, bukan terhadap satu angka untuk seluruh lelang.
+   *
+   * Tangga lelang naik, jadi harga tertinggi sejauh ini adalah acuan terbaik
+   * yang tersedia pada tiap baris — dan satu-satunya yang ikut berpindah saat
+   * tangganya menyeberang ke notasi juta.
+   */
+  let acuanBerjalan = acuan.length ? median(acuan) : (polos.length ? median(polos) * skala : null);
+
   for (const r of rows) {
-    r.bid = r.bidRaw == null ? null : (r.bidStrong ? r.bidRaw : r.bidRaw * skala);
-    r.bidScaled = r.bidRaw != null && !r.bidStrong && skala !== 1;
+    if (r.bidRaw == null) {
+      r.bid = null;
+      r.bidScaled = false;
+      continue;
+    }
+
+    if (r.bidStrong) {
+      r.bid = r.bidRaw;
+      r.bidScaled = false;
+    } else {
+      const m = skalaSatuan(r.bidRaw, acuanBerjalan);
+      r.bid = r.bidRaw * m;
+      r.bidScaled = m !== 1;
+    }
+
+    // Acuan hanya dinaikkan oleh tawaran peserta yang sah; komentar
+    // penyelenggara dan pengumuman aturan tidak menggerakkan tangga.
+    if (!r.isOwner && !r.isAnnouncement && !r.bidRelatif &&
+        (acuanBerjalan == null || r.bid > acuanBerjalan)) {
+      acuanBerjalan = r.bid;
+    }
   }
 
   // Harga pembukaan ikut dikalibrasi kalau angkanya telanjang, supaya tidak
@@ -466,7 +556,11 @@ export function analyze(comments, opts = {}) {
 
     // Tangga tawaran hanya menghitung peserta; komentar penyelenggara
     // dilewati sepenuhnya, tidak menaikkan maupun dibandingkan.
-    if (r.bid != null && !r.isOwner && !r.isAnnouncement) {
+    // Nilainya kenaikan, bukan harga penuh — jadi tidak boleh dibandingkan
+    // dengan tangga maupun mencapnya turun.
+    if (r.bidRelatif) r.flags.push('bid-relatif');
+
+    if (r.bid != null && !r.isOwner && !r.isAnnouncement && !r.bidRelatif) {
       if (prevHighBid != null) {
         r.increment = r.bid - prevHighBid;
         if (r.bid < prevHighBid) r.flags.push('bid-turun');
@@ -596,6 +690,7 @@ function summarize(rows, cutoffEpoch) {
       // Tawaran yang melanggar sniper zone tidak berhak menang.
       const eligible = rows.filter(
         (r) => r.bid != null && !r.isOwner && !r.isAnnouncement && !r.sniperIlegal &&
+          !r.bidRelatif &&
           (cutoffEpoch == null || r.created_at <= cutoffEpoch)
       );
       if (!eligible.length) return null;
