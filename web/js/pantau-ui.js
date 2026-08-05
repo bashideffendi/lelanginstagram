@@ -448,12 +448,14 @@ function gambarMasuk(pesan = '', kelas = '') {
 
   if (A.sudahMasuk()) {
     kotak.innerHTML =
-      '<div class="pm-in"><span class="pm-ok">Tersambung ke servermu</span>' +
-      '<span class="pm-sub">Daftar ini sama di semua perangkat yang kamu masuki.</span>' +
-      '<span class="fill"></span>' +
+      // Diciutkan jadi satu baris. Kabar baik yang tidak pernah berubah tidak
+      // pantas menempati 172px puncak halaman selamanya, apalagi di ponsel.
+      '<details class="pm-ok-lipat"><summary><span class="pm-ok">Tersambung ke servermu</span>' +
+      '<span class="pm-sub">daftar ini sama di semua perangkat</span></summary>' +
+      '<div class="pm-in">' +
       '<button class="btn sm quiet" id="pmcabut" ' +
       'title="Untuk kalau ponselmu hilang">Keluarkan semua perangkat</button>' +
-      '<button class="btn sm quiet" id="pmkeluar">Keluar</button></div>' +
+      '<button class="btn sm quiet" id="pmkeluar">Keluar</button></div></details>' +
       (pesan ? `<p class="pm-note ${esc(kelas)}">${esc(pesan)}</p>` : '');
 
     $('pmkeluar').onclick = async () => {
@@ -1441,12 +1443,13 @@ function kartu(it, tz) {
     : { l: 'Tawaranmu', v: '&mdash;',
         s: aku.tanpaAkun ? 'akunmu belum diisi' : 'belum menawar', nihil: true });
 
-  if (it.closeAt != null) {
-    angka.push({
-      l: 'Tutup', v: fmtTime(it.closeAt, tz),
-      s: `${fmtHari(it.closeAt, tz)}, ${fmtDate(it.closeAt, tz)}`
-    });
-  }
+  // Keempat sel selalu ada. Sel yang muncul-hilang membuat kolom bergeser
+  // antar kartu, jadi mata harus membaca ulang labelnya di tiap kartu alih-alih
+  // menyusuri satu kolom ke bawah — persis yang bikin daftar ini melelahkan.
+  angka.push(it.closeAt != null
+    ? { l: 'Tutup', v: fmtTime(it.closeAt, tz),
+        s: `${fmtHari(it.closeAt, tz)}, ${fmtDate(it.closeAt, tz)}` }
+    : { l: 'Tutup', v: '&mdash;', s: 'belum diketahui', nihil: true });
 
   if (aktif && detik != null) {
     angka.push({
@@ -1455,6 +1458,8 @@ function kartu(it, tz) {
     });
   } else if (it.finalPrice != null) {
     angka.push({ l: 'Harga akhir', v: 'Rp' + fmtRupiah(it.finalPrice), s: P.STATUS[it.status] });
+  } else {
+    angka.push({ l: 'Harga akhir', v: '&mdash;', s: 'belum dicatat', nihil: true });
   }
 
   const selAngka = angka.map((a) => `<div class="pk-a${a.mundur ? ' pk-mundur' : ''}">
@@ -1500,8 +1505,10 @@ function kartu(it, tz) {
           : (it.owner ? '@' + esc(it.owner) : 'penjual tidak diketahui')}</h3>
         ${it.title ? `<p class="pk-barang" title="${esc(it.title)}">${esc(it.title)}</p>` : ''}
       </div>
-      <span class="pk-segar" data-segar>${it.lastCheckedAt
-        ? 'dicek ' + fmtTime(it.lastCheckedAt, tz) : ''}</span>
+      <span class="pk-segar ${it.cekGagal ? 'gagal' : ''}" data-segar>${it.cekGagal
+        ? `gagal dicek ${it.cekGagal}×` +
+          (it.lastCheckedAt ? ` &middot; terakhir berhasil ${fmtTime(it.lastCheckedAt, tz)}` : '')
+        : (it.lastCheckedAt ? 'dicek ' + fmtTime(it.lastCheckedAt, tz) : '')}</span>
     </div>
 
     <div class="pk-angka">
@@ -1837,6 +1844,8 @@ async function perbaruiYangJatuhTempo() {
     const dump = await deps.tarik(it.url);
     simpanDump(it.id, dump);
     const baru = dariDump(dump);
+    baru.cekGagal = 0;
+    baru.cekGagalPesan = null;
     if (menutup) baru.cekAkhir = true;
     P.simpan(baru);
     render();
@@ -1846,14 +1855,32 @@ async function perbaruiYangJatuhTempo() {
       tandaiSegar(it.id, 'menunggu jatah…');
       return;
     }
-    // Gagal sesekali itu wajar — dicoba lagi pada putaran berikutnya. Tapi
-    // lelang yang sudah tutup tidak akan berubah lagi, jadi percobaannya
-    // dibatasi: postingan yang dihapus penjual kalau tidak akan ditarik terus
-    // tiap dua puluh detik sampai jatah lajunya habis.
-    if (menutup) {
-      const gagal = (P.ambil(it.id)?.cekAkhirGagal || 0) + 1;
-      const kini = P.ambil(it.id);
-      if (kini) P.simpan({ ...kini, cekAkhirGagal: gagal, cekAkhir: gagal >= BATAS_CEK_AKHIR });
+    /*
+     * Kegagalan dicatat dan ditampilkan, tidak ditelan.
+     *
+     * Sebelumnya galat selain 429 hilang tanpa bekas: kartunya tetap memajang
+     * harga lama dengan "dicek 20:31" yang juga lama, jadi harga basi terlihat
+     * persis seperti harga terkini. Di alat yang gunanya memberitahumu kapan
+     * harus bertindak, diam saat gagal adalah kegagalan yang paling merugikan.
+     */
+    const kini = P.ambil(it.id);
+    if (kini) {
+      const gagal = (kini.cekGagal || 0) + 1;
+      const ubah = { ...kini, cekGagal: gagal, cekGagalPesan: String(err?.message || err).slice(0, 120) };
+
+      // Lelang yang sudah tutup tidak akan berubah lagi, jadi percobaannya
+      // dibatasi: postingan yang dihapus penjual kalau tidak akan ditarik
+      // terus tiap dua puluh detik sampai jatah lajunya habis.
+      if (menutup) {
+        const gagalAkhir = (kini.cekAkhirGagal || 0) + 1;
+        ubah.cekAkhirGagal = gagalAkhir;
+        ubah.cekAkhir = gagalAkhir >= BATAS_CEK_AKHIR;
+      }
+      P.simpan(ubah);
+
+      // Gagal beruntun hampir selalu berarti sesinya mati, bukan lelangnya.
+      if (gagal >= 3) periksaSesi();
+      render();
     }
   } finally {
     sedangCek = false;

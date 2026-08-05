@@ -142,6 +142,43 @@ export function summaryText(summary, source, tz, dumpHash) {
   L.push(`  Bid turun         : ${summary.bidDown}`);
   L.push(`  Bid sama          : ${summary.bidSame}`);
   L.push(`  Nilai terbaca     : ${summary.parsedBids} dari ${summary.total} komentar`);
+
+  /*
+   * Sniper zone dan komentar terhapus ikut disebut.
+   *
+   * Keduanya justru yang paling menentukan dalam sanggahan, dan keduanya tidak
+   * pernah masuk ke teks ini — jadi ringkasan yang kamu salin dan kirim ke
+   * penyelenggara diam soal pelanggaran yang paling berat, sementara "Detik
+   * kembar" yang jarang berarti apa-apa tercetak rapi.
+   */
+  const z = summary.sniper;
+  if (z && z.aktif) {
+    L.push('');
+    L.push('SNIPER ZONE');
+    L.push(`  Zona mulai        : ${fmtDateTime(z.mulai, tz)}   [epoch ${z.mulai}]`);
+    L.push(`  Tawaran melanggar : ${z.pelanggar.length}` +
+      (z.pelanggar.length ? '  (akun yang belum pernah menawar sebelum zona dibuka)' : ''));
+    for (const r of z.pelanggar) {
+      L.push(`    @${r.username || '(tidak diketahui)'}  ${fmtRupiah(r.bid)}` +
+        `  ${fmtDateTime(r.created_at, tz)}  comment ID ${r.pk}`);
+    }
+    if (z.ragu?.length) {
+      L.push(`  Perlu diperiksa   : ${z.ragu.length} tawaran yang tawaran pra-zonanya`);
+      L.push('                      tidak berhasil dibaca alat ini — belum tentu melanggar.');
+    }
+  }
+
+  if (summary.terhapus?.length) {
+    L.push('');
+    L.push('KOMENTAR YANG HILANG SETELAH SEMPAT TERTARIK');
+    L.push('  Tercatat saat pemantauan berkala. Sekali dihapus, Instagram');
+    L.push('  tidak menyimpannya lagi — ini satu-satunya salinannya.');
+    for (const c of summary.terhapus) {
+      L.push(`    @${c.username || '(tidak diketahui)'}  ${fmtDateTime(c.created_at, tz)}` +
+        `  comment ID ${c.pk}`);
+      L.push(`      "${String(c.text || '').replace(/\s+/g, ' ').slice(0, 120)}"`);
+    }
+  }
   if (summary.winner) {
     L.push('');
     L.push('BID SAH TERTINGGI (sebelum cutoff)');

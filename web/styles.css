@@ -1157,3 +1157,54 @@ tbody tr.r-snipe td { background: var(--warn-soft); }
   font-family: var(--mono); font-size: 17px; font-weight: 700; color: var(--danger);
 }
 .pk-hapus > span:nth-child(3) { flex: 1 1 220px; font-size: 12.5px; color: var(--ink-soft); }
+.pk-segar.gagal { color: var(--danger); font-weight: 600; }
+
+/* ================================================= tambalan audit 2026-08-05 */
+
+/*
+ * Kelas dan variabel yang dipakai kode tapi tidak pernah punya aturan.
+ *
+ * Akibatnya diam-diam: kolom "Nilai turun" kehilangan satu-satunya penanda
+ * bahayanya, angka rupiah tampil huruf proporsional sehingga digitnya tidak
+ * rata, kalimat pembuka kartu bukti menempel ke nama pemenang, dan centang
+ * "Buka semua komentar" tidak melakukan apa pun.
+ */
+:root { --bad: var(--danger); --mute: var(--faint); }
+
+.money, td.mn {
+  font-family: var(--mono); font-variant-numeric: tabular-nums;
+  letter-spacing: -.01em;
+}
+
+/* Buka semua komentar: batalkan pemotongan satu baris. */
+table.wrapall td.txt,
+table.wrapall .txt { white-space: normal; overflow: visible; text-overflow: clip; }
+table.wrapall .clip { display: block; -webkit-line-clamp: unset; max-height: none; }
+
+.pcard-kicker {
+  display: block; font-family: var(--mono); font-size: 10px; font-weight: 500;
+  letter-spacing: .12em; text-transform: uppercase; color: var(--muted);
+  margin-bottom: 6px;
+}
+
+/*
+ * Kontras.
+ *
+ * --warn dipakai sebagai TEKS pada latar terang cuma 2,73:1, dan tanda "—"
+ * sel kosong 1,40:1 — hilang total, padahal tugasnya justru mengiklankan
+ * kolom yang perlu diisi. Alat ini dipakai di HP, kadang di luar ruangan;
+ * warna yang cuma terbaca di layar redup sama saja tidak ada.
+ */
+:root { --warn-teks: #8A5A00; }
+.pjam-nota.warn, .tag.snipe, tbody tr.zone td { color: var(--warn-teks); }
+.pk-r b.pk-nihil, .pk-a b.pk-nihil { color: var(--muted); }
+
+/* Tersambung: satu baris, bukan spanduk. */
+.pm-ok-lipat summary {
+  cursor: pointer; list-style: none; display: flex; align-items: baseline;
+  gap: 9px; flex-wrap: wrap; font-size: 13px;
+}
+.pm-ok-lipat summary::-webkit-details-marker { display: none; }
+.pm-ok-lipat summary::before { content: "+"; color: var(--primary); font-weight: 700; }
+.pm-ok-lipat[open] summary::before { content: "–"; }
+.pm-ok-lipat .pm-in { margin-top: 10px; }

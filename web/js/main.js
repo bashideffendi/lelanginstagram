@@ -618,6 +618,7 @@ function render() {
 
   tzNote();
   syncCutoffUI();
+  sisipkanTerhapus();
   renderPeringatanTarikan();
   kunciEksporKalauBolong();
   renderProof();
@@ -736,6 +737,13 @@ function tarikanBolong() {
   const errs = Array.isArray(st?.errors) ? st.errors : [];
   const partial = errs.some((e) => e && e.partial);
   return { errs, partial, ada: errs.length > 0 };
+}
+
+/** Komentar terhapus dari pemantauan diselipkan ke ringkasan bukti. */
+function sisipkanTerhapus() {
+  if (state.result?.summary && state.terhapusPantauan?.length) {
+    state.result.summary.terhapus = state.terhapusPantauan;
+  }
 }
 
 function renderPeringatanTarikan() {
@@ -1426,6 +1434,10 @@ function initPantauan() {
           state.sniperMin = item.sniperMin;
           $('sniper').value = String(item.sniperMin);
         }
+        // Komentar yang tertangkap hilang selama pemantauan ikut terbawa ke
+        // berkas bukti. Itu satu-satunya salinannya — Instagram sudah tidak
+        // menyimpannya lagi.
+        state.terhapusPantauan = item?.terhapus || null;
         render();
         return;
       }
