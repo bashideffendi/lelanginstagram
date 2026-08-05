@@ -181,3 +181,27 @@ test('yang harus sudah menawar adalah akun penembaknya', () => {
   assert.equal(p.tembak, false);
   assert.equal(p.kode, SEBAB.BELUM_MENAWAR);
 });
+
+test('seri dengan lawan yang lebih dulu bukan memimpin', () => {
+  // Di lelang, nilai sama berarti yang lebih dulu yang menang. Membaca seri
+  // sebagai "sudah memimpin" membuat alat ini menolak menembak tepat di
+  // keadaan yang paling butuh ditembak: harga seri, tinggal beberapa detik,
+  // dan satu kelipatan sudah cukup untuk membalik.
+  const l = lelang({
+    topBid: 800000, topUser: 'orang',
+    tawaranPer: { durian: 800000, orang: 800000 }
+  });
+  const p = putusan(l, { now: TUTUP - 3, akunPenembak: 'durian', akunSaya: ['durian'] });
+  assert.equal(p.tembak, true, 'seri = kalah, jadi harus menembak');
+  assert.equal(p.nilai, 850000);
+});
+
+test('seri dengan akunmu sendiri yang teratas tetap memimpin', () => {
+  const l = lelang({
+    topBid: 800000, topUser: 'durian',
+    tawaranPer: { durian: 800000, orang: 800000 }
+  });
+  const p = putusan(l, { now: TUTUP - 3, akunPenembak: 'durian', akunSaya: ['durian'] });
+  assert.equal(p.tembak, false);
+  assert.equal(p.kode, SEBAB.MEMIMPIN);
+});

@@ -113,8 +113,20 @@ export function putusan(it, { now, akunSaya = [], akunPenembak = '' }) {
     .filter((v) => typeof v === 'number')
     .reduce((a, b) => Math.max(a, b), -Infinity);
 
+  /*
+   * Seri BUKAN memimpin.
+   *
+   * Nilai yang sama dengan tawaran tertinggi dibaca sebagai "sudah memimpin",
+   * padahal di lelang yang menang adalah yang lebih dulu — dan kalau lawan
+   * yang lebih dulu, kamu sedang kalah. Alat ini lalu menolak menembak tepat
+   * di keadaan yang paling butuh ditembak: harga seri, tinggal beberapa detik,
+   * dan satu kelipatan sudah cukup untuk membalik.
+   */
   const tertinggi = it.topBid;
-  if (tertinggi != null && tertinggiku >= tertinggi) return tidak(SEBAB.MEMIMPIN);
+  const akuYangTeratas = milikku.includes(String(it.topUser || '').toLowerCase());
+  if (tertinggi != null && tertinggiku >= tertinggi && akuYangTeratas) {
+    return tidak(SEBAB.MEMIMPIN);
+  }
 
   const nilai = tawaranBerikut(it);
   if (nilai == null) return tidak(SEBAB.TANPA_KELIPATAN);
