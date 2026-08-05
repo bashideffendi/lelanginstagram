@@ -1138,3 +1138,5 @@ tbody tr.r-snipe td { background: var(--warn-soft); }
 }
 .pauto-rinci .bad { color: var(--danger); font-weight: 600; }
 .pakun { font-family: var(--mono); font-size: 12px; max-width: 190px; }
+.pakun-nota { font-size: 12px; color: var(--primary-700); }
+.pakun-nota:empty { display: none; }

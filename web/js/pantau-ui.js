@@ -107,11 +107,28 @@ export function initPantau(d) {
   $('paddgo').onclick = tambahDariKotak;
   $('paddlink').addEventListener('keydown', (e) => { if (e.key === 'Enter') tambahDariKotak(); });
 
+  /*
+   * Disimpan sambil diketik, bukan menunggu kolomnya kehilangan fokus.
+   *
+   * Dengan 'change' saja, mengetik lalu langsung menggulir atau menutup
+   * lipatan setelan membuat isinya tidak pernah tersimpan — dan tidak ada
+   * tanda apa pun bahwa itu terjadi. Yang hilang diam-diam selalu lebih buruk
+   * daripada yang gagal berisik.
+   */
   $('pakun').value = P.akunku();
-  $('pakun').addEventListener('change', () => {
+  const simpanAkun = () => {
     P.setAkunku($('pakun').value);
+    const n = $('pakunnota');
+    if (n) {
+      const daftar = P.akunSaya();
+      n.textContent = daftar.length > 1
+        ? `${daftar.length} akun tersimpan. Pilih per lelang di kartunya.`
+        : (daftar.length ? '1 akun tersimpan.' : '');
+    }
     render();
-  });
+  };
+  $('pakun').addEventListener('input', simpanAkun);
+  $('pakun').addEventListener('change', simpanAkun);
 
   $('pics').onclick = () => {
     const aktif = P.semua().filter((x) => x.status === 'aktif' && x.closeAt != null);
@@ -1063,8 +1080,12 @@ function sisaWaktu(epoch) {
 
 /** Sidik isi daftar; acara kalender hanya perlu disamakan kalau ini berubah. */
 function sidik(daftar) {
-  return daftar.map((x) =>
-    [x.id, x.status, x.closeAt, x.title, x.openBid, x.increment, x.sniperMin, x.topBid]
+  // Akun ikut disidik. Tanpa itu, mengubah daftar akun tidak pernah terkirim
+  // ke server — tersimpan di browser ini saja, lalu hilang begitu dibuka dari
+  // perangkat lain, tanpa ada yang memberi tahu.
+  return P.akunku() + '||' + daftar.map((x) =>
+    [x.id, x.status, x.closeAt, x.title, x.openBid, x.increment, x.sniperMin,
+     x.topBid, x.autoBid, x.maksBid, x.akunDipakai]
       .join('|')).join('||');
 }
 
