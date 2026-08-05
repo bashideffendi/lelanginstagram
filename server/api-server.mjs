@@ -711,13 +711,30 @@ const server = http.createServer(async (req, res) => {
   }
 
   try {
+    /*
+     * Batas halaman bisa dipersempit lewat ?halaman=N.
+     *
+     * Membaca seluruh komentar mahal: diukur pada lelang sungguhan, 5 komentar
+     * makan 0,9 detik dan 16 komentar 2,0 detik — naik per halaman, jadi lelang
+     * seratus komentar bisa sepuluh detik. Untuk menawar di detik terakhir itu
+     * mematikan: harga yang dipakai menghitung sudah basi sepuluh detik, dan
+     * yang menawar di sela itu tidak terlihat sama sekali.
+     *
+     * Di lelang yang harganya naik, yang tertinggi hampir selalu ada di
+     * komentar terbaru. Riwayat lengkapnya sudah dikumpulkan pemeriksaan
+     * berkala, jadi menjelang menembak yang perlu ditarik cuma selisihnya —
+     * satu halaman.
+     */
+    const mintaHalaman = Number(url.searchParams.get('halaman') || 0);
+    const batasHalaman = mintaHalaman > 0 ? Math.min(mintaHalaman, MAX_PAGES) : MAX_PAGES;
+
     const dump = await extract({
       base: IG_BASE,
       url: target,
       version: 'vps-1.0.0',
       via: 'server',
       includeRaw: url.searchParams.get('raw') !== '0',
-      maxPages: MAX_PAGES,
+      maxPages: batasHalaman,
       manualRedirect: true,
       headers: { ...HEADER_IG, cookie }
     });
