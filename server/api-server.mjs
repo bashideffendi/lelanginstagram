@@ -734,6 +734,10 @@ const server = http.createServer(async (req, res) => {
       version: 'vps-1.0.0',
       via: 'server',
       includeRaw: url.searchParams.get('raw') !== '0',
+      // ?balasan=0 melewati balasan. Dipakai saat menawar, tempat kecepatan
+      // menentukan; tidak dipakai saat menarik bukti, tempat kelengkapan
+      // menentukan.
+      skipReplies: url.searchParams.get('balasan') === '0',
       maxPages: batasHalaman,
       manualRedirect: true,
       headers: { ...HEADER_IG, cookie }

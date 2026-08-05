@@ -280,6 +280,23 @@ export function extract(opts) {
     })
     .then(function (top) {
       rawTop = top;
+
+      /*
+       * Balasan bisa dilewati sepenuhnya.
+       *
+       * Balasan ditarik satu utas per permintaan, berurutan, dengan jeda sopan
+       * di antaranya — dan itulah biaya sebenarnya dari satu penarikan, bukan
+       * jumlah halamannya. Diukur pada lelang sungguhan: 5 komentar 0,9 detik,
+       * 16 komentar 2,0 detik, dan keduanya cuma satu halaman.
+       *
+       * Untuk menawar di detik terakhir, dua detik itu terlalu lama: harga yang
+       * dipakai menghitung jadi basi. Tawaran hampir selalu komentar utama,
+       * jadi menjelang menembak balasannya dilewati. Untuk penarikan bukti —
+       * tempat balasan yang hilang justru bisa berisi tawaran — semuanya tetap
+       * diambil seperti biasa.
+       */
+      if (opts.skipReplies) return [];
+
       var threads = top.filter(function (c) { return (c.child_comment_count || 0) > 0; });
       if (!threads.length) return [];
 
