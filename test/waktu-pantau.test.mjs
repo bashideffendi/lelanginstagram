@@ -190,3 +190,37 @@ test('nama barang tidak ditebak lagi', () => {
   // Kolomnya dikosongkan dan diisi sendiri; kosong lebih jujur daripada salah.
   assert.equal(typeof bersihkanJudulTebakan, 'function');
 });
+
+// ------------------------------------------------- komentar yang dihapus
+
+test('komentar yang hilang antara dua tarikan terdeteksi', async () => {
+  const { hilangAntara } = await import('../web/js/diff.js');
+  const c = (pk, text) => ({ pk, text, username: 'u' + pk, created_at: 1785800000 + +pk });
+
+  const lama = { comments: [c('1', '800rb'), c('2', '1jt'), c('3', '850rb')] };
+  const baru = { comments: [c('1', '800rb'), c('3', '850rb')] };
+
+  const hilang = hilangAntara(lama, baru);
+  assert.equal(hilang.length, 1);
+  assert.equal(hilang[0].pk, '2');
+  assert.equal(hilang[0].text, '1jt', 'isinya ikut tersimpan — itu buktinya');
+});
+
+test('komentar yang disunting bukan komentar yang hilang', () => {
+  // Dibandingkan lewat pk, bukan teks: pk tidak berubah walau isinya disunting.
+  return import('../web/js/diff.js').then(({ hilangAntara }) => {
+    const lama = { comments: [{ pk: '1', text: '800rb' }] };
+    const baru = { comments: [{ pk: '1', text: '900rb' }] };
+    assert.deepEqual(hilangAntara(lama, baru), []);
+  });
+});
+
+test('tarikan kosong tidak dianggap semuanya terhapus', () => {
+  // Penarikan gagal mengembalikan nol komentar. Menganggap itu "semua dihapus"
+  // akan menghasilkan tuduhan massal dari satu gangguan jaringan.
+  return import('../web/js/diff.js').then(({ hilangAntara }) => {
+    const lama = { comments: [{ pk: '1' }, { pk: '2' }] };
+    assert.deepEqual(hilangAntara(lama, { comments: [] }), []);
+    assert.deepEqual(hilangAntara(lama, null), []);
+  });
+});

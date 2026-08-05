@@ -66,3 +66,25 @@ export function diffDumps(before, after) {
     changed
   };
 }
+
+/**
+ * Komentar yang ADA di tarikan lama tapi HILANG di tarikan baru.
+ *
+ * Dipakai pemantauan berkala, yang menarik tiap 45 detik menjelang penutupan.
+ * Komentar yang dihapus adalah bukti kecurangan paling telak yang bisa didapat
+ * dari lelang Instagram — tawaran tertinggi yang lenyap sesudah tutup, atau
+ * tawaran yang dibersihkan penyelenggara. Sekali dihapus, tidak ada cara
+ * mengambilnya kembali; satu-satunya jalan adalah sempat menariknya lebih
+ * dulu, dan itu memang sudah terjadi tiap malam lalu dibuang.
+ *
+ * Dibandingkan lewat pk, bukan teks: pk tidak berubah walau komentarnya
+ * disunting, dan komentar yang disunting bukan komentar yang hilang.
+ */
+export function hilangAntara(lama, baru) {
+  const a = Array.isArray(lama?.comments) ? lama.comments : [];
+  const b = Array.isArray(baru?.comments) ? baru.comments : [];
+  if (!a.length || !b.length) return [];
+
+  const ada = new Set(b.map((c) => String(c.pk)));
+  return a.filter((c) => c.pk != null && !ada.has(String(c.pk)));
+}

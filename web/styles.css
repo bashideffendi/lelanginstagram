@@ -1144,3 +1144,16 @@ tbody tr.r-snipe td { background: var(--warn-soft); }
 /* Rincian galat penarikan di peringatan tarikan bolong. */
 .tarik-galat { margin: 8px 0 8px 18px; font-size: 13px; line-height: 1.55; }
 .tarik-galat li { list-style: disc; }
+
+/* Komentar terhapus: bukti kecurangan terkuat, jadi diberi tempat sendiri. */
+.pk-hapus {
+  display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
+  padding: 10px 13px; margin-bottom: 14px;
+  border-radius: var(--r-sm); background: var(--danger-soft);
+  border: 1px solid rgba(192, 67, 47, .3); border-left: 3px solid var(--danger);
+}
+.pk-hapus .pk-l { margin-bottom: 0; flex: none; color: var(--danger); }
+.pk-hapus b {
+  font-family: var(--mono); font-size: 17px; font-weight: 700; color: var(--danger);
+}
+.pk-hapus > span:nth-child(3) { flex: 1 1 220px; font-size: 12.5px; color: var(--ink-soft); }

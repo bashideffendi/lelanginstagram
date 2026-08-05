@@ -12,6 +12,7 @@ import * as A from './akun.js';
 import * as J from './jam.js';
 import * as T from './tawar.js';
 import { analyze, parseBid, fmtRupiah, tebakOpenBid } from './analysis.js';
+import { hilangAntara } from './diff.js';
 import { keadaanSesiServer, segarkanSesiViaExtension } from './ext.js';
 import {
   fmtDateTime, fmtTime, fmtDate, fmtHari, fmtIsoDate, fmtDuration, wallTimeToEpoch,
@@ -57,7 +58,48 @@ function sudahSelesai(it, now) {
  */
 const dumpTerakhir = new Map();
 
+/**
+ * Bandingkan tarikan baru dengan tarikan sebelumnya, catat yang hilang.
+ *
+ * Komentar yang dihapus adalah bukti kecurangan paling telak yang bisa didapat
+ * dari lelang Instagram — tawaran tertinggi yang lenyap sesudah penutupan,
+ * atau tawaran penyelenggara sendiri yang dibersihkan. Sekali dihapus, tidak
+ * ada cara mengambilnya kembali dari Instagram.
+ *
+ * Pantauan sudah menarik tiap 45 detik menjelang tutup, lalu MENIMPA tarikan
+ * sebelumnya — jadi datanya lewat di tangan kita tiap malam dan langsung
+ * dibuang. Yang disimpan cuma yang hilang, jadi ukurannya kecil.
+ */
+function catatYangHilang(id, dumpBaru) {
+  const lama = dumpTerakhir.get(id);
+  if (!lama?.comments?.length || !dumpBaru?.comments?.length) return 0;
+
+  const hilang = hilangAntara(lama, dumpBaru);
+  if (!hilang.length) return 0;
+
+  const it = P.ambil(id);
+  if (!it) return 0;
+
+  const sudah = new Set((it.terhapus || []).map((c) => String(c.pk)));
+  const tambahan = hilang
+    .filter((c) => !sudah.has(String(c.pk)))
+    .map((c) => ({
+      pk: String(c.pk),
+      username: c.username || null,
+      text: c.text || '',
+      created_at: c.created_at,
+      // Kapan hilangnya diketahui — bukan kapan dihapusnya, dan bedanya
+      // penting kalau ini dipakai menyanggah.
+      ketahuan: J.sekarangDetik()
+    }));
+
+  if (!tambahan.length) return 0;
+  P.simpan({ ...it, terhapus: [...(it.terhapus || []), ...tambahan].slice(-80) });
+  return tambahan.length;
+}
+
 function simpanDump(id, dump) {
+  catatYangHilang(id, dump);
   dumpTerakhir.set(id, dump);
   if (dumpTerakhir.size > 12) dumpTerakhir.delete(dumpTerakhir.keys().next().value);
 }
@@ -1041,6 +1083,26 @@ async function tanganiAksi(e) {
       break;
     }
 
+    case 'hapusan': {
+      const d = item.terhapus || [];
+      if (!d.length) break;
+      // Diunduh sebagai berkas, bukan ditampilkan di kotak sistem: ini bukti,
+      // dan bukti harus bisa dilampirkan, bukan cuma dilihat sekilas.
+      const NL = '\n';
+      const baris = d.map((c) =>
+        fmtDateTime(c.created_at, deps.tz()) + '  @' + (c.username || '(tanpa nama)') +
+        '  pk=' + c.pk + '  ketahuan hilang ' + fmtDateTime(c.ketahuan, deps.tz()) +
+        NL + '    ' + c.text);
+
+      deps.unduh(`terhapus-${item.id}.txt`,
+        'Komentar yang hilang di lelang ' + (item.url || item.id) + NL +
+        'Tercatat oleh Lelang Insta saat pemeriksaan berkala.' + NL + NL +
+        baris.join(NL + NL) + NL,
+        'text/plain;charset=utf-8');
+      stat(`${d.length} komentar terhapus diunduh sebagai berkas.`, 'ready');
+      break;
+    }
+
     case 'ics':
       deps.unduh(`lelang-${item.id}.ics`, P.buatIcs([item]), 'text/calendar;charset=utf-8');
       stat('Berkas kalender diunduh. Buka berkasnya di ponsel untuk memasang pengingatnya.', 'ready');
@@ -1446,6 +1508,14 @@ function kartu(it, tz) {
       <div class="pk-baris">${selAngka}</div>
       <div class="pk-baris pk-rinci">${selRinci}</div>
     </div>
+
+    ${(it.terhapus || []).length ? `<div class="pk-hapus">
+      <span class="pk-l">Komentar dihapus</span>
+      <b>${it.terhapus.length}</b>
+      <span>tertangkap saat pemeriksaan berkala &mdash; sekali dihapus,
+        Instagram tidak menyimpannya lagi</span>
+      <button class="btn sm" data-aksi="hapusan">Lihat</button>
+    </div>` : ''}
 
     ${barisAuto(it)}
 
