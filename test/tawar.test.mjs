@@ -162,20 +162,22 @@ test('syarat sniper zone melekat pada akun penembaknya', () => {
   assert.equal(p.kode, SEBAB.BELUM_MENAWAR);
 });
 
-test('lelang yang ditandai pakai akun lain tidak ditembak', () => {
-  // Alat ini cuma memegang sesi satu akun. Kalau lelangnya kamu tandai dipakai
-  // dengan akun lain, yang benar adalah berhenti — bukan menembak atas nama
-  // akun yang tidak kamu maksud untuk lelang itu.
-  const l = lelang({ akunDipakai: 'bashide', tawaranPer: { durian: 750000, bashide: 700000, orang: 800000 } });
+test('penandaan akun di kartu tidak mengubah siapa yang menembak', () => {
+  // Penandaan cuma menentukan tawaran siapa yang ditampilkan. Yang menembak
+  // selalu akun yang sesinya dipegang alat ini, karena menembak dengan akun
+  // yang sesinya tidak ada memang mustahil.
+  const l = lelang({ akunDipakai: 'bashide' });
   const p = putusan(l, { now: TUTUP - 3, akunPenembak: 'durian', akunSaya: ['durian', 'bashide'] });
-  assert.equal(p.tembak, false);
-  assert.equal(p.kode, SEBAB.AKUN_LAIN);
-  assert.equal(p.akunDipakai, 'bashide');
+  assert.equal(p.tembak, true, 'durian sudah menawar, jadi tetap boleh menembak');
+  assert.equal(p.nilai, 850000);
 });
 
-test('lelang yang ditandai pakai akun penembaknya sendiri tetap jalan', () => {
-  const l = lelang({ akunDipakai: 'durian' });
+test('yang harus sudah menawar adalah akun penembaknya', () => {
+  // Ditandai bashide, dan bashide memang sudah menawar — tapi yang akan
+  // berkomentar durian, dan durian belum. Syarat sniper zone dinilai penjual
+  // per akun, jadi yang dinilai adalah akun yang benar-benar berkomentar.
+  const l = lelang({ akunDipakai: 'bashide', tawaranPer: { bashide: 750000, orang: 800000 } });
   const p = putusan(l, { now: TUTUP - 3, akunPenembak: 'durian', akunSaya: ['durian', 'bashide'] });
-  assert.equal(p.tembak, true);
-  assert.equal(p.nilai, 850000);
+  assert.equal(p.tembak, false);
+  assert.equal(p.kode, SEBAB.BELUM_MENAWAR);
 });

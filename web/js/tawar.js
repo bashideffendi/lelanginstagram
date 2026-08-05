@@ -21,7 +21,6 @@ export const SEBAB = {
   SUDAH_TUTUP: 'sudah_tutup',
   BELUM_WAKTUNYA: 'belum_waktunya',
   BELUM_MENAWAR: 'belum_menawar',
-  AKUN_LAIN: 'akun_lain',
   MEMIMPIN: 'memimpin',
   LEWAT_BATAS: 'lewat_batas',
   SUDAH_DITEMBAK: 'sudah_ditembak',
@@ -35,7 +34,6 @@ const PESAN = {
   [SEBAB.TANPA_JAM]: 'Jam tutup belum diketahui.',
   [SEBAB.SUDAH_TUTUP]: 'Lelangnya sudah tutup.',
   [SEBAB.BELUM_MENAWAR]: 'Akun penembak belum pernah menawar sendiri di lelang ini.',
-  [SEBAB.AKUN_LAIN]: 'Lelang ini kamu pakai dengan akun lain, dan alat ini hanya memegang sesi satu akun.',
   [SEBAB.MEMIMPIN]: 'Kamu sudah memimpin — menawar lagi berarti menaikkan harga sendiri.',
   [SEBAB.LEWAT_BATAS]: 'Harga sudah melewati batas atasmu. Kita kalah.',
   [SEBAB.SUDAH_DITEMBAK]: 'Sudah ditembakkan sekali untuk lelang ini.'
@@ -94,16 +92,12 @@ export function putusan(it, { now, akunSaya = [], akunPenembak = '' }) {
   const penembak = String(akunPenembak || '').toLowerCase();
 
   /*
-   * Kalau lelang ini kamu tandai dipakai dengan akun tertentu, akun itulah
-   * yang harus bisa menembak. Alat ini cuma memegang sesi satu akun, jadi
-   * ketika keduanya berbeda yang benar adalah berhenti — bukan menembak
-   * dengan akun lain dan menaruh tawaran atas nama yang tidak kamu maksud.
+   * Yang menembak selalu akun yang sesinya dipegang alat ini, apa pun akun
+   * yang kamu tandai untuk lelang itu. Penandaan di kartu cuma menentukan
+   * tawaran siapa yang ditampilkan sebagai "Tawaranmu"; menembak dengan akun
+   * yang sesinya tidak ada memang mustahil, dan berpura-pura bisa cuma
+   * menunda kegagalannya sampai lelang tutup.
    */
-  const dipakai = String(it.akunDipakai || '').toLowerCase();
-  if (dipakai && penembak && dipakai !== penembak) {
-    return tidak(SEBAB.AKUN_LAIN, { akunDipakai: dipakai, akunPenembak: penembak });
-  }
-
   if (!penembak || peta[penembak] == null) return tidak(SEBAB.BELUM_MENAWAR);
 
   /*

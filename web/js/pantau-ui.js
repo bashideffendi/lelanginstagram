@@ -1195,14 +1195,13 @@ function barisAuto(it) {
 
   const siap = p.tembak || p.kode === T.SEBAB.BELUM_WAKTUNYA;
   const kelas = siap ? 'siap'
-    : [T.SEBAB.LEWAT_BATAS, T.SEBAB.BELUM_MENAWAR, T.SEBAB.AKUN_LAIN,
-       T.SEBAB.TANPA_BATAS, T.SEBAB.TANPA_KELIPATAN, T.SEBAB.TANPA_JAM].includes(p.kode)
+    : [T.SEBAB.LEWAT_BATAS, T.SEBAB.BELUM_MENAWAR, T.SEBAB.TANPA_BATAS, T.SEBAB.TANPA_KELIPATAN, T.SEBAB.TANPA_JAM].includes(p.kode)
       ? 'bad' : '';
 
   // Keterangannya lengkap dan selalu terbaca, bukan diringkas jadi satu kata.
   // Alat yang bertindak sendiri harus bisa diperiksa sekilas: dengan akun mana,
   // sampai berapa, dan kapan — tanpa membuka apa pun.
-  const siapa = akunTembakUntuk(it);
+  const siapa = akunTembakUntuk();
   const rinci = [
     siapa ? `akun @${esc(siapa)}` : '<b class="bad">akun penembak belum diketahui</b>',
     it.maksBid != null ? `batas ${rp(it.maksBid)}` : '<b class="bad">batas belum diisi</b>',
@@ -1242,9 +1241,15 @@ function pilihAkun(it) {
   return `<select class="psel pakun" data-ubah="akun" title="Akun yang kamu pakai di lelang ini">${opsi.join('')}</select>`;
 }
 
-/** Akun yang akan dipakai menembak di lelang ini. */
-function akunTembakUntuk(it) {
-  return String(it.akunDipakai || akunPenembak || '').toLowerCase();
+/**
+ * Akun yang akan menembak — selalu akun yang sesinya dipegang alat ini.
+ *
+ * Penandaan akun di kartu tidak mengubahnya. Menembak dengan akun yang
+ * sesinya tidak ada memang mustahil, dan menampilkannya seolah bisa cuma
+ * menunda kegagalannya sampai lelang tutup.
+ */
+function akunTembakUntuk() {
+  return akunPenembak;
 }
 
 function kartu(it, tz) {
