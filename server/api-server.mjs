@@ -424,7 +424,18 @@ const server = http.createServer(async (req, res) => {
     return res.end();
   }
 
+  /*
+   * Jawaban untuk umum sengaja kosong isi.
+   *
+   * Nama akun Instagram di balik server dulu ikut terkirim ke siapa pun tanpa
+   * login. Penyerang yang relevan di sini bukan orang asing, melainkan
+   * penyelenggara lelang yang sedang disanggah: dia menerima berkas bukti,
+   * membuka situsnya, menemukan alamat API di config.js yang memang publik,
+   * lalu tahu akun mana yang memantaunya — dan bisa memblokirnya sebelum
+   * lelang berikutnya. Rinciannya sekarang menuntut sesi.
+   */
   if (url.pathname === '/sehat') {
+    if (!sesiSah(tokenDari(req))) return kirim(res, 200, { sehat: true }, asal);
     return kirim(res, 200, { sehat: true, cookie: cookieTerkirim(), sesiIg: keadaanSesi() }, asal);
   }
 

@@ -818,9 +818,13 @@ function petaTawaran(rows) {
    * kamu paling butuh menembak. Tanpa baris ini, alat ini menolak menolongmu
    * tepat di lelang yang paling membutuhkannya.
    */
-  const aku = P.akunku().trim().toLowerCase();
-  if (aku && peta.has(aku) && !teratas.some(([u]) => u === aku)) {
-    teratas.push([aku, peta.get(aku)]);
+  // akunSaya(), bukan akunku(). akunku() mengembalikan string gabungan
+  // berkoma; memakainya sebagai satu username berarti tidak pernah cocok, dan
+  // penjaga ini mati diam-diam justru sejak akun kedua ditambahkan.
+  for (const aku of P.akunSaya()) {
+    if (peta.has(aku) && !teratas.some(([u]) => u === aku)) {
+      teratas.push([aku, peta.get(aku)]);
+    }
   }
 
   return Object.fromEntries(teratas);
@@ -865,9 +869,14 @@ function posisiku(it) {
 
 function posisiDari(hasil) {
   const w = hasil.summary.winner;
-  const aku = P.akunku().toLowerCase();
+
+  // Semua akunmu, bukan string gabungannya. Memakai akunku() mentah di sini
+  // membuat myBid selalu kosong dan memimpin selalu salah begitu akun kedua
+  // ditambahkan — dan salahnya diam, karena "belum menawar" itu jawaban yang
+  // kelihatan masuk akal.
+  const milikku = P.akunSaya();
   const punyaku = hasil.rows
-    .filter((r) => (r.username || '').toLowerCase() === aku && r.bid != null)
+    .filter((r) => milikku.includes((r.username || '').toLowerCase()) && r.bid != null)
     .sort((a, b) => b.bid - a.bid)[0];
 
   return {
@@ -876,7 +885,7 @@ function posisiDari(hasil) {
     topBid: w ? w.bid : null,
     topUser: w ? w.username : null,
     myBid: punyaku ? punyaku.bid : null,
-    memimpin: !!(w && aku && (w.username || '').toLowerCase() === aku),
+    memimpin: !!(w && milikku.includes((w.username || '').toLowerCase())),
     peserta: hasil.summary.users
   };
 }
@@ -1288,8 +1297,9 @@ function barisAuto(it) {
     <div class="pauto-utama">
       <span class="pk-l">Menawar otomatis</span>
       <b>${p.nilai != null ? rp(p.nilai) : '&mdash;'}</b>
-      <span class="pauto-kata">${p.tembak ? 'menembak sekarang'
-        : p.kode === T.SEBAB.BELUM_WAKTUNYA ? 'siap' : esc(p.pesan)}</span>
+      <span class="pauto-kata">${p.tembak || p.kode === T.SEBAB.BELUM_WAKTUNYA
+        ? '<b class="bad">PRATINJAU</b> — penembaknya belum ada, tidak ada komentar yang akan terkirim'
+        : esc(p.pesan)}</span>
     </div>
     <p class="pauto-rinci">${rinci}</p>
   </div>`;
@@ -1532,10 +1542,15 @@ function formUbah(it, tz) {
     <details class="pauto" ${it.autoBid ? 'open' : ''}>
       <summary>Menawar otomatis${it.autoBid ? ' <b class="pauto-on">hidup</b>' : ''}</summary>
 
-      <p class="pauto-nota">Alat ini menawar sekadar cukup untuk memimpin, dan
-        <b>berhenti begitu harga melewati batas atasmu</b>. Syaratnya kamu sudah
-        menawar sendiri lebih dulu di postingannya &mdash; itu yang membuatmu
-        berhak menawar di sniper zone.</p>
+      <p class="pauto-nota"><b class="pauto-belum">Penembaknya belum dipasang.</b>
+        Yang jalan sekarang cuma pratinjau: kartunya menghitung dan memajang
+        tawaran yang <i>akan</i> dikirim, tapi <b>tidak ada komentar yang
+        benar-benar terkirim ke Instagram</b>. Gunanya supaya kamu bisa memeriksa
+        angkanya dengan lelang sungguhan sebelum apa pun ditembakkan.</p>
+      <p class="pauto-nota">Rencananya nanti: menawar sekadar cukup untuk
+        memimpin, dan berhenti begitu harga melewati batas atasmu. Syaratnya
+        kamu sudah menawar sendiri lebih dulu di postingannya &mdash; itu yang
+        membuatmu berhak menawar di sniper zone.</p>
 
       <div class="pform">
         <label><span>Menawar otomatis</span>
