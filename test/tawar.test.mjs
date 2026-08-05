@@ -161,3 +161,21 @@ test('syarat sniper zone melekat pada akun penembaknya', () => {
   assert.equal(p.tembak, false);
   assert.equal(p.kode, SEBAB.BELUM_MENAWAR);
 });
+
+test('lelang yang ditandai pakai akun lain tidak ditembak', () => {
+  // Alat ini cuma memegang sesi satu akun. Kalau lelangnya kamu tandai dipakai
+  // dengan akun lain, yang benar adalah berhenti — bukan menembak atas nama
+  // akun yang tidak kamu maksud untuk lelang itu.
+  const l = lelang({ akunDipakai: 'bashide', tawaranPer: { durian: 750000, bashide: 700000, orang: 800000 } });
+  const p = putusan(l, { now: TUTUP - 3, akunPenembak: 'durian', akunSaya: ['durian', 'bashide'] });
+  assert.equal(p.tembak, false);
+  assert.equal(p.kode, SEBAB.AKUN_LAIN);
+  assert.equal(p.akunDipakai, 'bashide');
+});
+
+test('lelang yang ditandai pakai akun penembaknya sendiri tetap jalan', () => {
+  const l = lelang({ akunDipakai: 'durian' });
+  const p = putusan(l, { now: TUTUP - 3, akunPenembak: 'durian', akunSaya: ['durian', 'bashide'] });
+  assert.equal(p.tembak, true);
+  assert.equal(p.nilai, 850000);
+});

@@ -788,10 +788,29 @@ function petaTawaran(rows) {
 
 /** Posisimu di satu lelang, dihitung dari akun yang sedang dipakai sekarang. */
 function posisiku(it) {
-  // Semua akunmu dihitung sebagai satu pihak. Kalau akunmu yang lain yang
-  // tertinggi, kamu memang sedang memimpin — bukan sedang tersalip oleh lawan.
-  const milikku = P.akunSaya();
+  /*
+   * Akun yang dipakai di lelang ini menentukan angka yang ditampilkan.
+   *
+   * Kalau kamu menandai satu lelang dipakai dengan akun tertentu, "Tawaranmu"
+   * berarti tawaran akun itu — bukan gabungan semua akunmu. Yang tetap
+   * memandang semua akunmu sebagai satu pihak adalah penilaian memimpin:
+   * kalau akunmu yang lain yang tertinggi, kamu memang sedang memimpin, dan
+   * menyalipnya berarti menaikkan harga yang kamu sendiri bayar.
+   */
+  const semua = P.akunSaya();
+  const dipakai = String(it.akunDipakai || '').toLowerCase();
+  const milikku = dipakai ? [dipakai] : semua;
   if (!milikku.length) return { myBid: null, memimpin: false, tanpaAkun: true };
+
+  const teratas = String(it.topUser || '').toLowerCase();
+  if (dipakai && semua.includes(teratas) && teratas !== dipakai) {
+    const peta = it.tawaranPer || {};
+    return {
+      myBid: typeof peta[dipakai] === 'number' ? peta[dipakai] : null,
+      memimpin: true,
+      akunLainMemimpin: teratas
+    };
+  }
 
   const memimpin = milikku.includes(String(it.topUser || '').toLowerCase());
   const peta = it.tawaranPer;
@@ -1012,6 +1031,8 @@ function tanganiUbah(e) {
     P.simpan({ ...item, finalPrice: v.value });
   } else if (jenis === 'sniper') {
     P.simpan({ ...item, sniperMin: +el.value || 0 });
+  } else if (jenis === 'akun') {
+    P.simpan({ ...item, akunDipakai: el.value || null });
   }
   render();
 }
@@ -1172,17 +1193,58 @@ function barisAuto(it) {
     </div>`;
   }
 
-  const kelas = p.tembak ? 'siap'
-    : p.kode === T.SEBAB.LEWAT_BATAS || p.kode === T.SEBAB.BELUM_MENAWAR ? 'bad' : '';
+  const siap = p.tembak || p.kode === T.SEBAB.BELUM_WAKTUNYA;
+  const kelas = siap ? 'siap'
+    : [T.SEBAB.LEWAT_BATAS, T.SEBAB.BELUM_MENAWAR, T.SEBAB.AKUN_LAIN,
+       T.SEBAB.TANPA_BATAS, T.SEBAB.TANPA_KELIPATAN, T.SEBAB.TANPA_JAM].includes(p.kode)
+      ? 'bad' : '';
+
+  // Keterangannya lengkap dan selalu terbaca, bukan diringkas jadi satu kata.
+  // Alat yang bertindak sendiri harus bisa diperiksa sekilas: dengan akun mana,
+  // sampai berapa, dan kapan — tanpa membuka apa pun.
+  const siapa = akunTembakUntuk(it);
+  const rinci = [
+    siapa ? `akun @${esc(siapa)}` : '<b class="bad">akun penembak belum diketahui</b>',
+    it.maksBid != null ? `batas ${rp(it.maksBid)}` : '<b class="bad">batas belum diisi</b>',
+    `tembak ${it.leadDetik || 5} detik sebelum tutup`,
+    it.increment != null ? `kelipatan ${rp(it.increment)}` : '<b class="bad">kelipatan belum diisi</b>'
+  ].join(' &middot; ');
 
   return `<div class="pauto-baris ${kelas}">
-    <span class="pk-l">Menawar otomatis</span>
-    <b>${p.nilai != null ? rp(p.nilai) : '&mdash;'}</b>
-    <span>${p.kode === T.SEBAB.BELUM_WAKTUNYA
-      ? `siap &middot; ditembakkan ${it.leadDetik || 5} detik sebelum tutup ` +
-        `&middot; batas ${rp(it.maksBid)}`
-      : esc(p.pesan)}</span>
+    <div class="pauto-utama">
+      <span class="pk-l">Menawar otomatis</span>
+      <b>${p.nilai != null ? rp(p.nilai) : '&mdash;'}</b>
+      <span class="pauto-kata">${p.tembak ? 'menembak sekarang'
+        : p.kode === T.SEBAB.BELUM_WAKTUNYA ? 'siap' : esc(p.pesan)}</span>
+    </div>
+    <p class="pauto-rinci">${rinci}</p>
   </div>`;
+}
+
+/**
+ * Pilihan akun untuk satu lelang.
+ *
+ * Muncul hanya kalau kamu punya lebih dari satu akun — dengan satu akun
+ * pilihannya tidak ada artinya dan cuma menambah kendali yang harus dibaca.
+ * Ditaruh di kartu, bukan di form sunting, karena akun yang dipakai berbeda
+ * per lelang dan sering baru diputuskan saat melihat siapa yang sedang
+ * memimpin.
+ */
+function pilihAkun(it) {
+  const semua = P.akunSaya();
+  if (semua.length < 2) return '';
+
+  const kini = String(it.akunDipakai || '').toLowerCase();
+  const opsi = ['<option value="">semua akunku</option>']
+    .concat(semua.map((u) =>
+      `<option value="${esc(u)}"${kini === u ? ' selected' : ''}>@${esc(u)}</option>`));
+
+  return `<select class="psel pakun" data-ubah="akun" title="Akun yang kamu pakai di lelang ini">${opsi.join('')}</select>`;
+}
+
+/** Akun yang akan dipakai menembak di lelang ini. */
+function akunTembakUntuk(it) {
+  return String(it.akunDipakai || akunPenembak || '').toLowerCase();
 }
 
 function kartu(it, tz) {
@@ -1305,6 +1367,7 @@ function kartu(it, tz) {
       <button class="btn sm utama" data-aksi="buka">Lihat urutan tawaran</button>
       ${aktif ? '<button class="btn sm quiet" data-aksi="cek">Cek sekarang</button>' : ''}
       <button class="btn sm quiet" data-aksi="ubah">Ubah</button>
+      ${pilihAkun(it)}
       <select class="psel" data-ubah="status">${status}</select>
       ${it.status === 'menang' || it.status === 'kalah'
         ? `<input class="pharga" data-ubah="final" placeholder="harga akhir"
