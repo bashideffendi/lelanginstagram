@@ -1140,3 +1140,7 @@ tbody tr.r-snipe td { background: var(--warn-soft); }
 .pakun { font-family: var(--mono); font-size: 12px; max-width: 190px; }
 .pakun-nota { font-size: 12px; color: var(--primary-700); }
 .pakun-nota:empty { display: none; }
+
+/* Rincian galat penarikan di peringatan tarikan bolong. */
+.tarik-galat { margin: 8px 0 8px 18px; font-size: 13px; line-height: 1.55; }
+.tarik-galat li { list-style: disc; }

@@ -618,6 +618,8 @@ function render() {
 
   tzNote();
   syncCutoffUI();
+  renderPeringatanTarikan();
+  kunciEksporKalauBolong();
   renderProof();
   renderCaption();          // butuh state.result untuk cadangan komentar aturan
   renderChips();
@@ -717,6 +719,60 @@ async function buatGambar(tombol) {
 }
 
 /** Kartu bukti — bagian yang difoto layar dan dikirim ke penyelenggara. */
+/**
+ * Peringatan kalau penarikannya tidak lengkap.
+ *
+ * ig-core mencatat tiap kegagalan ke stats.errors — halaman komentar yang
+ * gagal, utas balasan yang ditolak, paginasi yang berhenti di tengah. Sampai
+ * sekarang tidak ada satu baris pun yang membacanya, jadi tarikan bolong
+ * tampil persis seperti tarikan utuh: tabelnya rapi, pemenangnya tercetak,
+ * dan tidak ada yang memberi tahu bahwa sebagian komentar tidak pernah
+ * sampai. Itu berbahaya justru karena hasilnya meyakinkan.
+ *
+ * Satu utas balasan yang gagal bisa berisi tawaran tertinggi.
+ */
+function tarikanBolong() {
+  const st = state.primary?.stats;
+  const errs = Array.isArray(st?.errors) ? st.errors : [];
+  const partial = errs.some((e) => e && e.partial);
+  return { errs, partial, ada: errs.length > 0 };
+}
+
+function renderPeringatanTarikan() {
+  const kotak = $('tarikstat');
+  if (!kotak) return;
+
+  const { errs, partial } = tarikanBolong();
+  if (!errs.length) { kotak.innerHTML = ''; return; }
+
+  const rinci = errs.slice(0, 4).map((e) =>
+    `<li>${esc(e.stage || 'tarik')}: ${esc(e.message || String(e))}</li>`).join('');
+
+  kotak.innerHTML =
+    `<div class="alert bad"><b>Penarikan ini tidak lengkap — ${errs.length} bagian gagal diambil.</b>
+      <ul class="tarik-galat">${rinci}${errs.length > 4 ? `<li>dan ${errs.length - 4} lagi</li>` : ''}</ul>
+      <p>Komentar yang tidak terambil bisa berisi tawaran tertinggi, jadi hasil di bawah
+      <b>belum layak dipakai sebagai bukti</b>. Tarik ulang lelangnya.
+      ${partial ? '<b>Sebagian halaman komentar berhenti di tengah.</b>' : ''}</p></div>`;
+}
+
+/**
+ * Kunci ekspor selama tarikannya bolong.
+ *
+ * Menghalangi lebih baik daripada memperingatkan: berkas bukti dipakai
+ * berbulan kemudian, jauh dari layar tempat peringatannya muncul, dan tidak
+ * ada apa pun di dalam berkas itu yang mengingatkan bahwa isinya tidak utuh.
+ */
+function kunciEksporKalauBolong() {
+  const { ada } = tarikanBolong();
+  for (const id of ['dlimg', 'copyimg', 'copysum', 'dlsum', 'dlchrono', 'dlacc', 'dldiff', 'dlraw']) {
+    const el = $(id);
+    if (!el) continue;
+    el.disabled = ada;
+    el.title = ada ? 'Penarikan tidak lengkap — tarik ulang dulu sebelum dipakai jadi bukti.' : '';
+  }
+}
+
 function renderProof() {
   const s = state.result.summary;
   const w = s.winner;
