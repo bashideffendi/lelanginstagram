@@ -1061,7 +1061,26 @@ function tanganiUbah(e) {
   } else if (jenis === 'sniper') {
     P.simpan({ ...item, sniperMin: +el.value || 0 });
   } else if (jenis === 'akun') {
-    P.simpan({ ...item, akunDipakai: el.value || null });
+    /*
+     * Akun baru bisa ditambahkan dari kartunya sendiri.
+     *
+     * Menuntut orang membuka setelan lebih dulu berarti menaruh langkah di
+     * tempat yang salah: akun yang dipakai diputuskan saat melihat lelangnya,
+     * bukan saat menata setelan. Yang diketik di sini sekaligus masuk daftar
+     * akunmu, jadi lelang berikutnya tinggal memilih.
+     */
+    if (el.value === '__baru__') {
+      const nama = String(prompt('Akun Instagram yang kamu pakai menawar di lelang ini:\n(tanpa @)') || '')
+        .trim().replace(/^@/, '').toLowerCase();
+      if (!nama) { render(); return; }
+
+      const daftar = P.akunSaya();
+      if (!daftar.includes(nama)) P.setAkunku([...daftar, nama].join(', '));
+      P.simpan({ ...item, akunDipakai: nama });
+      stat(`Lelang ini ditandai pakai <b>@${esc(nama)}</b>.`, 'ready');
+    } else {
+      P.simpan({ ...item, akunDipakai: el.value || null });
+    }
   }
   render();
 }
@@ -1264,14 +1283,20 @@ function barisAuto(it) {
  */
 function pilihAkun(it) {
   const semua = P.akunSaya();
-  if (semua.length < 2) return '';
-
   const kini = String(it.akunDipakai || '').toLowerCase();
-  const opsi = ['<option value="">semua akunku</option>']
-    .concat(semua.map((u) =>
-      `<option value="${esc(u)}"${kini === u ? ' selected' : ''}>@${esc(u)}</option>`));
 
-  return `<select class="psel pakun" data-ubah="akun" title="Akun yang kamu pakai di lelang ini">${opsi.join('')}</select>`;
+  // Akun yang dipakai di lelang ini ikut masuk daftar walau belum terdaftar,
+  // supaya pilihan yang sudah tersimpan tidak hilang dari layar.
+  const daftar = kini && !semua.includes(kini) ? [...semua, kini] : semua;
+
+  const opsi = [
+    `<option value=""${!kini ? ' selected' : ''}>${daftar.length > 1 ? 'semua akunku' : 'akun belum dipilih'}</option>`,
+    ...daftar.map((u) =>
+      `<option value="${esc(u)}"${kini === u ? ' selected' : ''}>@${esc(u)}</option>`),
+    '<option value="__baru__">+ akun lain&hellip;</option>'
+  ];
+
+  return `<select class="psel pakun" data-ubah="akun" title="Akun Instagram yang kamu pakai menawar di lelang ini">${opsi.join('')}</select>`;
 }
 
 /**
