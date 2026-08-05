@@ -552,9 +552,32 @@ async function samakanServer({ pertamaKali = false } = {}) {
     const waktuJauh = Number(jauh?.updatedAt || 0);
     const waktuLokal = P.waktuUbah();
 
+    /*
+     * Daftar akun digabung, tidak dipilih salah satu.
+     *
+     * Untuk daftar lelang, yang lebih baru menang seluruhnya — menggabungkan
+     * akan menghidupkan lagi yang sengaja dihapus. Tapi daftar akun bukan
+     * daftar yang dihapus-hapus: menambah akun di ponsel lalu kehilangannya
+     * karena laptop menyimpan daftar yang lebih pendek adalah kehilangan
+     * murni. Akun berlebih tidak merugikan; akun yang hilang membuat penjaga
+     * anti-menyalip-diri-sendiri buta terhadap akunmu yang tidak terdaftar.
+     */
+    const gabungAkun = (a, b) => {
+      const set = [...new Set([...a, ...b].filter(Boolean))];
+      return set.join(', ');
+    };
+    const akunJauh = String(jauh?.akun || '').split(',')
+      .map((s) => s.trim().replace(/^@/, '').toLowerCase()).filter(Boolean);
+    if (akunJauh.length) {
+      const digabung = gabungAkun(P.akunSaya(), akunJauh);
+      if (digabung !== P.akunku()) {
+        P.setAkunku(digabung);
+        if ($('pakun')) $('pakun').value = digabung;
+      }
+    }
+
     if (pertamaKali && waktuJauh > waktuLokal && Array.isArray(jauh.items)) {
       P.timpaSemua(jauh.items, waktuJauh);
-      if (jauh.akun && !P.akunku()) P.setAkunku(jauh.akun);
       gambarMasuk(`Daftar dari server dipakai — ${jauh.items.length} lelang.`);
       render();
       return;
