@@ -430,6 +430,23 @@ const server = http.createServer(async (req, res) => {
 
   // ------------------------------------------------------------ akun
 
+  /*
+   * Jam server, untuk mengoreksi jam perangkat.
+   *
+   * Sengaja tanpa pembatas laju dan tanpa login: jawabannya satu bilangan yang
+   * juga tertera di header Date setiap jawaban lain, jadi tidak ada yang bisa
+   * dibocorkan, dan biayanya lebih murah daripada memeriksa batasnya.
+   *
+   * Jam mesin ini diselaraskan ntpd — diperiksa langsung terhadap acuan luar
+   * dan sama persis. Kalau ntpd mati, koreksinya ikut salah dan salahnya diam,
+   * jadi itu bagian yang perlu diperiksa lebih dulu kalau hitung mundurnya
+   * terasa meleset.
+   */
+  if (url.pathname === '/waktu') {
+    res.setHeader('cache-control', 'no-store');
+    return kirim(res, 200, { t: Date.now() }, asal);
+  }
+
   if (url.pathname === '/akun/keadaan') {
     return kirim(res, 200, {
       terpasang: sandiTerpasang(),

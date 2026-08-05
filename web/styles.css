@@ -866,6 +866,32 @@ tbody tr.r-snipe td { background: var(--warn-soft); }
 .pform input[type="date"]::-webkit-calendar-picker-indicator { cursor: pointer; opacity: .65; }
 .pform input[type="date"]:hover::-webkit-calendar-picker-indicator { opacity: 1; }
 
+/*
+ * Jam sungguhan.
+ *
+ * Bukan hiasan: seluruh hitung mundur dan seluruh penilaian sniper zone
+ * bersandar padanya. Ditaruh paling atas supaya kalau jam perangkatmu meleset,
+ * itu ketahuan sebelum lelang — bukan sesudah kalah.
+ */
+.pjam {
+  display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
+  padding: 11px 16px; margin-bottom: 16px;
+  background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--r);
+}
+.pjam-angka {
+  font-family: var(--mono); font-size: 22px; font-weight: 700;
+  letter-spacing: -.02em; font-variant-numeric: tabular-nums; color: var(--ink);
+}
+.pjam-zona {
+  font-family: var(--mono); font-size: 10px; font-weight: 500;
+  letter-spacing: .1em; text-transform: uppercase; color: var(--muted);
+}
+.pjam-nota { font-size: 12.5px; color: var(--muted); }
+.pjam-nota.ok { color: var(--primary-700); }
+.pjam-nota.warn { color: var(--amber); }
+.pjam-nota.bad { color: var(--danger); font-weight: 600; }
+.pjam-teliti { font-family: var(--mono); font-size: 11px; color: var(--faint); }
+
 /* Setelan dilipat: dipakai sekali seumur pemakaian, tidak perlu baris tetap. */
 .pset { margin: 18px 0 4px; border: 1px solid var(--line); border-radius: var(--r); }
 .pset summary {

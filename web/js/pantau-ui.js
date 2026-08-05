@@ -9,6 +9,7 @@
 import * as P from './pantau.js';
 import * as G from './gcal.js';
 import * as A from './akun.js';
+import * as J from './jam.js';
 import { analyze, parseBid, fmtRupiah, tebakOpenBid } from './analysis.js';
 import { keadaanSesiServer, segarkanSesiViaExtension } from './ext.js';
 import {
@@ -89,7 +90,7 @@ function keEpoch(tgl, jam, tz) {
     return { epoch: wallTimeToEpoch(+t[3], +t[2], +t[1], j.h, j.mi, j.sec, tz) };
   }
 
-  const now = Math.floor(Date.now() / 1000);
+  const now = J.sekarangDetik();
   const [d, b, th] = fmtDate(now, tz).split('/').map(Number);
   let epoch = wallTimeToEpoch(th, b, d, j.h, j.mi, j.sec, tz);
   if (epoch <= now) {
@@ -170,6 +171,12 @@ export function initPantau(d) {
   // supaya tidak ada kartu yang masih memajang tebakan lama.
   P.bersihkanJudulTebakan();
   P.perbaikiAngkaTelanjang();
+
+  // Jam perangkat diukur terhadap jam server sebelum apa pun dihitung.
+  // Sesudah terukur, jamnya digambar ulang supaya keterangannya berubah dari
+  // "belum terukur" menjadi keadaan yang sebenarnya.
+  J.mulai();
+  J.ukur().then(() => { gambarJam(); render(); });
   periksaSesi();
 
   A.keadaan().then((k) => {
@@ -717,7 +724,7 @@ function dariDump(dump) {
     closeSource: manual.has('closeAt') ? 'manual' : (tutup ? 'caption' : (lama.closeSource ?? null)),
     sniperMin: lama.sniperMin ?? 0,
     status: lama.status || 'aktif',
-    addedAt: lama.addedAt || Math.floor(Date.now() / 1000),
+    addedAt: lama.addedAt || J.sekarangDetik(),
     ...posisiDari(hasil)
   };
 }
@@ -770,7 +777,7 @@ function posisiDari(hasil) {
 
   return {
     tawaranPer: petaTawaran(hasil.rows),
-    lastCheckedAt: Math.floor(Date.now() / 1000),
+    lastCheckedAt: J.sekarangDetik(),
     topBid: w ? w.bid : null,
     topUser: w ? w.username : null,
     myBid: punyaku ? punyaku.bid : null,
@@ -948,7 +955,7 @@ function tanganiUbah(e) {
     const baru = { ...item, status: el.value };
     P.simpan(baru);
     // Kartunya pindah tab, jadi terlihat seperti menghilang. Sebut ke mana.
-    const keSelesai = sudahSelesai(baru, Math.floor(Date.now() / 1000));
+    const keSelesai = sudahSelesai(baru, J.sekarangDetik());
     if (keSelesai !== (subTab === 'selesai')) {
       stat(`"${esc(item.title || item.id)}" dipindahkan ke tab ` +
         `<b>${keSelesai ? 'Riwayat' : 'Berjalan'}</b>.`, 'ready');
@@ -965,7 +972,7 @@ function tanganiUbah(e) {
 // ---------------------------------------------------------------- gambar
 
 function sisaWaktu(epoch) {
-  const detik = epoch - Math.floor(Date.now() / 1000);
+  const detik = epoch - J.sekarangDetik();
   if (detik <= 0) return { teks: 'sudah tutup', lewat: true, mendesak: false };
   return {
     teks: fmtDuration(detik) + ' lagi',
@@ -1000,7 +1007,7 @@ export function render() {
   }
   sidikTerakhir = s;
 
-  const now = Math.floor(Date.now() / 1000);
+  const now = J.sekarangDetik();
   const jalan = daftar.filter((x) => !sudahSelesai(x, now));
   const selesai = daftar.filter((x) => sudahSelesai(x, now));
   jumlahSelesai = selesai.length;
@@ -1091,7 +1098,7 @@ function kartu(it, tz) {
   const aktif = it.status === 'aktif';
   const nada = nadaKartu(it);
 
-  const detik = it.closeAt != null ? it.closeAt - Math.floor(Date.now() / 1000) : null;
+  const detik = it.closeAt != null ? it.closeAt - J.sekarangDetik() : null;
   const url = it.url || (it.shortcode ? 'https://www.instagram.com/p/' + it.shortcode + '/' : null);
 
   /*
@@ -1208,7 +1215,7 @@ function kartu(it, tz) {
              value="${it.finalPrice != null ? 'Rp' + fmtRupiah(it.finalPrice) : ''}">`
         : ''}
       <span class="fill"></span>
-      ${aktif && !sudahSelesai(it, Math.floor(Date.now() / 1000))
+      ${aktif && !sudahSelesai(it, J.sekarangDetik())
         ? '<button class="btn sm quiet" data-aksi="ics" title="Unduh berkas kalender">Kalender</button>' : ''}
       <button class="btn sm quiet" data-aksi="hapus">Hapus</button>
     </div>
@@ -1313,14 +1320,56 @@ function chip(n, k, cls = '') {
   return `<div class="chip ${cls}"><div class="n">${n}</div><div class="k">${k}</div></div>`;
 }
 
+/**
+ * Jam sungguhan, digambar ulang beberapa kali sedetik.
+ *
+ * Ditampilkan bukan sebagai hiasan. Seluruh hitung mundur dan seluruh
+ * penilaian sniper zone bersandar pada angka ini; kalau ia meleset, semuanya
+ * meleset diam-diam. Menampilkannya berarti kesalahan itu punya kesempatan
+ * ketahuan sebelum lelang, bukan sesudah kalah.
+ */
+function gambarJam() {
+  const kotak = $('pjam');
+  if (!kotak) return;
+
+  const tz = deps.tz();
+  const k = J.kalimat();
+  const s = J.keadaan();
+
+  kotak.innerHTML =
+    `<span class="pjam-angka" data-jam>${fmtTime(J.sekarangDetik(), tz)}</span>` +
+    `<span class="pjam-zona">${esc(tz.split('/').pop().replace('_', ' '))}</span>` +
+    `<span class="fill"></span>` +
+    `<span class="pjam-nota ${k.kelas}">${esc(k.teks)}` +
+    (s.terukur && s.ketelitian != null
+      ? ` <span class="pjam-teliti">&plusmn;${s.ketelitian} md</span>` : '') +
+    '</span>';
+}
+
+let detakJam = null;
+
+function mulaiJam(aktif) {
+  clearInterval(detakJam);
+  if (!aktif) return;
+  gambarJam();
+  // Empat kali sedetik: cukup untuk terlihat hidup dan tidak pernah
+  // memperlihatkan detik yang sudah basi.
+  detakJam = setInterval(() => {
+    if (document.hidden) return;
+    const el = document.querySelector('#pjam [data-jam]');
+    if (el) el.textContent = fmtTime(J.sekarangDetik(), deps.tz());
+  }, 250);
+}
+
 /** Hitung mundur diperbarui tiap detik, tapi hanya saat halamannya terlihat. */
 export function mulaiDetak(aktif) {
   clearInterval(detak);
   clearInterval(pemburu);
+  mulaiJam(aktif);
   if (!aktif) return;
 
   detak = setInterval(() => {
-    const now = Math.floor(Date.now() / 1000);
+    const now = J.sekarangDetik();
 
     // Lelang yang jam tutupnya baru saja lewat pindah tab. Perpindahannya
     // butuh gambar ulang penuh, dan harus terjadi saat itu juga — kalau
@@ -1405,7 +1454,7 @@ async function perbaruiYangJatuhTempo() {
   // disimpan. Pemeriksaannya bisa menunggu; ketikan yang hilang tidak.
   if (sedangDiubah) return;
 
-  const now = Math.floor(Date.now() / 1000);
+  const now = J.sekarangDetik();
   const antre = P.semua().filter((it) => {
     if (it.status !== 'aktif' || !it.url || it.closeAt == null) return false;
     const sisa = it.closeAt - now;
