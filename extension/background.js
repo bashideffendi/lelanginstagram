@@ -16,7 +16,7 @@
  * gunanya justru mengurangi kerepotan. Nilainya berjalan dari browser ini
  * langsung ke server milikmu sendiri, tidak singgah ke mana pun.
  */
-import { extract } from './ig-core.js';
+import { extract, shortcodeFromUrl, shortcodeToMediaId } from './ig-core.js';
 
 const VERSION = chrome.runtime.getManifest().version;
 
@@ -87,6 +87,63 @@ async function segarkanSesi(msg) {
   }
 }
 
+/**
+ * Kirim komentar tawaran dari BROWSER INI.
+ *
+ * Bedanya dengan mengirim dari server bukan soal kode, melainkan soal dari
+ * mana permintaannya berangkat. Dari sini ia berangkat dari alamat rumahmu
+ * lewat sesi browser sungguhan — sama persis seperti kamu mengetik sendiri.
+ * Dari server ia berangkat dari IP pusat data, dan Instagram menjawabnya
+ * dengan challenge_required; itu bukan dugaan, itu yang terjadi 5 Agustus 2026
+ * pada tiga tawaran sekaligus.
+ *
+ * Nilainya sudah diputuskan halaman lewat putusan(). Di sini tidak ada
+ * keputusan apa pun — kalau bagian ini ikut memutuskan, ada dua tempat yang
+ * bisa salah dan cuma satu yang diuji.
+ */
+async function tembak(msg) {
+  const teks = String(msg.teks || '').trim();
+  if (!teks) return { kind: 'error', message: 'Tawarannya kosong.' };
+
+  let mediaId;
+  try {
+    const sc = shortcodeFromUrl(String(msg.url || ''));
+    if (!sc) throw new Error('bukan alamat postingan');
+    mediaId = String(shortcodeToMediaId(sc));
+  } catch (e) {
+    return { kind: 'error', message: 'Alamat postingannya tidak terbaca: ' + e.message };
+  }
+
+  const { isi, galat } = await bacaCookieIg();
+  if (galat) return { kind: 'error', message: galat };
+
+  try {
+    const r = await fetch(`https://www.instagram.com/api/v1/web/comments/${mediaId}/add/`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'x-csrftoken': isi.csrftoken,
+        'x-ig-app-id': '936619743392459',
+        'x-requested-with': 'XMLHttpRequest',
+        'content-type': 'application/x-www-form-urlencoded'
+      },
+      body: new URLSearchParams({ comment_text: teks }).toString()
+    });
+
+    const j = await r.json().catch(() => null);
+    if (!r.ok || j?.status === 'fail') {
+      return {
+        kind: 'error',
+        message: j?.message || `Instagram menolak (HTTP ${r.status}).`,
+        status: r.status
+      };
+    }
+    return { kind: 'done', pk: j?.id || null, teks };
+  } catch (e) {
+    return { kind: 'error', message: e.message };
+  }
+}
+
 chrome.runtime.onConnect.addListener((port) => {
   if (port.name !== 'ketok') return;
 
@@ -100,6 +157,11 @@ chrome.runtime.onConnect.addListener((port) => {
 
     if (msg.action === 'segarkanSesi') {
       post(await segarkanSesi(msg));
+      return;
+    }
+
+    if (msg.action === 'tembak') {
+      post(await tembak(msg));
       return;
     }
 

@@ -185,3 +185,37 @@ export async function extractViaServer(url, key) {
   }
   return r.body;
 }
+
+/**
+ * Kirim komentar tawaran lewat extension — dari browser ini, bukan server.
+ *
+ * Bedanya bukan soal kode melainkan soal dari mana permintaannya berangkat.
+ * Dari sini ia berangkat dari alamat rumahmu lewat sesi browser sungguhan.
+ * Dari server ia berangkat dari IP pusat data, dan Instagram menjawabnya
+ * challenge_required — itu bukan dugaan, itu yang terjadi pada tiga tawaran
+ * sekaligus pada 5 Agustus 2026.
+ */
+export function tembakViaExtension({ url, teks }) {
+  return new Promise((resolve, reject) => {
+    const id = 'tembak-' + Math.random().toString(36).slice(2);
+    // Sengaja pendek. Menjelang penutupan, jawaban yang datang terlambat sama
+    // saja dengan tidak ada jawaban — dan lebih baik tahu gagal lebih awal.
+    const jeda = setTimeout(() => {
+      window.removeEventListener('message', dengar);
+      reject(new Error('Extension tidak menjawab dalam 8 detik.'));
+    }, 8000);
+
+    function dengar(ev) {
+      const d = ev.data;
+      if (ev.source !== window || !d || d.ketokExt !== 'res' || d.id !== id) return;
+      if (d.kind === 'progress') return;
+      clearTimeout(jeda);
+      window.removeEventListener('message', dengar);
+      if (d.kind === 'error') reject(new Error(d.message || 'Gagal mengirim tawaran.'));
+      else resolve({ pk: d.pk, teks: d.teks });
+    }
+
+    window.addEventListener('message', dengar);
+    window.postMessage({ ketokExt: 'req', action: 'tembak', id, url, teks }, location.origin);
+  });
+}

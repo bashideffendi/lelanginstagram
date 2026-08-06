@@ -22,7 +22,7 @@
       return;
     }
 
-    if (d.action !== 'extract' && d.action !== 'segarkanSesi') return;
+    if (d.action !== 'extract' && d.action !== 'segarkanSesi' && d.action !== 'tembak') return;
 
     var port;
     try {

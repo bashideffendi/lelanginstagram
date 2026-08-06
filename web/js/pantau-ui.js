@@ -13,7 +13,7 @@ import * as J from './jam.js';
 import * as T from './tawar.js';
 import { analyze, parseBid, fmtRupiah, tebakOpenBid } from './analysis.js';
 import { hilangAntara } from './diff.js';
-import { keadaanSesiServer, segarkanSesiViaExtension } from './ext.js';
+import { keadaanSesiServer, segarkanSesiViaExtension, tembakViaExtension } from './ext.js';
 import {
   fmtDateTime, fmtTime, fmtDate, fmtHari, fmtIsoDate, fmtDuration, wallTimeToEpoch,
   parseClock, fmtClock, applyMask
@@ -1730,6 +1730,125 @@ function mulaiJam(aktif) {
   }, 250);
 }
 
+/*
+ * ============================================================ penembak browser
+ *
+ * Menembak dari browser ini, bukan dari server. Bedanya bukan soal kode
+ * melainkan soal dari mana permintaannya berangkat: dari sini ia berangkat
+ * dari alamat rumahmu lewat sesi browser sungguhan, tidak bisa dibedakan dari
+ * kamu mengetik sendiri. Penembak server sudah dicoba pada 5 Agustus 2026 dan
+ * Instagram menjawab challenge_required pada tiga tawaran sekaligus.
+ *
+ * Syaratnya tab ini terbuka. Itu batasan yang nyata, dan karena itu kegagalan
+ * maupun keberhasilannya harus KELIHATAN — lihat kabari() di bawah.
+ */
+
+const KUNCI_IZIN_NOTIF = 'lelanginsta_notif';
+
+/**
+ * Beri tahu lewat notifikasi sistem, bukan cuma menulis di kartu.
+ *
+ * Malam 5 Agustus 2026 tiga tawaran gagal terkirim dan kegagalannya cuma
+ * tercatat di log server. Tidak ada yang tahu sampai besok paginya, dan
+ * lelangnya sudah hilang. Auto-bid yang gagal diam-diam lebih buruk daripada
+ * tidak ada auto-bid sama sekali: kamu berhenti menawar manual karena mengira
+ * ada yang menjagamu.
+ */
+function kabari(judul, isi, penting = false) {
+  stat(esc(judul) + ' — ' + esc(isi), penting ? 'bad' : 'ready');
+
+  try {
+    if (!('Notification' in window)) return;
+    if (Notification.permission === 'granted') {
+      new Notification(judul, { body: isi, tag: 'lelanginsta', requireInteraction: penting });
+    } else if (Notification.permission === 'default') {
+      Notification.requestPermission().then((izin) => {
+        try { localStorage.setItem(KUNCI_IZIN_NOTIF, izin); } catch { /* diabaikan */ }
+        if (izin === 'granted') new Notification(judul, { body: isi });
+      });
+    }
+  } catch { /* notifikasi gagal bukan alasan menghentikan apa pun */ }
+}
+
+let sedangTembak = false;
+
+/**
+ * Periksa tiap lelang bersenjata; tembak yang sudah waktunya.
+ *
+ * Harga ditarik ULANG sesaat sebelum menembak. Yang tersimpan di kartu bisa
+ * berumur puluhan detik, dan di detik-detik terakhir itu selisih yang
+ * menentukan menang atau kalah.
+ */
+async function periksaTembak() {
+  if (sedangTembak || document.hidden) return;
+  if (!deps.punyaExtension?.()) return;
+
+  const now = J.sekarangDetik();
+  const antre = P.semua().filter((it) => {
+    if (!it.autoBid || it.autoTembakPada || it.status !== 'aktif') return false;
+    if (it.closeAt == null || !it.url) return false;
+    const jarak = it.closeAt - now;
+    // Jendela dibuka 3 detik lebih awal supaya penarikan harganya sempat
+    // selesai, dan ditutup di jam tutup supaya tidak pernah mengirim tawaran
+    // yang lewat batas — tawaran lewat cutoff justru yang dipakai menyanggah.
+    return jarak <= (it.leadDetik || 5) + 3 && jarak >= 0;
+  });
+  if (!antre.length) return;
+
+  sedangTembak = true;
+  try {
+    const it = antre.sort((a, b) => a.closeAt - b.closeAt)[0];
+    const dump = await deps.tarik(it.url);
+    simpanDump(it.id, dump);
+    const segar = dariDump(dump);
+
+    const p = T.putusan({ ...P.ambil(it.id), ...segar }, {
+      now: J.sekarangDetik(),
+      akunSaya: P.akunSaya(),
+      akunPenembak
+    });
+
+    P.simpan(segar);
+    if (!p.tembak) {
+      if (p.kode === T.SEBAB.LEWAT_BATAS) {
+        P.simpan({ ...P.ambil(it.id), autoTembakPada: J.sekarangDetik(), autoTembakGalat: p.pesan });
+        kabari('Tidak menawar', `${it.owner ? '@' + it.owner : it.id}: ${p.pesan}`);
+      }
+      render();
+      return;
+    }
+
+    const teks = T.teksTawaran(p.nilai, it.teksTawar);
+
+    try {
+      // URL yang dikirim, bukan media id: extension sudah punya ig-core untuk
+      // menghitungnya, dan halaman ini tidak bisa memuat berkas di luar akar
+      // yang dilayani.
+      await tembakViaExtension({ url: it.url, teks });
+      P.simpan({
+        ...P.ambil(it.id),
+        autoTembakPada: J.sekarangDetik(), autoTembakNilai: p.nilai,
+        autoTembakGalat: null, autoTembakOleh: 'browser'
+      });
+      kabari('Tawaran terkirim', `${it.owner ? '@' + it.owner : it.id}: ${teks}`);
+    } catch (e) {
+      P.simpan({
+        ...P.ambil(it.id),
+        autoTembakPada: J.sekarangDetik(), autoTembakNilai: null,
+        autoTembakGalat: String(e.message).slice(0, 160), autoTembakOleh: 'browser'
+      });
+      // Penting: ini keadaan tempat kamu mengira ada yang menjagamu padahal
+      // tidak. Notifikasinya sengaja menuntut ditutup manual.
+      kabari('TAWARAN GAGAL TERKIRIM', `${it.owner ? '@' + it.owner : it.id}: ${e.message}`, true);
+    }
+    render();
+  } catch (e) {
+    kabari('Gagal menarik harga sebelum menembak', String(e.message).slice(0, 120), true);
+  } finally {
+    sedangTembak = false;
+  }
+}
+
 /** Hitung mundur diperbarui tiap detik, tapi hanya saat halamannya terlihat. */
 export function mulaiDetak(aktif) {
   clearInterval(detak);
@@ -1768,6 +1887,11 @@ export function mulaiDetak(aktif) {
       }
     }
   }, 1000);
+
+  // Penembak diperiksa tiap detik, bukan tiap 20 detik seperti pemantau:
+  // jendelanya cuma beberapa detik, dan terlambat satu putaran berarti
+  // lelangnya lewat.
+  setInterval(periksaTembak, 1000);
 
   // Posisi diperbarui sendiri. Alat ini ada supaya kamu tidak perlu ingat;
   // menuntut klik "Cek posisi" mengembalikan beban yang mau dihilangkan.
