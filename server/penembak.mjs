@@ -15,6 +15,7 @@
  */
 
 import fs from 'node:fs';
+import crypto from 'node:crypto';
 import path from 'node:path';
 import { extract, shortcodeFromUrl, shortcodeToMediaId } from '../shared/ig-core.js';
 import { putusan, teksTawaran, SEBAB } from '../web/js/tawar.js';
@@ -35,6 +36,33 @@ const DETAK_MS = 2000;
  * jaringan yang tersendat, tanpa membuat harganya basi.
  */
 const SIAP_SIAP_MS = 2500;
+
+/**
+ * Kabari lewat Telegram kalau tawaran gagal terkirim.
+ *
+ * Malam 5 Agustus 2026 tiga tawaran gagal dan kegagalannya cuma tercatat di
+ * log server. Tidak ada yang tahu sampai besok paginya, dan lelangnya sudah
+ * hilang. Penembak yang berjalan tanpa perangkatmu menyala HARUS punya cara
+ * menjangkaumu — kalau tidak, kamu berhenti menawar manual karena mengira ada
+ * yang menjaga, dan itu justru yang menghilangkan lelangnya.
+ *
+ * Diam kalau belum disetel; pemberitahuan yang gagal tidak boleh ikut
+ * menggagalkan penembaknya.
+ */
+async function kabari(teks, log) {
+  const token = process.env.TELEGRAM_TOKEN;
+  const chat = process.env.TELEGRAM_CHAT_ID;
+  if (!token || !chat) return;
+  try {
+    await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ chat_id: chat, text: teks })
+    });
+  } catch (e) {
+    log(`[tembak] kabar gagal dikirim: ${e.message}`);
+  }
+}
 
 export function buatPenembak({ berkasPantau, headerIg, igBase, cookie, akunSekarang, log = console.log }) {
   let jalan = false;
@@ -95,25 +123,67 @@ export function buatPenembak({ berkasPantau, headerIg, igBase, cookie, akunSekar
   async function kirimKomentar(mediaId, teks) {
     const kuki = cookie();
     const csrf = (kuki.match(/csrftoken=([^;]+)/) || [])[1] || '';
-    const r = await fetch(`${igBase}/api/v1/web/comments/${mediaId}/add/`, {
-      method: 'POST',
-      redirect: 'manual',
-      headers: {
-        ...headerIg,
-        cookie: kuki,
-        'x-csrftoken': csrf,
-        'content-type': 'application/x-www-form-urlencoded'
-      },
-      body: new URLSearchParams({ comment_text: teks }).toString()
-    });
+    const uid = (kuki.match(/ds_user_id=([^;]+)/) || [])[1] || '';
+    const peramban = /Mozilla/.test(headerIg['user-agent'] || '');
 
-    const j = await r.json().catch(() => null);
-    if (!r.ok || j?.status === 'fail') {
-      const e = new Error(j?.message || `Instagram menolak (HTTP ${r.status}).`);
-      e.status = r.status;
-      throw e;
+    /*
+     * Endpoint dipilih menurut identitas yang dipakai sesinya.
+     *
+     * Percobaan pertama (5 Agustus 2026) mengirim UA aplikasi Instagram ke
+     * endpoint WEB, dan Instagram menjawab challenge_required pada tiga
+     * tawaran sekaligus. Sesi ini memang terikat UA aplikasi — itu syarat yang
+     * sudah lama diketahui untuk membaca — jadi yang tidak cocok bukan UA-nya
+     * melainkan endpointnya. Aplikasi tidak pernah memanggil /api/v1/web/.
+     *
+     * Ini dugaan yang beralasan, bukan kepastian: penyebabnya bisa juga
+     * reputasi IP pusat data, dan kalau itu masalahnya tidak ada susunan
+     * header yang menolong.
+     */
+    const jalur = peramban
+      ? [{ nama: 'web', url: `${igBase}/api/v1/web/comments/${mediaId}/add/`,
+           body: { comment_text: teks } }]
+      : [
+          { nama: 'aplikasi', url: `${igBase}/api/v1/media/${mediaId}/comment/`,
+            body: {
+              comment_text: teks,
+              idempotence_token: crypto.randomUUID(),
+              containermodule: 'comments_v2',
+              radio_type: 'wifi-none',
+              _uid: uid,
+              _uuid: crypto.randomUUID()
+            } },
+          { nama: 'web', url: `${igBase}/api/v1/web/comments/${mediaId}/add/`,
+            body: { comment_text: teks } }
+        ];
+
+    let terakhir = null;
+    for (const j of jalur) {
+      try {
+        const r = await fetch(j.url, {
+          method: 'POST',
+          redirect: 'manual',
+          headers: {
+            ...headerIg,
+            cookie: kuki,
+            'x-csrftoken': csrf,
+            'content-type': 'application/x-www-form-urlencoded'
+          },
+          body: new URLSearchParams(j.body).toString()
+        });
+
+        const isi = await r.json().catch(() => null);
+        if (r.ok && isi?.status !== 'fail') {
+          log(`[tembak] terkirim lewat jalur ${j.nama}`);
+          return isi;
+        }
+        terakhir = new Error(`${j.nama}: ${isi?.message || 'HTTP ' + r.status}`);
+        terakhir.status = r.status;
+        log(`[tembak] jalur ${j.nama} ditolak — ${isi?.message || r.status}`);
+      } catch (e) {
+        terakhir = new Error(`${j.nama}: ${e.message}`);
+      }
     }
-    return j;
+    throw terakhir || new Error('Semua jalur pengiriman gagal.');
   }
 
   async function coba(it, akunSaya, akunPenembak, sekarangDetik) {
@@ -147,6 +217,8 @@ export function buatPenembak({ berkasPantau, headerIg, igBase, cookie, akunSekar
         if (p.kode === SEBAB.LEWAT_BATAS || p.kode === SEBAB.SUDAH_TUTUP) {
           tulisDaftar({ id: it.id, autoTembakPada: sekarangDetik, autoTembakNilai: null,
             autoTembakGalat: p.pesan });
+          kabari(`Tidak menawar
+@${it.owner || it.id}: ${p.pesan}`, log);
         }
         return;
       }
@@ -165,8 +237,16 @@ export function buatPenembak({ berkasPantau, headerIg, igBase, cookie, akunSekar
         autoTembakOleh: 'server'
       });
       log(`[tembak] ${it.id}: TERKIRIM ${teks}`);
+      kabari(`Tawaran terkirim
+@${it.owner || it.id}: ${teks}`, log);
     } catch (e) {
       log(`[tembak] ${it.id}: GAGAL — ${e.message}`);
+      kabari(`TAWARAN GAGAL TERKIRIM
+@${it.owner || it.id}
+${e.message}
+
+` +
+        `Tawar manual sekarang kalau masih sempat.`, log);
       tulisDaftar({
         id: it.id,
         autoTembakPada: Math.floor(Date.now() / 1000),

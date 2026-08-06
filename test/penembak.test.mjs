@@ -71,7 +71,9 @@ function siapkan({ items, akun = 'durian', komentar = [] }) {
   const fetchAsli = globalThis.fetch;
   globalThis.fetch = async (url, opsi) => {
     const u = String(url);
-    if (u.includes('/comments/') && opsi?.method === 'POST') {
+    // Dua jalur kirim: endpoint aplikasi (/media/{id}/comment/) yang dicoba
+    // lebih dulu, dan endpoint web (/web/comments/{id}/add/) sebagai cadangan.
+    if (opsi?.method === 'POST' && /\/comment\/$|\/add\/$/.test(u)) {
       terkirim.push(new URLSearchParams(opsi.body).get('comment_text'));
       return { ok: true, status: 200, json: async () => ({ status: 'ok' }) };
     }
@@ -112,6 +114,7 @@ test('menembak tawaran berikutnya menjelang tutup', async () => {
   try {
     await satuPutaran(s);
     assert.deepEqual(s.terkirim, ['Rp850.000'], 'tertinggi 800rb + kelipatan 50rb');
+    // Jalur aplikasi yang dipakai lebih dulu, bukan jalur web.
 
     const d = JSON.parse(fs.readFileSync(s.berkas, 'utf8'));
     assert.equal(d.items[0].autoTembakNilai, 850000);
@@ -176,7 +179,7 @@ test('kegagalan Instagram dicatat, bukan ditelan', async () => {
   });
   const f = globalThis.fetch;
   globalThis.fetch = async (url, opsi) => {
-    if (String(url).includes('/comments/') && opsi?.method === 'POST') {
+    if (opsi?.method === 'POST' && /\/comment\/$|\/add\/$/.test(String(url))) {
       return { ok: false, status: 403, json: async () => ({ status: 'fail', message: 'checkpoint_required' }) };
     }
     return f(url, opsi);
